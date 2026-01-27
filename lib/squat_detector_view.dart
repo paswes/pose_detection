@@ -577,15 +577,15 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
     return Container(
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-      decoration: BoxDecoration(
+      /*   decoration: BoxDecoration(
         color: Colors.black54,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white24, width: 2),
-      ),
+      ), */
       child: Column(
         children: [
           const Text(
-            'REPS',
+            'Reps',
             style: TextStyle(
               color: Colors.white70,
               fontSize: 18,
@@ -610,6 +610,28 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
   Widget _buildFeedbackDisplay() {
     final isCountdown = _isCountdownActive && _countdownSeconds > 0;
 
+    // Only show during countdown, hide during active counting
+    if (!isCountdown) return const SizedBox.shrink();
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+      /*  decoration: BoxDecoration(
+        color: _feedbackColor.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _feedbackColor, width: 3),
+      ), */
+      child: Text(
+        _feedbackText,
+        style: TextStyle(
+          color: _feedbackColor,
+          fontSize: 80,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+
+    /* // Original code - keeping for later
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
@@ -627,13 +649,14 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
         ),
       ),
     );
+    */
   }
 
   Widget _buildDebugInfo() {
     if (!_isCountingActive) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.black45,
@@ -650,8 +673,8 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
             'State: ${_currentState.name.toUpperCase()}',
             style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
-          const SizedBox(height: 8),
-          _buildAngleIndicator(),
+          //const SizedBox(height: 32),
+          //_buildAngleIndicator(),
         ],
       ),
     );
@@ -714,8 +737,8 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
           _buildButton(
             onPressed: _startCountdown,
             icon: Icons.play_arrow,
-            label: 'START',
-            color: Colors.green,
+            label: 'Start',
+            color: Color(0xFF4BE6D7),
           ),
 
         // Reset Button (always visible during counting)
@@ -723,8 +746,8 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
           _buildButton(
             onPressed: _reset,
             icon: Icons.refresh,
-            label: 'RESET',
-            color: Colors.red,
+            label: 'Reset',
+            color: Color(0xFF4BE6D7),
           ),
       ],
     );
@@ -754,8 +777,8 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white, size: 28),
-            const SizedBox(width: 8),
+            /* Icon(icon, color: Colors.white, size: 28),
+            const SizedBox(width: 8), */
             Text(
               label,
               style: const TextStyle(

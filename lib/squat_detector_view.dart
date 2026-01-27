@@ -2,10 +2,8 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
-import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -36,6 +34,10 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
     ),
   );
   bool _isProcessingFrame = false;
+
+  // Pose overlay state
+  Pose? _currentPose;
+  Size? _imageSize;
 
   // Squat Counter State Machine
   SquatState _currentState = SquatState.standing;
@@ -187,6 +189,24 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
       if (poses.isNotEmpty) {
         final pose = poses.first;
         _analyzePose(pose);
+
+        // Update pose overlay state
+        if (mounted) {
+          setState(() {
+            _currentPose = pose;
+            _imageSize = Size(
+              image.width.toDouble(),
+              image.height.toDouble(),
+            );
+          });
+        }
+      } else {
+        // Clear pose when no detection
+        if (mounted && _currentPose != null) {
+          setState(() {
+            _currentPose = null;
+          });
+        }
       }
     } catch (e) {
       _log('Pose', 'ERROR processing image: $e');
@@ -478,6 +498,9 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
       _currentKneeAngle = 180.0;
       _feedbackText = 'Press Start';
       _feedbackColor = Colors.white;
+      // Clear pose overlay
+      _currentPose = null;
+      _imageSize = null;
     });
   }
 
@@ -502,10 +525,13 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Camera Preview (Fullscreen)
+          // Layer 1: Camera Preview (Fullscreen)
           _buildCameraPreview(),
 
-          // Overlay UI
+          // Layer 2: Skeletal Landmark Overlay
+          _buildPoseOverlay(),
+
+          // Layer 3: UI Overlay (Rep counter, Timer, HUD)
           _buildOverlay(),
         ],
       ),
@@ -542,6 +568,25 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
           width: size.width,
           height: size.width * cameraAspectRatio,
           child: CameraPreview(_cameraController!),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPoseOverlay() {
+    // Only show overlay when counting is active and we have a valid pose
+    if (!_isCountingActive || _currentPose == null || _imageSize == null) {
+      return const SizedBox.shrink();
+    }
+
+    final screenSize = MediaQuery.of(context).size;
+
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: PosePainter(
+          pose: _currentPose!,
+          imageSize: _imageSize!,
+          widgetSize: screenSize,
         ),
       ),
     );
@@ -680,54 +725,6 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
     );
   }
 
-  Widget _buildAngleIndicator() {
-    // Visual indicator showing current angle relative to thresholds
-    final normalizedAngle =
-        ((_currentKneeAngle - _downThreshold) / (_upThreshold - _downThreshold))
-            .clamp(0.0, 1.0);
-
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '${_downThreshold.toInt()}°',
-              style: const TextStyle(color: Colors.red, fontSize: 12),
-            ),
-            Text(
-              '${_upThreshold.toInt()}°',
-              style: const TextStyle(color: Colors.green, fontSize: 12),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          height: 8,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
-            gradient: const LinearGradient(
-              colors: [Colors.red, Colors.orange, Colors.green],
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                left:
-                    normalizedAngle * (MediaQuery.of(context).size.width - 104),
-                child: Container(
-                  width: 4,
-                  height: 8,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildControlButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -764,11 +761,11 @@ class _SquatDetectorViewState extends State<SquatDetectorView>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.8),
+          color: color.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.4),
+              color: color.withValues(alpha: 0.4),
               blurRadius: 20,
               spreadRadius: 2,
             ),
@@ -812,6 +809,139 @@ class Point {
   final double y;
 
   const Point(this.x, this.y);
+}
+
+// =============================================================================
+// POSE PAINTER - Skeletal Overlay
+// =============================================================================
+
+class PosePainter extends CustomPainter {
+  final Pose pose;
+  final Size imageSize;
+  final Size widgetSize;
+
+  PosePainter({
+    required this.pose,
+    required this.imageSize,
+    required this.widgetSize,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint landmarkPaint = Paint()
+      ..color = Colors.cyan
+      ..strokeWidth = 4
+      ..style = PaintingStyle.fill;
+
+    final Paint linePaint = Paint()
+      ..color = Colors.cyan.withValues(alpha: 0.8)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    // Draw skeletal connections
+    _drawConnections(canvas, linePaint);
+
+    // Draw landmark points
+    for (final landmark in pose.landmarks.values) {
+      final point = _translatePoint(landmark.x, landmark.y);
+
+      // Draw confidence indicator (larger = higher confidence)
+      final confidence = landmark.likelihood;
+      canvas.drawCircle(
+        point,
+        8 + (confidence * 4),
+        Paint()..color = Colors.yellow.withValues(alpha: confidence),
+      );
+
+      // Draw landmark point
+      canvas.drawCircle(point, 6, landmarkPaint);
+    }
+  }
+
+  void _drawConnections(Canvas canvas, Paint paint) {
+    // Define skeletal connections
+    final connections = [
+      // Torso
+      [PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder],
+      [PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip],
+      [PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip],
+      [PoseLandmarkType.leftHip, PoseLandmarkType.rightHip],
+
+      // Left arm
+      [PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow],
+      [PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist],
+
+      // Right arm
+      [PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow],
+      [PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist],
+
+      // Left leg
+      [PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee],
+      [PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle],
+
+      // Right leg
+      [PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee],
+      [PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle],
+
+      // Head connections
+      [PoseLandmarkType.leftShoulder, PoseLandmarkType.leftEar],
+      [PoseLandmarkType.rightShoulder, PoseLandmarkType.rightEar],
+      [PoseLandmarkType.leftEar, PoseLandmarkType.leftEye],
+      [PoseLandmarkType.rightEar, PoseLandmarkType.rightEye],
+      [PoseLandmarkType.leftEye, PoseLandmarkType.nose],
+      [PoseLandmarkType.rightEye, PoseLandmarkType.nose],
+    ];
+
+    for (final connection in connections) {
+      final landmark1 = pose.landmarks[connection[0]];
+      final landmark2 = pose.landmarks[connection[1]];
+
+      if (landmark1 != null && landmark2 != null) {
+        final point1 = _translatePoint(landmark1.x, landmark1.y);
+        final point2 = _translatePoint(landmark2.x, landmark2.y);
+
+        // Color lines based on average confidence
+        final avgConfidence = (landmark1.likelihood + landmark2.likelihood) / 2;
+        final connectionPaint = Paint()
+          ..color = Colors.cyan.withValues(alpha: avgConfidence)
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke;
+
+        canvas.drawLine(point1, point2, connectionPaint);
+      }
+    }
+  }
+
+  /// Translates ML Kit landmark coordinates to widget coordinates.
+  /// ML Kit returns coordinates relative to the input image size.
+  /// We need to scale these to match the displayed widget size.
+  Offset _translatePoint(double x, double y) {
+    // The image from camera is typically rotated 90° on iOS
+    // ML Kit handles rotation internally, but we need to account for
+    // the aspect ratio difference between image and display.
+
+    // Calculate scale factors
+    final scaleX = widgetSize.width / imageSize.width;
+    final scaleY = widgetSize.height / imageSize.height;
+
+    // Use the same scale for both axes to maintain aspect ratio
+    // The camera preview uses BoxFit.cover, so we use the larger scale
+    final scale = scaleX > scaleY ? scaleX : scaleY;
+
+    // Calculate offset to center the scaled image
+    final offsetX = (widgetSize.width - imageSize.width * scale) / 2;
+    final offsetY = (widgetSize.height - imageSize.height * scale) / 2;
+
+    final translatedX = x * scale + offsetX;
+    final translatedY = y * scale + offsetY;
+
+    return Offset(translatedX, translatedY);
+  }
+
+  @override
+  bool shouldRepaint(covariant PosePainter oldDelegate) {
+    return oldDelegate.pose != pose || oldDelegate.imageSize != imageSize;
+  }
 }
 
 // =============================================================================

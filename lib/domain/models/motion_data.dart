@@ -9,9 +9,11 @@ class RawLandmark {
   /// Y coordinate in image space (pixels)
   final double y;
 
-  /// Z coordinate - depth relative to hip midpoint (same unit as X/Y)
+  /// Z coordinate - depth relative to hip midpoint
+  /// ML Kit's Z is a scaled depth estimate (NOT in pixels)
   /// Negative values: landmark is in front of hip
   /// Positive values: landmark is behind hip
+  /// Note: Scale is approximately similar to X/Y pixel scale but represents depth
   final double z;
 
   /// ML model confidence (0.0 to 1.0)
@@ -41,8 +43,11 @@ class NormalizedLandmark {
   /// Y coordinate normalized (0.0 = top edge, 1.0 = bottom edge)
   final double y;
 
-  /// Z coordinate - depth relative to hip midpoint (not normalized)
-  /// Preserves the raw Z value from ML Kit as it's already relative
+  /// Z coordinate - depth relative to hip midpoint (intentionally NOT normalized)
+  /// Preserves the raw Z value from ML Kit (scaled depth estimate, not pixels)
+  /// WARNING: Z has different units than normalized X/Y
+  /// - X/Y are in 0.0-1.0 range (resolution-independent)
+  /// - Z is a raw depth estimate for relative comparisons only
   final double z;
 
   /// ML model confidence (0.0 to 1.0)
@@ -74,7 +79,13 @@ class TimestampedPose {
 
   /// Camera image timestamp in microseconds
   /// This is the authoritative temporal reference for motion analysis
+  /// Uses sensor timestamp from CameraImage for accurate temporal consistency
   final int timestampMicros;
+
+  /// Time delta from previous frame in microseconds
+  /// Null for the first frame in a session
+  /// Critical for accurate velocity and acceleration calculations
+  final int? deltaTimeMicros;
 
   /// System time when pose was detected (for debugging/logging)
   final DateTime systemTime;
@@ -88,6 +99,7 @@ class TimestampedPose {
     required this.normalizedLandmarks,
     required this.frameIndex,
     required this.timestampMicros,
+    this.deltaTimeMicros,
     required this.systemTime,
     required this.imageWidth,
     required this.imageHeight,
@@ -100,5 +112,5 @@ class TimestampedPose {
   int get landmarkCount => landmarks.length;
 
   @override
-  String toString() => 'TimestampedPose(frame: $frameIndex, time: $timestampMicros μs, landmarks: ${landmarks.length}, size: ${imageWidth}x$imageHeight)';
+  String toString() => 'TimestampedPose(frame: $frameIndex, time: $timestampMicros μs, delta: ${deltaTimeMicros != null ? '$deltaTimeMicros μs' : 'N/A'}, landmarks: ${landmarks.length}, size: ${imageWidth}x$imageHeight)';
 }

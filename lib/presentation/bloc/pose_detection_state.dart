@@ -1,10 +1,14 @@
 import 'dart:ui';
 import 'package:camera/camera.dart';
+import 'package:equatable/equatable.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
 
 /// States for generic PoseDetectionBloc
-abstract class PoseDetectionState {}
+abstract class PoseDetectionState extends Equatable {
+  @override
+  List<Object?> get props => [];
+}
 
 /// Initial state
 class PoseDetectionInitial extends PoseDetectionState {}
@@ -18,6 +22,9 @@ class CameraReady extends PoseDetectionState {
   final PoseSession? lastSession;
 
   CameraReady(this.cameraController, {this.lastSession});
+
+  @override
+  List<Object?> get props => [cameraController, lastSession];
 }
 
 /// Actively detecting poses with real-time metrics
@@ -46,6 +53,9 @@ class Detecting extends PoseDetectionState {
       session: session ?? this.session,
     );
   }
+
+  @override
+  List<Object?> get props => [cameraController, currentPose, imageSize, session];
 }
 
 /// Session completed with summary
@@ -57,6 +67,9 @@ class SessionSummary extends PoseDetectionState {
     required this.cameraController,
     required this.session,
   });
+
+  @override
+  List<Object?> get props => [cameraController, session];
 }
 
 /// Error state
@@ -64,4 +77,7 @@ class PoseDetectionError extends PoseDetectionState {
   final String message;
 
   PoseDetectionError(this.message);
+
+  @override
+  List<Object?> get props => [message];
 }

@@ -8,10 +8,11 @@ import 'package:pose_detection/domain/models/motion_data.dart';
 /// Service responsible for ML Kit pose detection
 /// Converts ML Kit outputs to domain-agnostic motion data models
 class PoseDetectionService {
-  late final PoseDetector _poseDetector;
+  PoseDetector? _poseDetector;
 
-  PoseDetectionService() {
-    _poseDetector = PoseDetector(
+  /// Initialize the pose detector lazily to defer ML model loading
+  void _ensureInitialized() {
+    _poseDetector ??= PoseDetector(
       options: PoseDetectorOptions(
         model: PoseDetectionModel.base,
         mode: PoseDetectionMode.stream,
@@ -25,14 +26,18 @@ class PoseDetectionService {
     required CameraImage image,
     required int sensorOrientation,
     required int frameIndex,
+    required int cameraTimestampMicros,
+    int? previousTimestampMicros,
   }) async {
+    _ensureInitialized();
+
     final inputImage = _convertCameraImage(image, sensorOrientation);
 
     if (inputImage == null) {
       return null;
     }
 
-    final poses = await _poseDetector.processImage(inputImage);
+    final poses = await _poseDetector!.processImage(inputImage);
 
     // Return first detected pose converted to domain model
     if (poses.isEmpty) {
@@ -44,6 +49,8 @@ class PoseDetectionService {
       frameIndex: frameIndex,
       imageWidth: image.width.toDouble(),
       imageHeight: image.height.toDouble(),
+      cameraTimestampMicros: cameraTimestampMicros,
+      previousTimestampMicros: previousTimestampMicros,
     );
   }
 
@@ -53,6 +60,8 @@ class PoseDetectionService {
     required int frameIndex,
     required double imageWidth,
     required double imageHeight,
+    required int cameraTimestampMicros,
+    int? previousTimestampMicros,
   }) {
     final imageSize = Size(imageWidth, imageHeight);
 
@@ -74,11 +83,17 @@ class PoseDetectionService {
       imageSize,
     );
 
+    // Calculate frame delta for motion analysis
+    final deltaTimeMicros = previousTimestampMicros != null
+        ? cameraTimestampMicros - previousTimestampMicros
+        : null;
+
     return TimestampedPose(
       landmarks: rawLandmarks,
       normalizedLandmarks: normalizedLandmarks,
       frameIndex: frameIndex,
-      timestampMicros: DateTime.now().microsecondsSinceEpoch,
+      timestampMicros: cameraTimestampMicros,
+      deltaTimeMicros: deltaTimeMicros,
       systemTime: DateTime.now(),
       imageWidth: imageWidth,
       imageHeight: imageHeight,
@@ -117,7 +132,8 @@ class PoseDetectionService {
 
   /// Close the pose detector
   void dispose() {
-    _poseDetector.close();
+    _poseDetector?.close();
+    _poseDetector = null;
   }
 }
 

@@ -1,7 +1,11 @@
 import 'package:camera/camera.dart';
+import 'package:equatable/equatable.dart';
 
 /// Events for generic PoseDetectionBloc
-abstract class PoseDetectionEvent {}
+abstract class PoseDetectionEvent extends Equatable {
+  @override
+  List<Object?> get props => [];
+}
 
 /// Initialize camera and services
 class InitializeEvent extends PoseDetectionEvent {}
@@ -16,8 +20,12 @@ class StopCaptureEvent extends PoseDetectionEvent {}
 class ProcessFrameEvent extends PoseDetectionEvent {
   final CameraImage image;
   final int sensorOrientation;
+  final int timestampMicros;
 
-  ProcessFrameEvent(this.image, this.sensorOrientation);
+  ProcessFrameEvent(this.image, this.sensorOrientation, this.timestampMicros);
+
+  @override
+  List<Object?> get props => [image, sensorOrientation, timestampMicros];
 }
 
 /// Dispose resources

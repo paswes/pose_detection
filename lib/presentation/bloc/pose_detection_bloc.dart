@@ -3,14 +3,15 @@ import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/domain/models/motion_data.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
+import 'package:pose_detection/domain/models/session_metrics.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 
-/// Generic BLoC for pose detection - provides raw pose data
+/// Generic BLoC for pose detection - provides raw motion data with metrics
 class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   final CameraService _cameraService;
   final PoseDetectionService _poseDetectionService;
@@ -18,6 +19,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   bool _isProcessingFrame = false;
   PoseSession? _currentSession;
   PoseSession? _lastSession;
+  int _frameIndex = 0;
 
   PoseDetectionBloc({
     required CameraService cameraService,
@@ -58,11 +60,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   ) async {
     _log('Bloc', 'Starting pose capture session...');
 
-    // Initialize new session
+    // Reset frame counter
+    _frameIndex = 0;
+
+    // Initialize new session with empty metrics
     _currentSession = PoseSession(
       startTime: DateTime.now(),
       capturedPoses: [],
-      totalFramesProcessed: 0,
+      metrics: const SessionMetrics(),
     );
 
     // Emit detecting state
@@ -75,8 +80,15 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     final cameraDescription = _cameraService.getCameraDescription();
     if (cameraDescription != null) {
       _cameraService.startImageStream((image) {
-        if (!_isProcessingFrame && _currentSession != null) {
-          add(ProcessFrameEvent(image, cameraDescription.sensorOrientation));
+        // Track received frames (including dropped ones)
+        if (_currentSession != null) {
+          if (!_isProcessingFrame) {
+            // Can process - add to event queue
+            add(ProcessFrameEvent(image, cameraDescription.sensorOrientation));
+          } else {
+            // Back-pressure: frame will be dropped
+            _updateMetricsForDroppedFrame();
+          }
         }
       });
     }
@@ -101,7 +113,10 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       _lastSession = finalSession;
       _currentSession = null;
 
-      _log('Bloc', 'Session stopped. Duration: ${finalSession.duration.inSeconds}s, Frames: ${finalSession.totalFramesProcessed}, Poses: ${finalSession.capturedPoses.length}');
+      _log('Bloc', 'Session Summary:');
+      _log('Bloc', '  Duration: ${finalSession.duration.inSeconds}s');
+      _log('Bloc', '  Poses Captured: ${finalSession.capturedPoses.length}');
+      _log('Bloc', '  ${finalSession.metrics}');
 
       emit(SessionSummary(
         cameraController: _cameraService.controller!,
@@ -117,28 +132,42 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     if (_isProcessingFrame || _currentSession == null) return;
     _isProcessingFrame = true;
 
+    final startTime = DateTime.now();
+
     try {
-      // Detect poses
-      final poses = await _poseDetectionService.detectPoses(
-        event.image,
-        event.sensorOrientation,
+      // Detect pose using domain model conversion
+      final timestampedPose = await _poseDetectionService.detectPose(
+        image: event.image,
+        sensorOrientation: event.sensorOrientation,
+        frameIndex: _frameIndex++,
       );
 
+      // Calculate processing latency
+      final latencyMs = DateTime.now().difference(startTime).inMicroseconds / 1000.0;
+
+      // Update metrics
+      final updatedMetrics = _currentSession!.metrics
+          .withReceivedFrame()
+          .withProcessedFrame(
+            poseDetected: timestampedPose != null,
+            latencyMs: latencyMs,
+          );
+
       // Update session
-      final updatedPoses = List<Pose>.from(_currentSession!.capturedPoses);
-      if (poses.isNotEmpty) {
-        updatedPoses.add(poses.first);
+      final updatedPoses = List<TimestampedPose>.from(_currentSession!.capturedPoses);
+      if (timestampedPose != null) {
+        updatedPoses.add(timestampedPose);
       }
 
       _currentSession = _currentSession!.copyWith(
         capturedPoses: updatedPoses,
-        totalFramesProcessed: _currentSession!.totalFramesProcessed + 1,
+        metrics: updatedMetrics,
       );
 
       // Emit updated state
       if (state is Detecting) {
         emit((state as Detecting).copyWith(
-          currentPose: poses.isNotEmpty ? poses.first : null,
+          currentPose: timestampedPose,
           imageSize: Size(
             event.image.width.toDouble(),
             event.image.height.toDouble(),
@@ -151,6 +180,17 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     } finally {
       _isProcessingFrame = false;
     }
+  }
+
+  /// Update metrics when a frame is dropped due to back-pressure
+  void _updateMetricsForDroppedFrame() {
+    if (_currentSession == null) return;
+
+    final updatedMetrics = _currentSession!.metrics.withDroppedFrame();
+
+    _currentSession = _currentSession!.copyWith(
+      metrics: updatedMetrics,
+    );
   }
 
   Future<void> _onDispose(
@@ -166,5 +206,5 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     developer.log('[$timestamp] [$tag] $message');
     debugPrint('[$timestamp] [$tag] $message');
   }
-
 }
+

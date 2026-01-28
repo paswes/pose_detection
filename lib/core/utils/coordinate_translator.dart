@@ -1,25 +1,45 @@
 import 'dart:ui';
+import 'package:pose_detection/domain/models/motion_data.dart';
 
-/// Utility class to translate ML Kit landmark coordinates to widget coordinates.
+/// Utility class for coordinate space transformations
 ///
-/// CRITICAL: This preserves the exact scaling logic from the original PoC.
-/// The coordinate system transformation accounts for:
-/// - Aspect ratio differences between camera image and display widget
-/// - BoxFit.cover behavior used in camera preview
+/// Handles three coordinate spaces:
+/// 1. Raw image space (pixels from ML Kit)
+/// 2. Normalized space (0.0 to 1.0, resolution-independent)
+/// 3. Widget space (pixels for UI rendering with BoxFit.cover)
 class CoordinateTranslator {
-  /// Translates ML Kit landmark coordinates to widget coordinates.
-  /// ML Kit returns coordinates relative to the input image size.
-  /// We need to scale these to match the displayed widget size.
+  /// Normalize coordinates to resolution-independent space (0.0 to 1.0)
+  /// This is critical for motion analysis across different devices
+  static NormalizedLandmark normalize(RawLandmark raw, Size imageSize) {
+    return NormalizedLandmark(
+      id: raw.id,
+      x: raw.x / imageSize.width,
+      y: raw.y / imageSize.height,
+      z: raw.z, // Z is already relative to hip, keep as-is
+      likelihood: raw.likelihood,
+    );
+  }
+
+  /// Batch normalize all landmarks in a pose
+  static List<NormalizedLandmark> normalizeAll(
+    List<RawLandmark> rawLandmarks,
+    Size imageSize,
+  ) {
+    return rawLandmarks
+        .map((raw) => normalize(raw, imageSize))
+        .toList(growable: false);
+  }
+
+  /// Translates raw image coordinates to widget coordinates for UI rendering.
+  /// Uses BoxFit.cover scaling to match camera preview display.
+  ///
+  /// This maintains aspect ratio and centers the image in the widget.
   static Offset translatePoint(
     double x,
     double y,
     Size imageSize,
     Size widgetSize,
   ) {
-    // The image from camera is typically rotated 90° on iOS
-    // ML Kit handles rotation internally, but we need to account for
-    // the aspect ratio difference between image and display.
-
     // Calculate scale factors
     final scaleX = widgetSize.width / imageSize.width;
     final scaleY = widgetSize.height / imageSize.height;
@@ -36,5 +56,14 @@ class CoordinateTranslator {
     final translatedY = y * scale + offsetY;
 
     return Offset(translatedX, translatedY);
+  }
+
+  /// Translate a RawLandmark to widget space for rendering
+  static Offset translateLandmark(
+    RawLandmark landmark,
+    Size imageSize,
+    Size widgetSize,
+  ) {
+    return translatePoint(landmark.x, landmark.y, imageSize, widgetSize);
   }
 }

@@ -79,6 +79,8 @@ class _CapturePageState extends State<CapturePage> {
     final duration = state.session.duration;
     final minutes = duration.inMinutes.toString().padLeft(2, '0');
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    final metrics = state.session.metrics;
+    final fps = metrics.effectiveFps(duration);
 
     return SafeArea(
       child: Container(
@@ -93,57 +95,100 @@ class _CapturePageState extends State<CapturePage> {
             ],
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Duration
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Duration
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.cyan.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timer, color: Colors.cyan, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$minutes:$seconds',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Stats
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Poses: ${state.session.capturedPoses.length}',
+                        style: const TextStyle(color: Colors.cyan, fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'FPS: ${fps.toStringAsFixed(1)}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Live metrics bar
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.cyan.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  const Icon(Icons.timer, color: Colors.cyan, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$minutes:$seconds',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Stats
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Frames: ${state.session.totalFramesProcessed}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  Text(
-                    'Poses: ${state.session.capturedPoses.length}',
-                    style: const TextStyle(color: Colors.cyan, fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
+                  _buildMetricChip('Processed', '${metrics.totalFramesProcessed}', Colors.greenAccent),
+                  _buildMetricChip('Dropped', '${metrics.totalFramesDropped}', metrics.totalFramesDropped > 0 ? Colors.orangeAccent : Colors.white70),
+                  _buildMetricChip('Latency', '${metrics.averageLatencyMs.toStringAsFixed(0)}ms', Colors.cyanAccent),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMetricChip(String label, String value, Color valueColor) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white60, fontSize: 9),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'monospace',
+          ),
+        ),
+      ],
     );
   }
 

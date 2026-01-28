@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
+import 'package:pose_detection/domain/models/motion_data.dart';
 
-/// Generic painter for drawing all 33 ML Kit pose landmarks
+/// Generic painter for drawing all 33 pose landmarks
 /// High-visibility cyan skeleton for analysis purposes
 class PosePainter extends CustomPainter {
-  final Pose pose;
+  final TimestampedPose pose;
   final Size imageSize;
   final Size widgetSize;
 
@@ -31,11 +31,10 @@ class PosePainter extends CustomPainter {
     // Draw all skeletal connections
     _drawAllConnections(canvas, linePaint);
 
-    // Draw all 33 landmark points
-    for (final landmark in pose.landmarks.values) {
-      final point = CoordinateTranslator.translatePoint(
-        landmark.x,
-        landmark.y,
+    // Draw all landmark points
+    for (final landmark in pose.landmarks) {
+      final point = CoordinateTranslator.translateLandmark(
+        landmark,
         imageSize,
         widgetSize,
       );
@@ -55,72 +54,53 @@ class PosePainter extends CustomPainter {
 
   /// Draw all skeletal connections for the complete pose
   void _drawAllConnections(Canvas canvas, Paint paint) {
-    // Complete ML Kit Pose skeleton connections (33 landmarks total)
+    // Complete pose skeleton connections using landmark IDs (0-32)
     final connections = [
       // Face (11 connections)
-      [PoseLandmarkType.leftEyeInner, PoseLandmarkType.leftEye],
-      [PoseLandmarkType.leftEye, PoseLandmarkType.leftEyeOuter],
-      [PoseLandmarkType.leftEyeOuter, PoseLandmarkType.leftEar],
-      [PoseLandmarkType.rightEyeInner, PoseLandmarkType.rightEye],
-      [PoseLandmarkType.rightEye, PoseLandmarkType.rightEyeOuter],
-      [PoseLandmarkType.rightEyeOuter, PoseLandmarkType.rightEar],
-      [PoseLandmarkType.leftMouth, PoseLandmarkType.rightMouth],
-      [PoseLandmarkType.nose, PoseLandmarkType.leftEyeInner],
-      [PoseLandmarkType.nose, PoseLandmarkType.rightEyeInner],
-      [PoseLandmarkType.leftMouth, PoseLandmarkType.leftEar],
-      [PoseLandmarkType.rightMouth, PoseLandmarkType.rightEar],
+      [1, 2], [2, 3], [3, 7], // Left eye to ear
+      [4, 5], [5, 6], [6, 8], // Right eye to ear
+      [9, 10], // Mouth
+      [0, 1], [0, 4], // Nose to eyes
+      [9, 7], [10, 8], // Mouth to ears
 
       // Torso (4 connections)
-      [PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder],
-      [PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip],
-      [PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip],
-      [PoseLandmarkType.leftHip, PoseLandmarkType.rightHip],
+      [11, 12], // Shoulders
+      [11, 23], [12, 24], // Shoulders to hips
+      [23, 24], // Hips
 
-      // Left arm (4 connections)
-      [PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow],
-      [PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist],
-      [PoseLandmarkType.leftWrist, PoseLandmarkType.leftPinky],
-      [PoseLandmarkType.leftWrist, PoseLandmarkType.leftIndex],
-      [PoseLandmarkType.leftPinky, PoseLandmarkType.leftIndex],
-      [PoseLandmarkType.leftWrist, PoseLandmarkType.leftThumb],
+      // Left arm (6 connections)
+      [11, 13], [13, 15], // Shoulder to wrist
+      [15, 17], [15, 19], [17, 19], [15, 21], // Hand
 
-      // Right arm (4 connections)
-      [PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow],
-      [PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist],
-      [PoseLandmarkType.rightWrist, PoseLandmarkType.rightPinky],
-      [PoseLandmarkType.rightWrist, PoseLandmarkType.rightIndex],
-      [PoseLandmarkType.rightPinky, PoseLandmarkType.rightIndex],
-      [PoseLandmarkType.rightWrist, PoseLandmarkType.rightThumb],
+      // Right arm (6 connections)
+      [12, 14], [14, 16], // Shoulder to wrist
+      [16, 18], [16, 20], [18, 20], [16, 22], // Hand
 
       // Left leg (5 connections)
-      [PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee],
-      [PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle],
-      [PoseLandmarkType.leftAnkle, PoseLandmarkType.leftHeel],
-      [PoseLandmarkType.leftAnkle, PoseLandmarkType.leftFootIndex],
-      [PoseLandmarkType.leftHeel, PoseLandmarkType.leftFootIndex],
+      [23, 25], [25, 27], // Hip to ankle
+      [27, 29], [27, 31], [29, 31], // Foot
 
       // Right leg (5 connections)
-      [PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee],
-      [PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle],
-      [PoseLandmarkType.rightAnkle, PoseLandmarkType.rightHeel],
-      [PoseLandmarkType.rightAnkle, PoseLandmarkType.rightFootIndex],
-      [PoseLandmarkType.rightHeel, PoseLandmarkType.rightFootIndex],
+      [24, 26], [26, 28], // Hip to ankle
+      [28, 30], [28, 32], [30, 32], // Foot
     ];
 
     for (final connection in connections) {
-      final landmark1 = pose.landmarks[connection[0]];
-      final landmark2 = pose.landmarks[connection[1]];
+      final id1 = connection[0];
+      final id2 = connection[1];
+
+      // Find landmarks by ID
+      final landmark1 = pose.landmarks.where((l) => l.id == id1).firstOrNull;
+      final landmark2 = pose.landmarks.where((l) => l.id == id2).firstOrNull;
 
       if (landmark1 != null && landmark2 != null) {
-        final point1 = CoordinateTranslator.translatePoint(
-          landmark1.x,
-          landmark1.y,
+        final point1 = CoordinateTranslator.translateLandmark(
+          landmark1,
           imageSize,
           widgetSize,
         );
-        final point2 = CoordinateTranslator.translatePoint(
-          landmark2.x,
-          landmark2.y,
+        final point2 = CoordinateTranslator.translateLandmark(
+          landmark2,
           imageSize,
           widgetSize,
         );

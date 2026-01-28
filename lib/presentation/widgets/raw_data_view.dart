@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:pose_detection/domain/models/motion_data.dart';
 
 /// Widget to display raw landmark data in a structured format
 class RawDataView extends StatelessWidget {
-  final Pose? pose;
+  final TimestampedPose? pose;
 
   const RawDataView({super.key, this.pose});
 
@@ -34,42 +34,8 @@ class RawDataView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Flexible(
-                child: Text(
-                  'Landmark Data (33 Points)',
-                  style: TextStyle(
-                    color: Colors.cyan,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.cyan.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${pose!.landmarks.length}',
-                  style: const TextStyle(
-                    color: Colors.cyan,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          // Header with temporal metadata
+          _buildHeader(),
           const SizedBox(height: 16),
 
           // Table header
@@ -79,25 +45,95 @@ class RawDataView extends StatelessWidget {
           // Landmark list
           Expanded(
             child: ListView.builder(
-              itemCount: PoseLandmarkType.values.length,
+              itemCount: pose!.landmarks.length,
               itemBuilder: (context, index) {
-                final type = PoseLandmarkType.values[index];
-                final landmark = pose!.landmarks[type];
-
-                if (landmark == null) {
-                  return _buildLandmarkRow(
-                    index,
-                    _getLandmarkName(type),
-                    null,
-                  );
-                }
-
-                return _buildLandmarkRow(
-                  index,
-                  _getLandmarkName(type),
-                  landmark,
-                );
+                final landmark = pose!.landmarks[index];
+                return _buildLandmarkRow(index, landmark);
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Flexible(
+              child: Text(
+                'Motion Data Stream',
+                style: TextStyle(
+                  color: Colors.cyan,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.cyan.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${pose!.landmarks.length} pts',
+                style: const TextStyle(
+                  color: Colors.cyan,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Temporal metadata
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.cyan.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 1),
+          ),
+          child: Column(
+            children: [
+              _buildMetadataRow('Frame Index', '#${pose!.frameIndex}'),
+              _buildMetadataRow('Timestamp', '${pose!.timestampMicros} μs'),
+              _buildMetadataRow('Image Size', '${pose!.imageWidth.toInt()} × ${pose!.imageHeight.toInt()}'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetadataRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white60, fontSize: 11),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.cyan,
+              fontSize: 11,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -189,10 +225,7 @@ class RawDataView extends StatelessWidget {
     );
   }
 
-  Widget _buildLandmarkRow(int index, String name, PoseLandmark? landmark) {
-    final isDetected = landmark != null;
-    final textColor = isDetected ? Colors.white70 : Colors.white30;
-
+  Widget _buildLandmarkRow(int index, RawLandmark landmark) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
       margin: const EdgeInsets.only(bottom: 2),
@@ -207,9 +240,9 @@ class RawDataView extends StatelessWidget {
           SizedBox(
             width: 30,
             child: Text(
-              '${index + 1}',
-              style: TextStyle(
-                color: textColor,
+              '${landmark.id}',
+              style: const TextStyle(
+                color: Colors.white70,
                 fontSize: 11,
                 fontFamily: 'monospace',
               ),
@@ -218,17 +251,17 @@ class RawDataView extends StatelessWidget {
           Expanded(
             flex: 3,
             child: Text(
-              name,
-              style: TextStyle(color: textColor, fontSize: 11),
+              _getLandmarkName(landmark.id),
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
-              isDetected ? landmark.x.toStringAsFixed(1) : '-',
-              style: TextStyle(
-                color: textColor,
+              landmark.x.toStringAsFixed(1),
+              style: const TextStyle(
+                color: Colors.white70,
                 fontSize: 11,
                 fontFamily: 'monospace',
               ),
@@ -238,9 +271,9 @@ class RawDataView extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              isDetected ? landmark.y.toStringAsFixed(1) : '-',
-              style: TextStyle(
-                color: textColor,
+              landmark.y.toStringAsFixed(1),
+              style: const TextStyle(
+                color: Colors.white70,
                 fontSize: 11,
                 fontFamily: 'monospace',
               ),
@@ -250,9 +283,9 @@ class RawDataView extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              isDetected ? landmark.z.toStringAsFixed(1) : '-',
-              style: TextStyle(
-                color: textColor,
+              landmark.z.toStringAsFixed(1),
+              style: const TextStyle(
+                color: Colors.white70,
                 fontSize: 11,
                 fontFamily: 'monospace',
               ),
@@ -262,13 +295,11 @@ class RawDataView extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              isDetected ? landmark.likelihood.toStringAsFixed(4) : '-',
+              landmark.likelihood.toStringAsFixed(4),
               style: TextStyle(
-                color: isDetected
-                    ? (landmark.likelihood > 0.7
-                          ? Colors.greenAccent
-                          : Colors.orangeAccent)
-                    : textColor,
+                color: landmark.likelihood > 0.7
+                    ? Colors.greenAccent
+                    : Colors.orangeAccent,
                 fontSize: 11,
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w600,
@@ -281,12 +312,18 @@ class RawDataView extends StatelessWidget {
     );
   }
 
-  String _getLandmarkName(PoseLandmarkType type) {
-    return type.name
-        .replaceAllMapped(
-          RegExp(r'([A-Z])'),
-          (match) => ' ${match.group(0)}',
-        )
-        .trim();
+  String _getLandmarkName(int id) {
+    // Standard 33 pose landmark names
+    const landmarkNames = [
+      'Nose', 'Left Eye Inner', 'Left Eye', 'Left Eye Outer',
+      'Right Eye Inner', 'Right Eye', 'Right Eye Outer', 'Left Ear', 'Right Ear',
+      'Mouth Left', 'Mouth Right', 'Left Shoulder', 'Right Shoulder',
+      'Left Elbow', 'Right Elbow', 'Left Wrist', 'Right Wrist',
+      'Left Pinky', 'Right Pinky', 'Left Index', 'Right Index',
+      'Left Thumb', 'Right Thumb', 'Left Hip', 'Right Hip',
+      'Left Knee', 'Right Knee', 'Left Ankle', 'Right Ankle',
+      'Left Heel', 'Right Heel', 'Left Foot Index', 'Right Foot Index',
+    ];
+    return id < landmarkNames.length ? landmarkNames[id] : 'Unknown $id';
   }
 }

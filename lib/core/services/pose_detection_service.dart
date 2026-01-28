@@ -2,8 +2,11 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:pose_detection/core/utils/coordinate_translator.dart';
+import 'package:pose_detection/domain/models/motion_data.dart';
 
 /// Service responsible for ML Kit pose detection
+/// Converts ML Kit outputs to domain-agnostic motion data models
 class PoseDetectionService {
   late final PoseDetector _poseDetector;
 
@@ -16,15 +19,70 @@ class PoseDetectionService {
     );
   }
 
-  /// Process a camera image and detect poses
-  Future<List<Pose>> detectPoses(CameraImage image, int sensorOrientation) async {
+  /// Process a camera image and return timestamped pose data
+  /// Returns null if no pose detected or conversion fails
+  Future<TimestampedPose?> detectPose({
+    required CameraImage image,
+    required int sensorOrientation,
+    required int frameIndex,
+  }) async {
     final inputImage = _convertCameraImage(image, sensorOrientation);
 
     if (inputImage == null) {
-      return [];
+      return null;
     }
 
-    return await _poseDetector.processImage(inputImage);
+    final poses = await _poseDetector.processImage(inputImage);
+
+    // Return first detected pose converted to domain model
+    if (poses.isEmpty) {
+      return null;
+    }
+
+    return _convertToDomainModel(
+      pose: poses.first,
+      frameIndex: frameIndex,
+      imageWidth: image.width.toDouble(),
+      imageHeight: image.height.toDouble(),
+    );
+  }
+
+  /// Convert ML Kit Pose to domain TimestampedPose
+  TimestampedPose _convertToDomainModel({
+    required Pose pose,
+    required int frameIndex,
+    required double imageWidth,
+    required double imageHeight,
+  }) {
+    final imageSize = Size(imageWidth, imageHeight);
+
+    // Extract raw landmarks from ML Kit
+    final rawLandmarks = pose.landmarks.entries.map((entry) {
+      final landmark = entry.value;
+      return RawLandmark(
+        id: entry.key.index,
+        x: landmark.x,
+        y: landmark.y,
+        z: landmark.z,
+        likelihood: landmark.likelihood,
+      );
+    }).toList(growable: false);
+
+    // Normalize landmarks for resolution-independent analysis
+    final normalizedLandmarks = CoordinateTranslator.normalizeAll(
+      rawLandmarks,
+      imageSize,
+    );
+
+    return TimestampedPose(
+      landmarks: rawLandmarks,
+      normalizedLandmarks: normalizedLandmarks,
+      frameIndex: frameIndex,
+      timestampMicros: DateTime.now().microsecondsSinceEpoch,
+      systemTime: DateTime.now(),
+      imageWidth: imageWidth,
+      imageHeight: imageHeight,
+    );
   }
 
   /// Convert CameraImage to InputImage for ML Kit
@@ -51,7 +109,10 @@ class PoseDetectionService {
       );
     }
 
-    return null;
+    // Android not implemented - throw explicit error
+    throw UnsupportedError(
+      'Android YUV420 conversion not yet implemented. Only iOS BGRA8888 is supported.',
+    );
   }
 
   /// Close the pose detector
@@ -59,3 +120,4 @@ class PoseDetectionService {
     _poseDetector.close();
   }
 }
+

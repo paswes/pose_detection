@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:camera/camera.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:pose_detection/domain/models/motion_data.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
 
 /// States for generic PoseDetectionBloc
@@ -20,10 +20,10 @@ class CameraReady extends PoseDetectionState {
   CameraReady(this.cameraController, {this.lastSession});
 }
 
-/// Actively detecting poses
+/// Actively detecting poses with real-time metrics
 class Detecting extends PoseDetectionState {
   final CameraController cameraController;
-  final Pose? currentPose;
+  final TimestampedPose? currentPose;
   final Size? imageSize;
   final PoseSession session;
 
@@ -35,7 +35,7 @@ class Detecting extends PoseDetectionState {
   });
 
   Detecting copyWith({
-    Pose? currentPose,
+    TimestampedPose? currentPose,
     Size? imageSize,
     PoseSession? session,
   }) {

@@ -183,15 +183,22 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         _previousTimestampMicros = timestampedPose.timestampMicros;
       }
 
-      // Calculate processing latency
-      final latencyMs = DateTime.now().difference(startTime).inMicroseconds / 1000.0;
+      // Calculate processing latency (ML Kit inference time)
+      final processingLatencyMs =
+          DateTime.now().difference(startTime).inMicroseconds / 1000.0;
+
+      // Calculate end-to-end latency (frame capture to now)
+      // This represents the "visual lag" users perceive
+      final nowMicros = DateTime.now().microsecondsSinceEpoch;
+      final endToEndLatencyMs = (nowMicros - event.timestampMicros) / 1000.0;
 
       // Update metrics
       final updatedMetrics = _currentSession!.metrics
           .withReceivedFrame()
           .withProcessedFrame(
             poseDetected: timestampedPose != null,
-            latencyMs: latencyMs,
+            latencyMs: processingLatencyMs,
+            endToEndLatencyMs: endToEndLatencyMs,
           );
 
       // Implement ring buffer for pose retention (keep last N poses)

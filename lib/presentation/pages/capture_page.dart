@@ -185,9 +185,14 @@ class _CapturePageState extends State<CapturePage> {
                         : Colors.white70,
                   ),
                   _buildMetricChip(
-                    'Latency',
+                    'ML Kit',
                     '${metrics.averageLatencyMs.toStringAsFixed(0)}ms',
                     Colors.cyanAccent,
+                  ),
+                  _buildMetricChip(
+                    'E2E Lag',
+                    '${metrics.lastEndToEndLatencyMs.toStringAsFixed(0)}ms',
+                    _getLatencyColor(metrics.lastEndToEndLatencyMs),
                   ),
                 ],
               ),
@@ -217,6 +222,15 @@ class _CapturePageState extends State<CapturePage> {
         ),
       ],
     );
+  }
+
+  /// Returns color based on end-to-end latency thresholds
+  /// Green: <50ms (excellent), Yellow: 50-100ms (acceptable), Orange: 100-150ms, Red: >150ms
+  Color _getLatencyColor(double latencyMs) {
+    if (latencyMs < 50) return Colors.greenAccent;
+    if (latencyMs < 100) return Colors.yellowAccent;
+    if (latencyMs < 150) return Colors.orangeAccent;
+    return Colors.redAccent;
   }
 
   Widget _buildBottomControls() {

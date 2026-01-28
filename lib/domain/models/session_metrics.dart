@@ -19,6 +19,17 @@ class SessionMetrics {
   /// Sum of all latencies (for calculating running average)
   final double _totalLatencyMs;
 
+  /// Average end-to-end latency in milliseconds
+  /// Time from camera frame capture (timestamp) to state emission
+  /// This is the "visual lag" the user perceives
+  final double averageEndToEndLatencyMs;
+
+  /// Sum of all end-to-end latencies (for calculating running average)
+  final double _totalEndToEndLatencyMs;
+
+  /// Last measured end-to-end latency (for real-time display)
+  final double lastEndToEndLatencyMs;
+
   const SessionMetrics({
     this.totalFramesReceived = 0,
     this.totalFramesProcessed = 0,
@@ -26,7 +37,11 @@ class SessionMetrics {
     this.totalPosesDetected = 0,
     this.averageLatencyMs = 0.0,
     double totalLatencyMs = 0.0,
-  }) : _totalLatencyMs = totalLatencyMs;
+    this.averageEndToEndLatencyMs = 0.0,
+    double totalEndToEndLatencyMs = 0.0,
+    this.lastEndToEndLatencyMs = 0.0,
+  })  : _totalLatencyMs = totalLatencyMs,
+        _totalEndToEndLatencyMs = totalEndToEndLatencyMs;
 
   /// Effective frames per second (based on processed frames)
   double effectiveFps(Duration sessionDuration) {
@@ -41,14 +56,27 @@ class SessionMetrics {
   }
 
   /// Update metrics with a new processed frame
+  ///
+  /// [latencyMs] - ML Kit processing time only
+  /// [endToEndLatencyMs] - Optional total latency from frame capture to state emission
   SessionMetrics withProcessedFrame({
     required bool poseDetected,
     required double latencyMs,
+    double? endToEndLatencyMs,
   }) {
     final newProcessed = totalFramesProcessed + 1;
     final newPoses = poseDetected ? totalPosesDetected + 1 : totalPosesDetected;
     final newTotalLatency = _totalLatencyMs + latencyMs;
     final newAverage = newTotalLatency / newProcessed;
+
+    // Calculate end-to-end metrics if provided
+    final newTotalE2E = endToEndLatencyMs != null
+        ? _totalEndToEndLatencyMs + endToEndLatencyMs
+        : _totalEndToEndLatencyMs;
+    final newAverageE2E = endToEndLatencyMs != null
+        ? newTotalE2E / newProcessed
+        : averageEndToEndLatencyMs;
+    final newLastE2E = endToEndLatencyMs ?? lastEndToEndLatencyMs;
 
     return SessionMetrics(
       totalFramesReceived: totalFramesReceived,
@@ -57,6 +85,9 @@ class SessionMetrics {
       totalPosesDetected: newPoses,
       averageLatencyMs: newAverage,
       totalLatencyMs: newTotalLatency,
+      averageEndToEndLatencyMs: newAverageE2E,
+      totalEndToEndLatencyMs: newTotalE2E,
+      lastEndToEndLatencyMs: newLastE2E,
     );
   }
 
@@ -69,6 +100,9 @@ class SessionMetrics {
       totalPosesDetected: totalPosesDetected,
       averageLatencyMs: averageLatencyMs,
       totalLatencyMs: _totalLatencyMs,
+      averageEndToEndLatencyMs: averageEndToEndLatencyMs,
+      totalEndToEndLatencyMs: _totalEndToEndLatencyMs,
+      lastEndToEndLatencyMs: lastEndToEndLatencyMs,
     );
   }
 
@@ -81,11 +115,14 @@ class SessionMetrics {
       totalPosesDetected: totalPosesDetected,
       averageLatencyMs: averageLatencyMs,
       totalLatencyMs: _totalLatencyMs,
+      averageEndToEndLatencyMs: averageEndToEndLatencyMs,
+      totalEndToEndLatencyMs: _totalEndToEndLatencyMs,
+      lastEndToEndLatencyMs: lastEndToEndLatencyMs,
     );
   }
 
   @override
   String toString() {
-    return 'SessionMetrics(received: $totalFramesReceived, processed: $totalFramesProcessed, dropped: $totalFramesDropped, poses: $totalPosesDetected, avgLatency: ${averageLatencyMs.toStringAsFixed(2)}ms, dropRate: ${dropRate.toStringAsFixed(1)}%)';
+    return 'SessionMetrics(received: $totalFramesReceived, processed: $totalFramesProcessed, dropped: $totalFramesDropped, poses: $totalPosesDetected, avgLatency: ${averageLatencyMs.toStringAsFixed(2)}ms, avgE2E: ${averageEndToEndLatencyMs.toStringAsFixed(2)}ms, dropRate: ${dropRate.toStringAsFixed(1)}%)';
   }
 }

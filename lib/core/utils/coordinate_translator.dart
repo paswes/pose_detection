@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:pose_detection/domain/models/motion_data.dart';
+import 'package:pose_detection/presentation/widgets/camera_preview_widget.dart';
 
 /// Utility class for coordinate space transformations
 ///
@@ -7,6 +8,9 @@ import 'package:pose_detection/domain/models/motion_data.dart';
 /// 1. Raw image space (pixels from ML Kit)
 /// 2. Normalized space (0.0 to 1.0, resolution-independent)
 /// 3. Widget space (pixels for UI rendering with BoxFit.cover)
+///
+/// CRITICAL: This class uses the EXACT same transformation logic as
+/// [CameraPreviewWidget] to ensure pixel-perfect overlay alignment.
 class CoordinateTranslator {
   /// Normalize coordinates to resolution-independent space (0.0 to 1.0)
   /// This is critical for motion analysis across different devices
@@ -46,29 +50,23 @@ class CoordinateTranslator {
   }
 
   /// Translates raw image coordinates to widget coordinates for UI rendering.
-  /// Uses BoxFit.cover scaling to match camera preview display.
+  /// Uses BoxFit.cover scaling to EXACTLY match camera preview display.
   ///
-  /// This maintains aspect ratio and centers the image in the widget.
+  /// This method delegates to [CameraPreviewWidget.getImageToScreenTransform]
+  /// to ensure the transformation is identical to the camera preview rendering.
   static Offset translatePoint(
     double x,
     double y,
     Size imageSize,
     Size widgetSize,
   ) {
-    // Calculate scale factors
-    final scaleX = widgetSize.width / imageSize.width;
-    final scaleY = widgetSize.height / imageSize.height;
+    final transform = CameraPreviewWidget.getImageToScreenTransform(
+      imageSize: imageSize,
+      screenSize: widgetSize,
+    );
 
-    // Use the same scale for both axes to maintain aspect ratio
-    // The camera preview uses BoxFit.cover, so we use the larger scale
-    final scale = scaleX > scaleY ? scaleX : scaleY;
-
-    // Calculate offset to center the scaled image
-    final offsetX = (widgetSize.width - imageSize.width * scale) / 2;
-    final offsetY = (widgetSize.height - imageSize.height * scale) / 2;
-
-    final translatedX = x * scale + offsetX;
-    final translatedY = y * scale + offsetY;
+    final translatedX = x * transform.scale + transform.offset.dx;
+    final translatedY = y * transform.scale + transform.offset.dy;
 
     return Offset(translatedX, translatedY);
   }
@@ -80,5 +78,74 @@ class CoordinateTranslator {
     Size widgetSize,
   ) {
     return translatePoint(landmark.x, landmark.y, imageSize, widgetSize);
+  }
+
+  /// Pre-compute all landmark translations for a pose.
+  /// Returns a Map from landmark ID to screen position.
+  ///
+  /// This is more efficient than calling translateLandmark repeatedly
+  /// when drawing connections, as each landmark is translated only once.
+  static Map<int, Offset> translateAllLandmarks(
+    List<RawLandmark> landmarks,
+    Size imageSize,
+    Size widgetSize,
+  ) {
+    final transform = CameraPreviewWidget.getImageToScreenTransform(
+      imageSize: imageSize,
+      screenSize: widgetSize,
+    );
+
+    final result = <int, Offset>{};
+    for (final landmark in landmarks) {
+      result[landmark.id] = Offset(
+        landmark.x * transform.scale + transform.offset.dx,
+        landmark.y * transform.scale + transform.offset.dy,
+      );
+    }
+    return result;
+  }
+
+  /// Pre-compute translations with Z-depth information.
+  /// Returns a Map from landmark ID to a record containing position and depth.
+  ///
+  /// The depth value is normalized relative to the pose's Z-range for visualization.
+  static Map<int, ({Offset position, double normalizedDepth})>
+      translateAllLandmarksWithDepth(
+    List<RawLandmark> landmarks,
+    Size imageSize,
+    Size widgetSize,
+  ) {
+    final transform = CameraPreviewWidget.getImageToScreenTransform(
+      imageSize: imageSize,
+      screenSize: widgetSize,
+    );
+
+    // Calculate Z-range for normalization
+    double minZ = double.infinity;
+    double maxZ = double.negativeInfinity;
+    for (final landmark in landmarks) {
+      if (landmark.z < minZ) minZ = landmark.z;
+      if (landmark.z > maxZ) maxZ = landmark.z;
+    }
+    final zRange = maxZ - minZ;
+    final hasValidZRange = zRange > 0.001; // Avoid division by near-zero
+
+    final result = <int, ({Offset position, double normalizedDepth})>{};
+    for (final landmark in landmarks) {
+      // Normalize Z to 0.0-1.0 range (0 = furthest, 1 = closest)
+      // Note: More negative Z = closer to camera in ML Kit convention
+      final normalizedDepth = hasValidZRange
+          ? 1.0 - ((landmark.z - minZ) / zRange) // Invert so closer = higher
+          : 0.5; // Default to middle if no Z variance
+
+      result[landmark.id] = (
+        position: Offset(
+          landmark.x * transform.scale + transform.offset.dx,
+          landmark.y * transform.scale + transform.offset.dy,
+        ),
+        normalizedDepth: normalizedDepth.clamp(0.0, 1.0),
+      );
+    }
+    return result;
   }
 }

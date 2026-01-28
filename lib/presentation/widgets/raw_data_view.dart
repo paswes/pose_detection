@@ -47,7 +47,10 @@ class RawDataView extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.cyan.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
@@ -107,12 +110,76 @@ class RawDataView extends StatelessWidget {
       ),
       child: const Row(
         children: [
-          SizedBox(width: 30, child: Text('#', style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(flex: 3, child: Text('Landmark', style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(flex: 2, child: Text('X', style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.right)),
-          Expanded(flex: 2, child: Text('Y', style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.right)),
-          Expanded(flex: 2, child: Text('Z', style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.right)),
-          Expanded(flex: 2, child: Text('Conf', style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.right)),
+          SizedBox(
+            width: 30,
+            child: Text(
+              '#',
+              style: TextStyle(
+                color: Colors.cyan,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              'Landmark',
+              style: TextStyle(
+                color: Colors.cyan,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'X',
+              style: TextStyle(
+                color: Colors.cyan,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'Y',
+              style: TextStyle(
+                color: Colors.cyan,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'Z',
+              style: TextStyle(
+                color: Colors.cyan,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'Conf',
+              style: TextStyle(
+                color: Colors.cyan,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
         ],
       ),
     );
@@ -137,7 +204,11 @@ class RawDataView extends StatelessWidget {
             width: 30,
             child: Text(
               '${index + 1}',
-              style: TextStyle(color: textColor, fontSize: 11, fontFamily: 'monospace'),
+              style: TextStyle(
+                color: textColor,
+                fontSize: 11,
+                fontFamily: 'monospace',
+              ),
             ),
           ),
           Expanded(
@@ -152,7 +223,11 @@ class RawDataView extends StatelessWidget {
             flex: 2,
             child: Text(
               isDetected ? landmark.x.toStringAsFixed(1) : '-',
-              style: TextStyle(color: textColor, fontSize: 11, fontFamily: 'monospace'),
+              style: TextStyle(
+                color: textColor,
+                fontSize: 11,
+                fontFamily: 'monospace',
+              ),
               textAlign: TextAlign.right,
             ),
           ),
@@ -160,7 +235,11 @@ class RawDataView extends StatelessWidget {
             flex: 2,
             child: Text(
               isDetected ? landmark.y.toStringAsFixed(1) : '-',
-              style: TextStyle(color: textColor, fontSize: 11, fontFamily: 'monospace'),
+              style: TextStyle(
+                color: textColor,
+                fontSize: 11,
+                fontFamily: 'monospace',
+              ),
               textAlign: TextAlign.right,
             ),
           ),
@@ -168,17 +247,23 @@ class RawDataView extends StatelessWidget {
             flex: 2,
             child: Text(
               isDetected ? landmark.z.toStringAsFixed(1) : '-',
-              style: TextStyle(color: textColor, fontSize: 11, fontFamily: 'monospace'),
+              style: TextStyle(
+                color: textColor,
+                fontSize: 11,
+                fontFamily: 'monospace',
+              ),
               textAlign: TextAlign.right,
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
-              isDetected ? '${(landmark.likelihood * 100).toStringAsFixed(0)}%' : '-',
+              isDetected ? landmark.likelihood.toStringAsFixed(4) : '-',
               style: TextStyle(
                 color: isDetected
-                    ? (landmark.likelihood > 0.7 ? Colors.greenAccent : Colors.orangeAccent)
+                    ? (landmark.likelihood > 0.7
+                          ? Colors.greenAccent
+                          : Colors.orangeAccent)
                     : textColor,
                 fontSize: 11,
                 fontFamily: 'monospace',
@@ -193,9 +278,11 @@ class RawDataView extends StatelessWidget {
   }
 
   String _getLandmarkName(PoseLandmarkType type) {
-    return type.name.replaceAllMapped(
-      RegExp(r'([A-Z])'),
-      (match) => ' ${match.group(0)}',
-    ).trim();
+    return type.name
+        .replaceAllMapped(
+          RegExp(r'([A-Z])'),
+          (match) => ' ${match.group(0)}',
+        )
+        .trim();
   }
 }

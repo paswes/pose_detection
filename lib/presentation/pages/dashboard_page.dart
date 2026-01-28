@@ -84,6 +84,33 @@ class _DashboardPageState extends State<DashboardPage>
             return const SizedBox.shrink();
           },
         ),
+        floatingActionButton:
+            BlocBuilder<PoseDetectionBloc, PoseDetectionState>(
+              builder: (context, state) {
+                if (state is CameraReady || state is SessionSummary) {
+                  return FloatingActionButton(
+                    onPressed: () async {
+                      final navigator = Navigator.of(context);
+                      _bloc.add(StartCaptureEvent());
+                      await Future.delayed(const Duration(milliseconds: 100));
+                      if (mounted) {
+                        await navigator.push(
+                          MaterialPageRoute(
+                            builder: (context) => BlocProvider.value(
+                              value: _bloc,
+                              child: const CapturePage(),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    backgroundColor: Colors.cyan,
+                    child: const Icon(Icons.play_arrow, size: 32),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
       ),
     );
   }
@@ -137,7 +164,12 @@ class _DashboardPageState extends State<DashboardPage>
                   vertical: 16,
                 ),
               ),
-              child: const Text('Retry'),
+              child: const Text(
+                'Retry',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
@@ -160,12 +192,12 @@ class _DashboardPageState extends State<DashboardPage>
             if (lastSession != null) ...[
               _buildLastSessionCard(lastSession),
               const SizedBox(height: 24),
+            ] else ...[
+              _buildEmptyStateCard(),
+              const SizedBox(height: 24),
             ],
 
             const Spacer(),
-
-            // Start button
-            _buildStartButton(),
           ],
         ),
       ),
@@ -192,6 +224,41 @@ class _DashboardPageState extends State<DashboardPage>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEmptyStateCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.1),
+          width: 2,
+        ),
+      ),
+      child: const Column(
+        children: [
+          Text(
+            'No Session History',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Start a new capture to begin tracking poses',
+            style: TextStyle(
+              color: Colors.white38,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
@@ -341,62 +408,6 @@ class _DashboardPageState extends State<DashboardPage>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildStartButton() {
-    return GestureDetector(
-      onTap: () async {
-        // Start capture and navigate to capture page
-        _bloc.add(StartCaptureEvent());
-
-        // Wait a brief moment for the state to update
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        if (mounted) {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => BlocProvider.value(
-                value: _bloc,
-                child: const CapturePage(),
-              ),
-            ),
-          );
-        }
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF00D9FF), Color(0xFF00A8CC)],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.cyan.withValues(alpha: 0.4),
-              blurRadius: 20,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.play_arrow, color: Colors.white, size: 32),
-            SizedBox(width: 12),
-            Text(
-              'Start New Capture',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

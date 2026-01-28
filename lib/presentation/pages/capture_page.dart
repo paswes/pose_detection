@@ -103,7 +103,10 @@ class _CapturePageState extends State<CapturePage> {
               children: [
                 // Duration
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.cyan.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(20),
@@ -127,7 +130,10 @@ class _CapturePageState extends State<CapturePage> {
 
                 // Stats
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(20),
@@ -137,11 +143,18 @@ class _CapturePageState extends State<CapturePage> {
                     children: [
                       Text(
                         'Poses: ${state.session.capturedPoses.length}',
-                        style: const TextStyle(color: Colors.cyan, fontSize: 14, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.cyan,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         'FPS: ${fps.toStringAsFixed(1)}',
-                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -159,9 +172,23 @@ class _CapturePageState extends State<CapturePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildMetricChip('Processed', '${metrics.totalFramesProcessed}', Colors.greenAccent),
-                  _buildMetricChip('Dropped', '${metrics.totalFramesDropped}', metrics.totalFramesDropped > 0 ? Colors.orangeAccent : Colors.white70),
-                  _buildMetricChip('Latency', '${metrics.averageLatencyMs.toStringAsFixed(0)}ms', Colors.cyanAccent),
+                  _buildMetricChip(
+                    'Processed',
+                    '${metrics.totalFramesProcessed}',
+                    Colors.greenAccent,
+                  ),
+                  _buildMetricChip(
+                    'Dropped',
+                    '${metrics.totalFramesDropped}',
+                    metrics.totalFramesDropped > 0
+                        ? Colors.orangeAccent
+                        : Colors.white70,
+                  ),
+                  _buildMetricChip(
+                    'Latency',
+                    '${metrics.averageLatencyMs.toStringAsFixed(0)}ms',
+                    Colors.cyanAccent,
+                  ),
                 ],
               ),
             ),
@@ -245,22 +272,7 @@ class _CapturePageState extends State<CapturePage> {
             ),
           ],
         ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.stop, color: Colors.white, size: 28),
-            SizedBox(width: 8),
-            Text(
-              'STOP',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ],
-        ),
+        child: Icon(Icons.stop, color: Colors.white, size: 28),
       ),
     );
   }
@@ -277,7 +289,10 @@ class _CapturePageState extends State<CapturePage> {
         decoration: BoxDecoration(
           color: Colors.cyan.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.cyan.withValues(alpha: 0.5), width: 1),
+          border: Border.all(
+            color: Colors.cyan.withValues(alpha: 0.5),
+            width: 1,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -304,41 +319,51 @@ class _CapturePageState extends State<CapturePage> {
       behavior: HitTestBehavior.opaque,
       child: Container(
         color: Colors.black.withValues(alpha: 0.7),
-        child: Column(
-          children: [
-            // Tap area to close
-            Expanded(
-              flex: 1,
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 32),
-                    SizedBox(height: 8),
-                    Text(
-                      'Tap to close',
-                      style: TextStyle(color: Colors.white54, fontSize: 14),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Data view
-            Expanded(
-              flex: 3,
-              child: GestureDetector(
-                onTap: () {}, // Prevent close when tapping inside data view
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.95),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                    border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 2),
+        padding: EdgeInsets.all(16),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Tap area to close
+              Expanded(
+                flex: 1,
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.white54,
+                        size: 32,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Tap to close',
+                        style: TextStyle(color: Colors.white54, fontSize: 14),
+                      ),
+                    ],
                   ),
-                  child: RawDataView(pose: state.currentPose),
                 ),
               ),
-            ),
-          ],
+              // Data view
+              Expanded(
+                flex: 3,
+                child: GestureDetector(
+                  onTap: () {}, // Prevent close when tapping inside data view
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.95),
+                      borderRadius: const BorderRadius.all(Radius.circular(20)),
+                      border: Border.all(
+                        color: Colors.cyan.withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: RawDataView(pose: state.currentPose),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

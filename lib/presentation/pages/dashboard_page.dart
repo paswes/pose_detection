@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/domain/models/pose_session.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
+import 'package:pose_detection/presentation/pages/session_details_page.dart';
 
 /// Main dashboard for the Pose Engine Core
 class DashboardPage extends StatefulWidget {
@@ -213,45 +215,73 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  Widget _buildLastSessionCard(dynamic session) {
+  Widget _buildLastSessionCard(PoseSession session) {
     final duration = session.duration;
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds % 60;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.cyan.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.history, color: Colors.cyan, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Last Session',
-                style: TextStyle(
-                  color: Colors.cyan,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => SessionDetailsPage(session: session),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.cyan.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.history, color: Colors.cyan, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Last Session',
+                      style: TextStyle(
+                        color: Colors.cyan,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatColumn('Duration', '${minutes}m ${seconds}s'),
-              _buildStatColumn('Frames', '${session.totalFramesProcessed}'),
-              _buildStatColumn('Poses', '${session.capturedPoses.length}'),
-            ],
-          ),
-        ],
+                // Tap indicator
+                const Row(
+                  children: [
+                    Text(
+                      'View Details',
+                      style: TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_ios, color: Colors.cyan, size: 14),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatColumn('Duration', '${minutes}m ${seconds}s'),
+                _buildStatColumn('Frames', '${session.totalFramesProcessed}'),
+                _buildStatColumn('Poses', '${session.capturedPoses.length}'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

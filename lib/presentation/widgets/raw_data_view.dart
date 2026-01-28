@@ -38,14 +38,18 @@ class RawDataView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Landmark Data (33 Points)',
-                style: TextStyle(
-                  color: Colors.cyan,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              const Flexible(
+                child: Text(
+                  'Landmark Data (33 Points)',
+                  style: TextStyle(
+                    color: Colors.cyan,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -56,7 +60,7 @@ class RawDataView extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${pose!.landmarks.length} detected',
+                  '${pose!.landmarks.length}',
                   style: const TextStyle(
                     color: Colors.cyan,
                     fontSize: 14,

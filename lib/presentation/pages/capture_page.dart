@@ -254,22 +254,47 @@ class _CapturePageState extends State<CapturePage> {
   }
 
   Widget _buildRawDataOverlay(Detecting state) {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.5,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) {
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.95),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 2),
+    return GestureDetector(
+      onTap: () => setState(() => _showRawData = false),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.7),
+        child: Column(
+          children: [
+            // Tap area to close
+            Expanded(
+              flex: 1,
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 32),
+                    SizedBox(height: 8),
+                    Text(
+                      'Tap to close',
+                      style: TextStyle(color: Colors.white54, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: RawDataView(pose: state.currentPose),
-          );
-        },
+            // Data view
+            Expanded(
+              flex: 3,
+              child: GestureDetector(
+                onTap: () {}, // Prevent close when tapping inside data view
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.95),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 2),
+                  ),
+                  child: RawDataView(pose: state.currentPose),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

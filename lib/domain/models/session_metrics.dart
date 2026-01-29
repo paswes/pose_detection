@@ -12,6 +12,15 @@ class SessionMetrics {
   /// Total poses successfully detected (frames may have 0 poses if no person visible)
   final int totalPosesDetected;
 
+  /// Total poses that passed validation (confirmed human poses)
+  final int totalValidatedPoses;
+
+  /// Total poses rejected by validation (ghost poses filtered out)
+  final int totalRejectedPoses;
+
+  /// Total frames where no human was detected by object detector
+  final int totalNoHumanFrames;
+
   /// Average processing latency in milliseconds
   /// Time from ML Kit processImage start to completion
   final double averageLatencyMs;
@@ -35,6 +44,9 @@ class SessionMetrics {
     this.totalFramesProcessed = 0,
     this.totalFramesDropped = 0,
     this.totalPosesDetected = 0,
+    this.totalValidatedPoses = 0,
+    this.totalRejectedPoses = 0,
+    this.totalNoHumanFrames = 0,
     this.averageLatencyMs = 0.0,
     double totalLatencyMs = 0.0,
     this.averageEndToEndLatencyMs = 0.0,
@@ -55,14 +67,30 @@ class SessionMetrics {
     return (totalFramesDropped / totalFramesReceived) * 100.0;
   }
 
+  /// Validation acceptance rate (percentage of detected poses that are valid)
+  double get validationRate {
+    if (totalPosesDetected == 0) return 100.0;
+    return (totalValidatedPoses / totalPosesDetected) * 100.0;
+  }
+
+  /// Ghost pose rate (percentage of poses that were rejected)
+  double get ghostPoseRate {
+    if (totalPosesDetected == 0) return 0.0;
+    return (totalRejectedPoses / totalPosesDetected) * 100.0;
+  }
+
   /// Update metrics with a new processed frame
   ///
   /// [latencyMs] - ML Kit processing time only
   /// [endToEndLatencyMs] - Optional total latency from frame capture to state emission
+  /// [poseValidated] - Whether the pose passed validation (null if no pose detected)
+  /// [humanDetected] - Whether a human was detected by object detector
   SessionMetrics withProcessedFrame({
     required bool poseDetected,
     required double latencyMs,
     double? endToEndLatencyMs,
+    bool? poseValidated,
+    bool humanDetected = true,
   }) {
     final newProcessed = totalFramesProcessed + 1;
     final newPoses = poseDetected ? totalPosesDetected + 1 : totalPosesDetected;
@@ -78,11 +106,24 @@ class SessionMetrics {
         : averageEndToEndLatencyMs;
     final newLastE2E = endToEndLatencyMs ?? lastEndToEndLatencyMs;
 
+    // Validation metrics
+    final newValidated = (poseValidated == true)
+        ? totalValidatedPoses + 1
+        : totalValidatedPoses;
+    final newRejected = (poseDetected && poseValidated == false)
+        ? totalRejectedPoses + 1
+        : totalRejectedPoses;
+    final newNoHuman =
+        humanDetected ? totalNoHumanFrames : totalNoHumanFrames + 1;
+
     return SessionMetrics(
       totalFramesReceived: totalFramesReceived,
       totalFramesProcessed: newProcessed,
       totalFramesDropped: totalFramesDropped,
       totalPosesDetected: newPoses,
+      totalValidatedPoses: newValidated,
+      totalRejectedPoses: newRejected,
+      totalNoHumanFrames: newNoHuman,
       averageLatencyMs: newAverage,
       totalLatencyMs: newTotalLatency,
       averageEndToEndLatencyMs: newAverageE2E,
@@ -98,6 +139,9 @@ class SessionMetrics {
       totalFramesProcessed: totalFramesProcessed,
       totalFramesDropped: totalFramesDropped,
       totalPosesDetected: totalPosesDetected,
+      totalValidatedPoses: totalValidatedPoses,
+      totalRejectedPoses: totalRejectedPoses,
+      totalNoHumanFrames: totalNoHumanFrames,
       averageLatencyMs: averageLatencyMs,
       totalLatencyMs: _totalLatencyMs,
       averageEndToEndLatencyMs: averageEndToEndLatencyMs,
@@ -113,6 +157,9 @@ class SessionMetrics {
       totalFramesProcessed: totalFramesProcessed,
       totalFramesDropped: totalFramesDropped + 1,
       totalPosesDetected: totalPosesDetected,
+      totalValidatedPoses: totalValidatedPoses,
+      totalRejectedPoses: totalRejectedPoses,
+      totalNoHumanFrames: totalNoHumanFrames,
       averageLatencyMs: averageLatencyMs,
       totalLatencyMs: _totalLatencyMs,
       averageEndToEndLatencyMs: averageEndToEndLatencyMs,
@@ -123,6 +170,9 @@ class SessionMetrics {
 
   @override
   String toString() {
-    return 'SessionMetrics(received: $totalFramesReceived, processed: $totalFramesProcessed, dropped: $totalFramesDropped, poses: $totalPosesDetected, avgLatency: ${averageLatencyMs.toStringAsFixed(2)}ms, avgE2E: ${averageEndToEndLatencyMs.toStringAsFixed(2)}ms, dropRate: ${dropRate.toStringAsFixed(1)}%)';
+    return 'SessionMetrics(received: $totalFramesReceived, processed: $totalFramesProcessed, dropped: $totalFramesDropped, '
+        'poses: $totalPosesDetected, validated: $totalValidatedPoses, rejected: $totalRejectedPoses, '
+        'avgLatency: ${averageLatencyMs.toStringAsFixed(2)}ms, avgE2E: ${averageEndToEndLatencyMs.toStringAsFixed(2)}ms, '
+        'dropRate: ${dropRate.toStringAsFixed(1)}%, validationRate: ${validationRate.toStringAsFixed(1)}%)';
   }
 }

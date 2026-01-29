@@ -397,6 +397,25 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                // Validation metrics row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildMetricItem(
+                      'Validated',
+                      '${metrics.totalValidatedPoses}',
+                    ),
+                    _buildMetricItem(
+                      'Ghosts Filtered',
+                      '${metrics.totalRejectedPoses}',
+                    ),
+                    _buildMetricItem(
+                      'No Human',
+                      '${metrics.totalNoHumanFrames}',
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -404,6 +423,10 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
                     _buildMetricItem(
                       'Drop Rate',
                       '${metrics.dropRate.toStringAsFixed(1)}%',
+                    ),
+                    _buildMetricItem(
+                      'Validation Rate',
+                      '${metrics.validationRate.toStringAsFixed(1)}%',
                     ),
                     _buildMetricItem(
                       'Avg Latency',

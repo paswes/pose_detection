@@ -173,21 +173,23 @@ class _CapturePageState extends State<CapturePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildMetricChip(
-                    'Processed',
-                    '${metrics.totalFramesProcessed}',
+                    'Validated',
+                    '${metrics.totalValidatedPoses}',
                     Colors.greenAccent,
                   ),
                   _buildMetricChip(
-                    'Dropped',
-                    '${metrics.totalFramesDropped}',
-                    metrics.totalFramesDropped > 0
-                        ? Colors.orangeAccent
+                    'Rejected',
+                    '${metrics.totalRejectedPoses}',
+                    metrics.totalRejectedPoses > 0
+                        ? Colors.redAccent
                         : Colors.white70,
                   ),
                   _buildMetricChip(
-                    'ML Kit',
-                    '${metrics.averageLatencyMs.toStringAsFixed(0)}ms',
-                    Colors.cyanAccent,
+                    'No Human',
+                    '${metrics.totalNoHumanFrames}',
+                    metrics.totalNoHumanFrames > 0
+                        ? Colors.orangeAccent
+                        : Colors.white70,
                   ),
                   _buildMetricChip(
                     'E2E Lag',
@@ -197,6 +199,11 @@ class _CapturePageState extends State<CapturePage> {
                 ],
               ),
             ),
+            // Validation status indicator
+            if (state.validationEnabled) ...[
+              const SizedBox(height: 4),
+              _buildValidationIndicator(state),
+            ],
           ],
         ),
       ),
@@ -221,6 +228,53 @@ class _CapturePageState extends State<CapturePage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildValidationIndicator(Detecting state) {
+    final hasValidPose = state.hasValidPose;
+    final lastWasGhost = state.lastPoseWasGhost;
+
+    Color indicatorColor;
+    String statusText;
+    IconData statusIcon;
+
+    if (hasValidPose) {
+      indicatorColor = Colors.greenAccent;
+      statusText = 'Human Confirmed';
+      statusIcon = Icons.check_circle;
+    } else if (lastWasGhost) {
+      indicatorColor = Colors.redAccent;
+      statusText = 'Ghost Filtered';
+      statusIcon = Icons.block;
+    } else {
+      indicatorColor = Colors.white54;
+      statusText = 'Scanning...';
+      statusIcon = Icons.search;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: indicatorColor.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: indicatorColor.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(statusIcon, color: indicatorColor, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            statusText,
+            style: TextStyle(
+              color: indicatorColor,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

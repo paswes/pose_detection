@@ -349,8 +349,12 @@ class _DashboardPageState extends State<DashboardPage>
                     '${metrics.totalFramesProcessed}',
                   ),
                   _buildMetricRow(
-                    'Dropped',
-                    '${metrics.totalFramesDropped} (${metrics.dropRate.toStringAsFixed(1)}%)',
+                    'Validated',
+                    '${metrics.totalValidatedPoses} (${metrics.validationRate.toStringAsFixed(1)}%)',
+                  ),
+                  _buildMetricRow(
+                    'Ghosts Filtered',
+                    '${metrics.totalRejectedPoses}',
                   ),
                   _buildMetricRow(
                     'Avg Latency',

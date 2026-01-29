@@ -5,17 +5,38 @@ import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
+import 'package:pose_detection/core/services/object_detection_service.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/domain/models/detected_object.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
 import 'package:pose_detection/domain/models/session_metrics.dart';
+import 'package:pose_detection/domain/models/validation_result.dart';
+import 'package:pose_detection/domain/validators/human_signal_validator.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 
-/// Generic BLoC for pose detection - provides raw motion data with metrics
+/// BLoC for pose detection with cascaded human validation
+///
+/// Architecture follows Clean Architecture principles:
+/// - Core Layer: CameraService, ObjectDetectionService, PoseDetectionService
+///   (agnostic data providers - no knowledge of "humans")
+/// - Domain Layer: HumanSignalValidator (biometric control center)
+///   (all interpretation and validation logic)
+/// - Presentation Layer: This BLoC (orchestration and state management)
+///
+/// Flow: Object Detection -> Human Detection (Domain) -> Pose Detection -> Validation
 class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
+  // === Core Layer Services (Agnostic) ===
   final CameraService _cameraService;
+  final ObjectDetectionService _objectDetectionService;
   final PoseDetectionService _poseDetectionService;
+
+  // === Domain Layer Validator (Biometric Control Center) ===
+  final HumanSignalValidator _humanValidator;
+
+  /// Whether validation is enabled (can be toggled for debugging)
+  bool _validationEnabled = true;
 
   bool _isProcessingFrame = false;
   bool _isStreamingActive = false;
@@ -33,9 +54,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   PoseDetectionBloc({
     required CameraService cameraService,
     required PoseDetectionService poseDetectionService,
-  })  : _cameraService = cameraService,
-        _poseDetectionService = poseDetectionService,
-        super(PoseDetectionInitial()) {
+    ObjectDetectionService? objectDetectionService,
+    HumanSignalValidator? humanValidator,
+  }) : _cameraService = cameraService,
+       _poseDetectionService = poseDetectionService,
+       _objectDetectionService =
+           objectDetectionService ?? ObjectDetectionService(),
+       _humanValidator = humanValidator ?? HumanSignalValidator(),
+       super(PoseDetectionInitial()) {
     on<InitializeEvent>(_onInitialize);
     on<StartCaptureEvent>(_onStartCapture);
     on<StopCaptureEvent>(_onStopCapture);
@@ -43,6 +69,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     // This automatically drops events that arrive while processing
     on<ProcessFrameEvent>(_onProcessFrame, transformer: droppable());
     on<DisposeEvent>(_onDispose);
+  }
+
+  /// Enable or disable validation (useful for debugging)
+  void setValidationEnabled(bool enabled) {
+    _validationEnabled = enabled;
+    _log('Bloc', 'Validation ${enabled ? "enabled" : "disabled"}');
   }
 
   Future<void> _onInitialize(
@@ -75,7 +107,10 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Emitter<PoseDetectionState> emit,
   ) async {
     if (_isStreamingActive) {
-      _log('Bloc', 'WARNING: Stream already active, stopping existing stream first');
+      _log(
+        'Bloc',
+        'WARNING: Stream already active, stopping existing stream first',
+      );
       _cameraService.stopImageStream();
       _isStreamingActive = false;
     }
@@ -101,10 +136,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     }
 
     // Emit detecting state
-    emit(Detecting(
-      cameraController: controller,
-      session: _currentSession!,
-    ));
+    emit(
+      Detecting(
+        cameraController: controller,
+        session: _currentSession!,
+      ),
+    );
 
     // Start image stream
     final cameraDescription = _cameraService.getCameraDescription();
@@ -118,7 +155,13 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
           if (!_isProcessingFrame) {
             // Can process - add to event queue
-            add(ProcessFrameEvent(image, cameraDescription.sensorOrientation, timestampMicros));
+            add(
+              ProcessFrameEvent(
+                image,
+                cameraDescription.sensorOrientation,
+                timestampMicros,
+              ),
+            );
           } else {
             // Back-pressure: frame will be dropped
             _updateMetricsForDroppedFrame();
@@ -152,10 +195,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       _log('Bloc', '  Poses Captured: ${finalSession.capturedPoses.length}');
       _log('Bloc', '  ${finalSession.metrics}');
 
-      emit(SessionSummary(
-        cameraController: _cameraService.controller!,
-        session: finalSession,
-      ));
+      emit(
+        SessionSummary(
+          cameraController: _cameraService.controller!,
+          session: finalSession,
+        ),
+      );
     }
   }
 
@@ -169,7 +214,41 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     final startTime = DateTime.now();
 
     try {
-      // Detect pose using domain model conversion with camera timestamp
+      // ============================================================
+      // STAGE 1: Core Layer - Object Detection (Agnostic)
+      // ============================================================
+      // Core service returns ALL detected objects without interpretation
+      ObjectDetectionResult? objectDetectionResult;
+      HumanDetectionResult? humanDetection;
+      bool humanPresent = true;
+
+      if (_validationEnabled) {
+        objectDetectionResult = await _objectDetectionService.detectObjects(
+          image: event.image,
+          sensorOrientation: event.sensorOrientation,
+        );
+
+        // ============================================================
+        // STAGE 2: Domain Layer - Human Interpretation
+        // ============================================================
+        // Domain layer interprets agnostic data to find humans
+        humanDetection = _humanValidator.interpretObjectDetection(
+          objectDetectionResult,
+        );
+
+        humanPresent = _humanValidator.isHumanPresent(humanDetection);
+
+        if (!humanPresent) {
+          // No human detected - skip pose detection entirely
+          _handleNoHumanFrame(event, emit, humanDetection);
+          return;
+        }
+      }
+
+      // ============================================================
+      // STAGE 3: Core Layer - Pose Detection (Agnostic)
+      // ============================================================
+      // Only run pose detection if human was detected (cascaded principle)
       final timestampedPose = await _poseDetectionService.detectPose(
         image: event.image,
         sensorOrientation: event.sensorOrientation,
@@ -183,36 +262,69 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         _previousTimestampMicros = timestampedPose.timestampMicros;
       }
 
-      // Calculate processing latency (ML Kit inference time)
+      // ============================================================
+      // STAGE 4: Domain Layer - Pose Validation (Biometric Control)
+      // ============================================================
+      // Domain layer validates pose is a real human signal
+      PoseValidationResult? validationResult;
+      TimestampedPose? validatedPose;
+
+      if (timestampedPose != null &&
+          _validationEnabled &&
+          humanDetection != null) {
+        // Validate the detected pose using domain validator
+        validationResult = _humanValidator.validatePose(
+          pose: timestampedPose,
+          humanDetection: humanDetection,
+        );
+
+        if (validationResult.isValid) {
+          // Pose passed all validation gates - this is a confirmed human
+          validatedPose = timestampedPose;
+          _log('Validation', 'VALID pose - human confirmed');
+        } else {
+          // Ghost pose detected - filter it out
+          _log(
+            'Validation',
+            'REJECTED pose: ${validationResult.rejectionReasons.map((r) => r.name).join(", ")}',
+          );
+        }
+      } else if (timestampedPose != null && !_validationEnabled) {
+        // Validation disabled - pass through all poses
+        validatedPose = timestampedPose;
+      }
+
+      // Calculate processing latency (total pipeline time)
       final processingLatencyMs =
           DateTime.now().difference(startTime).inMicroseconds / 1000.0;
 
       // Calculate end-to-end latency (frame capture to now)
-      // This represents the "visual lag" users perceive
       final nowMicros = DateTime.now().microsecondsSinceEpoch;
       final endToEndLatencyMs = (nowMicros - event.timestampMicros) / 1000.0;
 
-      // Update metrics
+      // Update metrics with validation info
       final updatedMetrics = _currentSession!.metrics
           .withReceivedFrame()
           .withProcessedFrame(
             poseDetected: timestampedPose != null,
             latencyMs: processingLatencyMs,
             endToEndLatencyMs: endToEndLatencyMs,
+            poseValidated: validatedPose != null,
+            humanDetected: humanPresent,
           );
 
-      // Implement ring buffer for pose retention (keep last N poses)
+      // Implement ring buffer for pose retention (only store VALIDATED poses)
       final currentPoses = _currentSession!.capturedPoses;
       List<TimestampedPose> updatedPoses;
 
-      if (timestampedPose != null) {
+      if (validatedPose != null) {
         if (currentPoses.length >= _maxPosesInMemory) {
           // Ring buffer: remove oldest pose
           updatedPoses = List<TimestampedPose>.from(currentPoses.sublist(1))
-            ..add(timestampedPose);
+            ..add(validatedPose);
         } else {
           updatedPoses = List<TimestampedPose>.from(currentPoses)
-            ..add(timestampedPose);
+            ..add(validatedPose);
         }
       } else {
         updatedPoses = currentPoses;
@@ -228,31 +340,82 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       // Emit updated state
       if (state is Detecting) {
-        emit((state as Detecting).copyWith(
-          currentPose: timestampedPose,
-          imageSize: Size(
-            event.image.width.toDouble(),
-            event.image.height.toDouble(),
+        emit(
+          (state as Detecting).copyWith(
+            currentPose: validatedPose,
+            lastValidation: validationResult,
+            imageSize: Size(
+              event.image.width.toDouble(),
+              event.image.height.toDouble(),
+            ),
+            session: _currentSession!,
+            validationEnabled: _validationEnabled,
+            // Clear pose if rejected to avoid stale display
+            clearCurrentPose: timestampedPose != null && validatedPose == null,
           ),
-          session: _currentSession!,
-        ));
+        );
       }
     } catch (e) {
       _consecutiveErrors++;
-      _log('Bloc', 'ERROR processing frame ($_consecutiveErrors consecutiveErrors/$_maxConsecutiveErrors): $e');
+      _log(
+        'Bloc',
+        'ERROR processing frame ($_consecutiveErrors consecutiveErrors/$_maxConsecutiveErrors): $e',
+      );
 
       // Check if we've exceeded the error threshold
       if (_consecutiveErrors >= _maxConsecutiveErrors) {
         _log('Bloc', 'CRITICAL: Too many consecutive errors, stopping capture');
         _cameraService.stopImageStream();
         _isStreamingActive = false;
-        emit(PoseDetectionError(
-          'Pose detection failed after $_maxConsecutiveErrors consecutive errors. Last error: $e',
-        ));
+        emit(
+          PoseDetectionError(
+            'Pose detection failed after $_maxConsecutiveErrors consecutive errors. Last error: $e',
+          ),
+        );
       }
     } finally {
       _isProcessingFrame = false;
     }
+  }
+
+  /// Handle frames where no human was detected
+  void _handleNoHumanFrame(
+    ProcessFrameEvent event,
+    Emitter<PoseDetectionState> emit,
+    HumanDetectionResult humanDetection,
+  ) {
+    final processingLatencyMs = humanDetection.detectionLatencyMs;
+    final nowMicros = DateTime.now().microsecondsSinceEpoch;
+    final endToEndLatencyMs = (nowMicros - event.timestampMicros) / 1000.0;
+
+    // Update metrics - frame processed but no pose detected
+    final updatedMetrics = _currentSession!.metrics
+        .withReceivedFrame()
+        .withProcessedFrame(
+          poseDetected: false,
+          latencyMs: processingLatencyMs,
+          endToEndLatencyMs: endToEndLatencyMs,
+          poseValidated: null,
+          humanDetected: false,
+        );
+
+    _currentSession = _currentSession!.copyWith(
+      metrics: updatedMetrics,
+    );
+
+    // Emit state with no pose but keep session updated
+    // IMPORTANT: Clear the current pose so no landmarks are painted
+    if (state is Detecting) {
+      emit(
+        (state as Detecting).copyWith(
+          session: _currentSession!,
+          clearCurrentPose: true,
+          validationEnabled: _validationEnabled,
+        ),
+      );
+    }
+
+    _isProcessingFrame = false;
   }
 
   /// Update metrics when a frame is dropped due to back-pressure
@@ -271,13 +434,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Emitter<PoseDetectionState> emit,
   ) async {
     _cameraService.dispose();
+    _objectDetectionService.dispose();
     _poseDetectionService.dispose();
   }
 
   void _log(String tag, String message) {
     final timestamp = DateTime.now().toIso8601String().substring(11, 23);
     developer.log('[$timestamp] [$tag] $message');
-    debugPrint('[$timestamp] [$tag] $message');
   }
 }
-

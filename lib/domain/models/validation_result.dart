@@ -8,17 +8,17 @@ export 'package:pose_detection/domain/models/detected_object.dart'
 
 /// Reason why a pose was rejected during validation
 enum RejectionReason {
-  /// No human detected in the frame by object detector
+  /// No human detected in the frame by segmentation
   noHumanDetected,
 
-  /// Human detected but bounding box too small (too far away or partial)
+  /// Human detected but coverage too small (too far away or partial)
   humanTooSmall,
 
   /// Human bounding box doesn't overlap with pose bounding box
   poseOutsideHumanBounds,
 
-  /// Multiple humans detected - ambiguous which pose belongs to whom
-  multipleHumansDetected,
+  /// Segmentation confidence too low
+  lowSegmentationConfidence,
 
   /// Pose failed biomechanical constraints check
   biomechanicallyInvalid,
@@ -33,47 +33,48 @@ enum RejectionReason {
   suspectedHallucination,
 }
 
-/// Result of human detection analysis (interpreted from raw object detection)
-/// This is created by the Domain layer from agnostic ObjectDetectionResult
+/// Result of human detection analysis (interpreted from segmentation data)
+/// This is created by the Domain layer from agnostic SegmentationResult
 class HumanDetectionResult extends Equatable {
-  /// Whether at least one human was detected
+  /// Whether a human was detected via segmentation
   final bool humanDetected;
 
-  /// Number of humans detected in the frame
-  final int humanCount;
+  /// Coverage of the frame by the detected human (0.0 to 1.0)
+  final double coverage;
 
-  /// Bounding box of the primary (largest) human in normalized coordinates
+  /// Bounding box of the human in normalized coordinates
   /// null if no human detected
-  final NormalizedBoundingBox? primaryHumanBounds;
+  final NormalizedBoundingBox? humanBounds;
 
-  /// Confidence score for the primary human detection (0.0 to 1.0)
-  final double? primaryConfidence;
+  /// Confidence score for the human detection (0.0 to 1.0)
+  final double confidence;
 
-  /// Processing time for object detection in milliseconds
+  /// Processing time for segmentation in milliseconds
   final double detectionLatencyMs;
 
   const HumanDetectionResult({
     required this.humanDetected,
-    required this.humanCount,
-    this.primaryHumanBounds,
-    this.primaryConfidence,
+    required this.coverage,
+    this.humanBounds,
+    required this.confidence,
     required this.detectionLatencyMs,
   });
 
   @override
   List<Object?> get props => [
         humanDetected,
-        humanCount,
-        primaryHumanBounds,
-        primaryConfidence,
+        coverage,
+        humanBounds,
+        confidence,
         detectionLatencyMs,
       ];
 
   @override
   String toString() =>
-      'HumanDetectionResult(detected: $humanDetected, count: $humanCount, '
-      'confidence: ${primaryConfidence?.toStringAsFixed(2)}, '
-      'latency: ${detectionLatencyMs.toStringAsFixed(2)}ms)';
+      'HumanDetectionResult(detected: $humanDetected, '
+      'coverage: ${(coverage * 100).toStringAsFixed(1)}%, '
+      'confidence: ${(confidence * 100).toStringAsFixed(1)}%, '
+      'latency: ${detectionLatencyMs.toStringAsFixed(1)}ms)';
 }
 
 /// Result of biomechanical sanity check
@@ -138,8 +139,6 @@ class PoseValidationResult extends Equatable {
   /// Combined rejection reasons (empty if valid)
   List<RejectionReason> get rejectionReasons => [
         if (!humanDetection.humanDetected) RejectionReason.noHumanDetected,
-        if (humanDetection.humanCount > 1)
-          RejectionReason.multipleHumansDetected,
         ...sanityCheck.failedChecks,
       ];
 

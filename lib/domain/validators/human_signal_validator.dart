@@ -1,37 +1,32 @@
-import 'package:pose_detection/domain/models/detected_object.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
+import 'package:pose_detection/domain/models/segmentation_result.dart';
 import 'package:pose_detection/domain/models/validation_result.dart';
 import 'package:pose_detection/domain/validators/human_sanity_checker.dart';
 
 /// Configuration for the human signal validation
 class HumanValidationConfig {
-  /// Minimum confidence threshold for human detection
-  final double minHumanConfidence;
+  /// Minimum segmentation confidence threshold for human detection
+  final double minSegmentationConfidence;
 
-  /// Minimum bounding box area (normalized) to consider a valid human
+  /// Minimum coverage of frame by foreground (0.0 to 1.0)
   /// Filters out distant or partial detections
-  final double minBoundingBoxArea;
+  final double minForegroundCoverage;
+
+  /// Maximum coverage - if too high, might be false positive or too close
+  final double maxForegroundCoverage;
 
   /// Minimum IoU overlap between pose bounding box and human bounding box
   final double minPoseHumanOverlap;
 
-  /// Whether to allow poses when multiple humans are detected
-  /// If false, poses are rejected when multiple humans are present
-  final bool allowMultipleHumans;
-
   /// Minimum human likelihood score from biomechanical sanity checker
   final double minHumanLikelihood;
 
-  /// Labels that identify a human in object detection results
-  final List<String> humanLabels;
-
   const HumanValidationConfig({
-    this.minHumanConfidence = 0.5,
-    this.minBoundingBoxArea = 0.02, // 2% of frame
+    this.minSegmentationConfidence = 0.5,
+    this.minForegroundCoverage = 0.02, // 2% of frame minimum
+    this.maxForegroundCoverage = 0.95, // 95% max (avoid full-frame false positives)
     this.minPoseHumanOverlap = 0.3,
-    this.allowMultipleHumans = false,
     this.minHumanLikelihood = 0.5,
-    this.humanLabels = const ['person', 'human', 'man', 'woman'],
   });
 
   /// Default strict configuration
@@ -39,11 +34,11 @@ class HumanValidationConfig {
 
   /// Lenient configuration - lower thresholds
   static const lenient = HumanValidationConfig(
-    minHumanConfidence: 0.3,
-    minBoundingBoxArea: 0.01,
+    minSegmentationConfidence: 0.3,
+    minForegroundCoverage: 0.01,
+    maxForegroundCoverage: 0.98,
     minPoseHumanOverlap: 0.2,
     minHumanLikelihood: 0.3,
-    allowMultipleHumans: true,
   );
 }
 
@@ -55,10 +50,10 @@ class HumanValidationConfig {
 /// Key responsibilities (per Clean Architecture):
 /// - All interpretation and validation logic lives here
 /// - Decides biological and physical authenticity of data
-/// - Uses various raw data signals (objects, poses) for decision making
+/// - Uses various raw data signals (segmentation, poses) for decision making
 /// - Completely agnostic of data acquisition (Core layer responsibility)
 ///
-/// Flow: ObjectDetectionResult -> HumanDetectionResult -> PoseValidation
+/// Flow: SegmentationResult -> HumanDetectionResult -> PoseValidation
 class HumanSignalValidator {
   final HumanSanityChecker _sanityChecker;
   final HumanValidationConfig config;
@@ -68,85 +63,53 @@ class HumanSignalValidator {
     this.config = const HumanValidationConfig(),
   }) : _sanityChecker = sanityChecker ?? HumanSanityChecker();
 
-  /// Interpret raw object detection results to determine human presence
+  /// Interpret segmentation results to determine human presence
   ///
   /// This is where the Domain layer applies human-specific knowledge
-  /// to agnostic Core layer data.
-  HumanDetectionResult interpretObjectDetection(
-    ObjectDetectionResult objectDetection,
+  /// to agnostic Core layer segmentation data.
+  HumanDetectionResult interpretSegmentation(
+    SegmentationResult segmentation,
   ) {
-    // Filter objects for human labels (case-insensitive)
-    final humanObjects = <DetectedObjectData>[];
+    // Check if there's sufficient foreground coverage
+    final coverage = segmentation.foregroundCoverage;
+    final confidence = segmentation.averageConfidence;
 
-    for (final obj in objectDetection.objects) {
-      for (final label in obj.labels) {
-        final labelLower = label.text.toLowerCase();
-        if (config.humanLabels.contains(labelLower) &&
-            label.confidence >= config.minHumanConfidence) {
-          humanObjects.add(obj);
-          break; // Object already identified as human
-        }
-      }
-    }
+    // Validate coverage is within acceptable range
+    final hasSufficientCoverage = coverage >= config.minForegroundCoverage &&
+        coverage <= config.maxForegroundCoverage;
 
-    // Filter by minimum bounding box area
-    final validHumans = humanObjects
-        .where((obj) => obj.bounds.area >= config.minBoundingBoxArea)
-        .toList();
+    // Validate confidence meets threshold
+    final hasSufficientConfidence = confidence >= config.minSegmentationConfidence;
 
-    if (validHumans.isEmpty) {
-      return HumanDetectionResult(
-        humanDetected: false,
-        humanCount: 0,
-        detectionLatencyMs: objectDetection.detectionLatencyMs,
-      );
-    }
-
-    // Sort by area (largest first) to find primary human
-    validHumans.sort((a, b) => b.bounds.area.compareTo(a.bounds.area));
-    final primary = validHumans.first;
-
-    // Get the highest confidence for human labels
-    double primaryConfidence = 0.0;
-    for (final label in primary.labels) {
-      final labelLower = label.text.toLowerCase();
-      if (config.humanLabels.contains(labelLower) &&
-          label.confidence > primaryConfidence) {
-        primaryConfidence = label.confidence;
-      }
-    }
+    // Human detected if both conditions are met
+    final humanDetected = segmentation.hasForeground &&
+        hasSufficientCoverage &&
+        hasSufficientConfidence;
 
     return HumanDetectionResult(
-      humanDetected: true,
-      humanCount: validHumans.length,
-      primaryHumanBounds: primary.bounds,
-      primaryConfidence: primaryConfidence,
-      detectionLatencyMs: objectDetection.detectionLatencyMs,
+      humanDetected: humanDetected,
+      coverage: coverage,
+      humanBounds: segmentation.foregroundBounds,
+      confidence: confidence,
+      detectionLatencyMs: segmentation.segmentationLatencyMs,
     );
   }
 
-  /// Validate a detected pose using both object detection and biomechanical checks
+  /// Validate a detected pose using both segmentation and biomechanical checks
   ///
   /// This is the main validation pipeline that produces the "Human-Only Signal".
   PoseValidationResult validatePose({
     required TimestampedPose pose,
     required HumanDetectionResult humanDetection,
   }) {
-    // Gate 1: Human detection check
+    // Gate 1: Human detection check (from segmentation)
     bool passesHumanDetection = humanDetection.humanDetected;
 
-    // Check for multiple humans if not allowed
-    if (passesHumanDetection &&
-        !config.allowMultipleHumans &&
-        humanDetection.humanCount > 1) {
-      passesHumanDetection = false;
-    }
-
-    // Check pose-human bounding box overlap
-    if (passesHumanDetection && humanDetection.primaryHumanBounds != null) {
+    // Check pose-human bounding box overlap if we have bounds
+    if (passesHumanDetection && humanDetection.humanBounds != null) {
       final poseBounds = _calculatePoseBounds(pose);
       if (poseBounds != null) {
-        final overlap = humanDetection.primaryHumanBounds!.iou(poseBounds);
+        final overlap = humanDetection.humanBounds!.iou(poseBounds);
         if (overlap < config.minPoseHumanOverlap) {
           passesHumanDetection = false;
         }
@@ -162,7 +125,9 @@ class HumanSignalValidator {
         isValid: false,
         failedChecks: [
           ...sanityResult.failedChecks,
-          if (!sanityResult.failedChecks.contains(RejectionReason.suspectedHallucination))
+          if (!sanityResult.failedChecks.contains(
+            RejectionReason.suspectedHallucination,
+          ))
             RejectionReason.suspectedHallucination,
         ],
         humanLikelihood: sanityResult.humanLikelihood,
@@ -184,14 +149,7 @@ class HumanSignalValidator {
   /// Quick check if human is present (without full pose validation)
   /// Use this to decide whether to run pose detection at all
   bool isHumanPresent(HumanDetectionResult humanDetection) {
-    if (!humanDetection.humanDetected) return false;
-
-    // If multiple humans not allowed, check count
-    if (!config.allowMultipleHumans && humanDetection.humanCount > 1) {
-      return false;
-    }
-
-    return true;
+    return humanDetection.humanDetected;
   }
 
   /// Calculate bounding box of pose from normalized landmarks

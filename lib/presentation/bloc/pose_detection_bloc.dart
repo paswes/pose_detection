@@ -2,14 +2,13 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
-import 'package:pose_detection/core/services/object_detection_service.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
-import 'package:pose_detection/domain/models/detected_object.dart';
+import 'package:pose_detection/core/services/segmentation_service.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
+import 'package:pose_detection/domain/models/segmentation_result.dart';
 import 'package:pose_detection/domain/models/session_metrics.dart';
 import 'package:pose_detection/domain/models/validation_result.dart';
 import 'package:pose_detection/domain/validators/human_signal_validator.dart';
@@ -19,17 +18,17 @@ import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 /// BLoC for pose detection with cascaded human validation
 ///
 /// Architecture follows Clean Architecture principles:
-/// - Core Layer: CameraService, ObjectDetectionService, PoseDetectionService
+/// - Core Layer: CameraService, SegmentationService, PoseDetectionService
 ///   (agnostic data providers - no knowledge of "humans")
 /// - Domain Layer: HumanSignalValidator (biometric control center)
 ///   (all interpretation and validation logic)
 /// - Presentation Layer: This BLoC (orchestration and state management)
 ///
-/// Flow: Object Detection -> Human Detection (Domain) -> Pose Detection -> Validation
+/// Flow: Segmentation -> Human Detection (Domain) -> Pose Detection -> Validation
 class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   // === Core Layer Services (Agnostic) ===
   final CameraService _cameraService;
-  final ObjectDetectionService _objectDetectionService;
+  final SegmentationService _segmentationService;
   final PoseDetectionService _poseDetectionService;
 
   // === Domain Layer Validator (Biometric Control Center) ===
@@ -54,12 +53,11 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   PoseDetectionBloc({
     required CameraService cameraService,
     required PoseDetectionService poseDetectionService,
-    ObjectDetectionService? objectDetectionService,
+    SegmentationService? segmentationService,
     HumanSignalValidator? humanValidator,
   }) : _cameraService = cameraService,
        _poseDetectionService = poseDetectionService,
-       _objectDetectionService =
-           objectDetectionService ?? ObjectDetectionService(),
+       _segmentationService = segmentationService ?? SegmentationService(),
        _humanValidator = humanValidator ?? HumanSignalValidator(),
        super(PoseDetectionInitial()) {
     on<InitializeEvent>(_onInitialize);
@@ -215,15 +213,15 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
     try {
       // ============================================================
-      // STAGE 1: Core Layer - Object Detection (Agnostic)
+      // STAGE 1: Core Layer - Segmentation (Agnostic)
       // ============================================================
-      // Core service returns ALL detected objects without interpretation
-      ObjectDetectionResult? objectDetectionResult;
+      // Core service segments frame into foreground/background without interpretation
+      SegmentationResult? segmentationResult;
       HumanDetectionResult? humanDetection;
       bool humanPresent = true;
 
       if (_validationEnabled) {
-        objectDetectionResult = await _objectDetectionService.detectObjects(
+        segmentationResult = await _segmentationService.segmentFrame(
           image: event.image,
           sensorOrientation: event.sensorOrientation,
         );
@@ -231,9 +229,9 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         // ============================================================
         // STAGE 2: Domain Layer - Human Interpretation
         // ============================================================
-        // Domain layer interprets agnostic data to find humans
-        humanDetection = _humanValidator.interpretObjectDetection(
-          objectDetectionResult,
+        // Domain layer interprets agnostic segmentation data to detect humans
+        humanDetection = _humanValidator.interpretSegmentation(
+          segmentationResult,
         );
 
         humanPresent = _humanValidator.isHumanPresent(humanDetection);
@@ -434,7 +432,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Emitter<PoseDetectionState> emit,
   ) async {
     _cameraService.dispose();
-    _objectDetectionService.dispose();
+    _segmentationService.dispose();
     _poseDetectionService.dispose();
   }
 

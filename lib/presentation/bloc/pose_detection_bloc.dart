@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/core/utils/logger.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
 import 'package:pose_detection/domain/models/session_metrics.dart';
@@ -51,7 +50,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   ) async {
     try {
       emit(CameraInitializing());
-      _log('Bloc', 'Initializing camera...');
 
       await _cameraService.initialize();
 
@@ -60,12 +58,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         throw Exception('Camera controller not properly initialized');
       }
 
-      _log('Bloc', 'Camera initialized successfully');
-      _log('Bloc', 'Resolution: ${controller.value.previewSize}');
+      Logger.info(
+        'Bloc',
+        'Camera initialized with resolution: ${controller.value.previewSize}',
+      );
 
       emit(CameraReady(controller, lastSession: _lastSession));
     } catch (e) {
-      _log('Bloc', 'ERROR initializing: $e');
+      Logger.error('Bloc', 'ERROR initializing: $e');
       emit(PoseDetectionError('Failed to initialize camera: $e'));
     }
   }
@@ -75,15 +75,15 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Emitter<PoseDetectionState> emit,
   ) async {
     if (_isStreamingActive) {
-      _log(
+      Logger.warning(
         'Bloc',
-        'WARNING: Stream already active, stopping existing stream first',
+        'Stream already active, stopping existing stream first',
       );
       _cameraService.stopImageStream();
       _isStreamingActive = false;
     }
 
-    _log('Bloc', 'Starting pose capture session...');
+    Logger.info('Bloc', 'Starting pose capture session...');
 
     // Reset state for new session
     _frameIndex = 0;
@@ -138,14 +138,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       });
     }
 
-    _log('Bloc', 'Capture session started');
+    Logger.info('Bloc', 'Capture session started');
   }
 
   Future<void> _onStopCapture(
     StopCaptureEvent event,
     Emitter<PoseDetectionState> emit,
   ) async {
-    _log('Bloc', 'Stopping capture session...');
+    Logger.info('Bloc', 'Stopping capture session...');
 
     _cameraService.stopImageStream();
 
@@ -158,10 +158,13 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       _lastSession = finalSession;
       _currentSession = null;
 
-      _log('Bloc', 'Session Summary:');
-      _log('Bloc', '  Duration: ${finalSession.duration.inSeconds}s');
-      _log('Bloc', '  Poses Captured: ${finalSession.capturedPoses.length}');
-      _log('Bloc', '  ${finalSession.metrics}');
+      Logger.info('Bloc', 'Session Summary:');
+      Logger.info('Bloc', '  Duration: ${finalSession.duration.inSeconds}s');
+      Logger.info(
+        'Bloc',
+        '  Poses Captured: ${finalSession.capturedPoses.length}',
+      );
+      Logger.info('Bloc', '  ${finalSession.metrics}');
 
       emit(
         SessionSummary(
@@ -254,14 +257,17 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       }
     } catch (e) {
       _consecutiveErrors++;
-      _log(
+      Logger.error(
         'Bloc',
         'ERROR processing frame ($_consecutiveErrors consecutiveErrors/$_maxConsecutiveErrors): $e',
       );
 
       // Check if we've exceeded the error threshold
       if (_consecutiveErrors >= _maxConsecutiveErrors) {
-        _log('Bloc', 'CRITICAL: Too many consecutive errors, stopping capture');
+        Logger.error(
+          'Bloc',
+          'CRITICAL: Too many consecutive errors, stopping capture',
+        );
         _cameraService.stopImageStream();
         _isStreamingActive = false;
         emit(

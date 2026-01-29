@@ -33,9 +33,9 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   PoseDetectionBloc({
     required CameraService cameraService,
     required PoseDetectionService poseDetectionService,
-  })  : _cameraService = cameraService,
-        _poseDetectionService = poseDetectionService,
-        super(PoseDetectionInitial()) {
+  }) : _cameraService = cameraService,
+       _poseDetectionService = poseDetectionService,
+       super(PoseDetectionInitial()) {
     on<InitializeEvent>(_onInitialize);
     on<StartCaptureEvent>(_onStartCapture);
     on<StopCaptureEvent>(_onStopCapture);
@@ -75,7 +75,10 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Emitter<PoseDetectionState> emit,
   ) async {
     if (_isStreamingActive) {
-      _log('Bloc', 'WARNING: Stream already active, stopping existing stream first');
+      _log(
+        'Bloc',
+        'WARNING: Stream already active, stopping existing stream first',
+      );
       _cameraService.stopImageStream();
       _isStreamingActive = false;
     }
@@ -101,10 +104,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     }
 
     // Emit detecting state
-    emit(Detecting(
-      cameraController: controller,
-      session: _currentSession!,
-    ));
+    emit(
+      Detecting(
+        cameraController: controller,
+        session: _currentSession!,
+      ),
+    );
 
     // Start image stream
     final cameraDescription = _cameraService.getCameraDescription();
@@ -118,7 +123,13 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
           if (!_isProcessingFrame) {
             // Can process - add to event queue
-            add(ProcessFrameEvent(image, cameraDescription.sensorOrientation, timestampMicros));
+            add(
+              ProcessFrameEvent(
+                image,
+                cameraDescription.sensorOrientation,
+                timestampMicros,
+              ),
+            );
           } else {
             // Back-pressure: frame will be dropped
             _updateMetricsForDroppedFrame();
@@ -152,10 +163,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       _log('Bloc', '  Poses Captured: ${finalSession.capturedPoses.length}');
       _log('Bloc', '  ${finalSession.metrics}');
 
-      emit(SessionSummary(
-        cameraController: _cameraService.controller!,
-        session: finalSession,
-      ));
+      emit(
+        SessionSummary(
+          cameraController: _cameraService.controller!,
+          session: finalSession,
+        ),
+      );
     }
   }
 
@@ -228,27 +241,34 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       // Emit updated state
       if (state is Detecting) {
-        emit((state as Detecting).copyWith(
-          currentPose: timestampedPose,
-          imageSize: Size(
-            event.image.width.toDouble(),
-            event.image.height.toDouble(),
+        emit(
+          (state as Detecting).copyWith(
+            currentPose: timestampedPose,
+            imageSize: Size(
+              event.image.width.toDouble(),
+              event.image.height.toDouble(),
+            ),
+            session: _currentSession!,
           ),
-          session: _currentSession!,
-        ));
+        );
       }
     } catch (e) {
       _consecutiveErrors++;
-      _log('Bloc', 'ERROR processing frame ($_consecutiveErrors consecutiveErrors/$_maxConsecutiveErrors): $e');
+      _log(
+        'Bloc',
+        'ERROR processing frame ($_consecutiveErrors consecutiveErrors/$_maxConsecutiveErrors): $e',
+      );
 
       // Check if we've exceeded the error threshold
       if (_consecutiveErrors >= _maxConsecutiveErrors) {
         _log('Bloc', 'CRITICAL: Too many consecutive errors, stopping capture');
         _cameraService.stopImageStream();
         _isStreamingActive = false;
-        emit(PoseDetectionError(
-          'Pose detection failed after $_maxConsecutiveErrors consecutive errors. Last error: $e',
-        ));
+        emit(
+          PoseDetectionError(
+            'Pose detection failed after $_maxConsecutiveErrors consecutive errors. Last error: $e',
+          ),
+        );
       }
     } finally {
       _isProcessingFrame = false;
@@ -273,11 +293,4 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     _cameraService.dispose();
     _poseDetectionService.dispose();
   }
-
-  void _log(String tag, String message) {
-    final timestamp = DateTime.now().toIso8601String().substring(11, 23);
-    developer.log('[$timestamp] [$tag] $message');
-    debugPrint('[$timestamp] [$tag] $message');
-  }
 }
-

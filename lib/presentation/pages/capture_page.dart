@@ -70,6 +70,7 @@ class _CapturePageState extends State<CapturePage> {
           pose: state.currentPose!,
           imageSize: state.imageSize!,
           widgetSize: screenSize,
+          isValidHuman: state.isValidHuman,
         ),
       ),
     );
@@ -173,15 +174,15 @@ class _CapturePageState extends State<CapturePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildMetricChip(
-                    'Processed',
-                    '${metrics.totalFramesProcessed}',
+                    'Valid',
+                    '${metrics.totalValidatedPoses}',
                     Colors.greenAccent,
                   ),
                   _buildMetricChip(
-                    'Dropped',
-                    '${metrics.totalFramesDropped}',
-                    metrics.totalFramesDropped > 0
-                        ? Colors.orangeAccent
+                    'Rejected',
+                    '${metrics.totalRejectedPoses}',
+                    metrics.totalRejectedPoses > 0
+                        ? Colors.redAccent
                         : Colors.white70,
                   ),
                   _buildMetricChip(
@@ -197,6 +198,9 @@ class _CapturePageState extends State<CapturePage> {
                 ],
               ),
             ),
+            // Validation status indicator
+            if (state.validationResult != null)
+              _buildValidationIndicator(state),
           ],
         ),
       ),
@@ -231,6 +235,60 @@ class _CapturePageState extends State<CapturePage> {
     if (latencyMs < 100) return Colors.yellowAccent;
     if (latencyMs < 150) return Colors.orangeAccent;
     return Colors.redAccent;
+  }
+
+  /// Builds a visual indicator showing current validation status
+  Widget _buildValidationIndicator(Detecting state) {
+    final validation = state.validationResult!;
+    final isValid = validation.isValid;
+    final confidence = (validation.confidence * 100).toStringAsFixed(0);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: (isValid ? Colors.green : Colors.red).withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (isValid ? Colors.green : Colors.red).withValues(alpha: 0.5),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isValid ? Icons.check_circle : Icons.warning_amber,
+              color: isValid ? Colors.greenAccent : Colors.redAccent,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isValid ? 'Human Detected ($confidence%)' : 'Not Human',
+              style: TextStyle(
+                color: isValid ? Colors.greenAccent : Colors.redAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (!isValid && validation.rejectionReason != null) ...[
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  validation.rejectionReason!,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 10,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildBottomControls() {

@@ -1,6 +1,6 @@
 import 'dart:developer' as developer;
 
-const loggingEnabled = false;
+const loggingEnabled = true;
 
 /// Centralized logging utility for the application
 class Logger {

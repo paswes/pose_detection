@@ -11,13 +11,18 @@ import 'package:pose_detection/domain/models/motion_data.dart';
 /// - Includes widgetSize in shouldRepaint for rotation handling
 ///
 /// Visual features:
-/// - Cyan skeleton with depth-based sizing (closer = larger)
+/// - Cyan skeleton for valid human poses (depth-based sizing)
+/// - Red skeleton for invalid/rejected poses (false positive detection)
 /// - Confidence indicator via yellow glow intensity
 /// - Z-depth visualization via landmark radius and connection thickness
 class PosePainter extends CustomPainter {
   final TimestampedPose pose;
   final Size imageSize;
   final Size widgetSize;
+
+  /// Whether this pose passed human validation
+  /// When false, the pose is rendered in red to indicate it's a false positive
+  final bool isValidHuman;
 
   /// Complete pose skeleton connections using landmark IDs (0-32)
   static const List<List<int>> _connections = [
@@ -54,7 +59,11 @@ class PosePainter extends CustomPainter {
     required this.pose,
     required this.imageSize,
     required this.widgetSize,
+    this.isValidHuman = true,
   });
+
+  /// Primary color based on validation status
+  Color get _primaryColor => isValidHuman ? Colors.cyan : Colors.red;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -117,11 +126,12 @@ class PosePainter extends CustomPainter {
       }
 
       // Draw main landmark point with depth-adjusted color
-      // Closer = more saturated cyan, further = more muted
+      // Closer = more saturated, further = more muted
+      // Color based on validation status (cyan for valid, red for invalid)
       final landmarkPaint = Paint()
         ..color = Color.lerp(
-          Colors.cyan.withValues(alpha: 0.6),
-          Colors.cyan,
+          _primaryColor.withValues(alpha: 0.6),
+          _primaryColor,
           depth,
         )!
         ..style = PaintingStyle.fill;
@@ -166,7 +176,7 @@ class PosePainter extends CustomPainter {
         final alpha = 0.4 + (avgConfidence * 0.6);
 
         final linePaint = Paint()
-          ..color = Colors.cyan.withValues(alpha: alpha)
+          ..color = _primaryColor.withValues(alpha: alpha)
           ..style = PaintingStyle.stroke
           ..strokeWidth = lineWidth
           ..strokeCap = StrokeCap.round;
@@ -178,9 +188,10 @@ class PosePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PosePainter oldDelegate) {
-    // Check all three dimensions that affect rendering
+    // Check all dimensions that affect rendering
     return oldDelegate.pose != pose ||
         oldDelegate.imageSize != imageSize ||
-        oldDelegate.widgetSize != widgetSize;
+        oldDelegate.widgetSize != widgetSize ||
+        oldDelegate.isValidHuman != isValidHuman;
   }
 }

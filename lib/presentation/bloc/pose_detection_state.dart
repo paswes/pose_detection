@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:equatable/equatable.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
+import 'package:pose_detection/domain/validation/pose_validation_result.dart';
 
 /// States for generic PoseDetectionBloc
 abstract class PoseDetectionState extends Equatable {
@@ -34,28 +35,38 @@ class Detecting extends PoseDetectionState {
   final Size? imageSize;
   final PoseSession session;
 
+  /// Latest validation result for UI feedback
+  /// Null if no pose detected this frame
+  final PoseValidationResult? validationResult;
+
   Detecting({
     required this.cameraController,
     this.currentPose,
     this.imageSize,
     required this.session,
+    this.validationResult,
   });
+
+  /// Whether the current pose is a validated human
+  bool get isValidHuman => validationResult?.isValid ?? false;
 
   Detecting copyWith({
     TimestampedPose? currentPose,
     Size? imageSize,
     PoseSession? session,
+    PoseValidationResult? validationResult,
   }) {
     return Detecting(
       cameraController: cameraController,
       currentPose: currentPose ?? this.currentPose,
       imageSize: imageSize ?? this.imageSize,
       session: session ?? this.session,
+      validationResult: validationResult ?? this.validationResult,
     );
   }
 
   @override
-  List<Object?> get props => [cameraController, currentPose, imageSize, session];
+  List<Object?> get props => [cameraController, currentPose, imageSize, session, validationResult];
 }
 
 /// Session completed with summary

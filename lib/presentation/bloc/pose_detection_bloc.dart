@@ -8,6 +8,8 @@ import 'package:pose_detection/core/utils/logger.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
 import 'package:pose_detection/domain/models/session_metrics.dart';
+import 'package:pose_detection/domain/validation/human_pose_validator.dart';
+import 'package:pose_detection/domain/validation/pose_validation_result.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 
@@ -15,6 +17,7 @@ import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   final CameraService _cameraService;
   final PoseDetectionService _poseDetectionService;
+  final HumanPoseValidator _humanValidator;
 
   bool _isProcessingFrame = false;
   bool _isStreamingActive = false;
@@ -32,8 +35,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   PoseDetectionBloc({
     required CameraService cameraService,
     required PoseDetectionService poseDetectionService,
+    HumanPoseValidatorConfig? validatorConfig,
+    double? userHeightCm,
   }) : _cameraService = cameraService,
        _poseDetectionService = poseDetectionService,
+       _humanValidator = HumanPoseValidator(
+         config: validatorConfig ??
+             HumanPoseValidatorConfig(userHeightCm: userHeightCm),
+       ),
        super(PoseDetectionInitial()) {
     on<InitializeEvent>(_onInitialize);
     on<StartCaptureEvent>(_onStartCapture);
@@ -89,6 +98,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     _frameIndex = 0;
     _previousTimestampMicros = null;
     _consecutiveErrors = 0;
+    _humanValidator.reset(); // Clear temporal history
 
     // Initialize new session with empty metrics
     _currentSession = PoseSession(
@@ -199,6 +209,22 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         _previousTimestampMicros = timestampedPose.timestampMicros;
       }
 
+      // Validate pose is a real human (not furniture, walls, etc.)
+      PoseValidationResult? validationResult;
+      bool poseIsValid = false;
+
+      if (timestampedPose != null) {
+        validationResult = _humanValidator.validate(timestampedPose);
+        poseIsValid = validationResult.isValid;
+
+        if (!poseIsValid) {
+          Logger.debug(
+            'Bloc',
+            'Pose rejected: ${validationResult.rejectionReason}',
+          );
+        }
+      }
+
       // Calculate processing latency (ML Kit inference time)
       final processingLatencyMs =
           DateTime.now().difference(startTime).inMicroseconds / 1000.0;
@@ -208,20 +234,23 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       final nowMicros = DateTime.now().microsecondsSinceEpoch;
       final endToEndLatencyMs = (nowMicros - event.timestampMicros) / 1000.0;
 
-      // Update metrics
+      // Update metrics with validation info
       final updatedMetrics = _currentSession!.metrics
           .withReceivedFrame()
           .withProcessedFrame(
             poseDetected: timestampedPose != null,
             latencyMs: processingLatencyMs,
             endToEndLatencyMs: endToEndLatencyMs,
+            poseValidated: timestampedPose != null ? poseIsValid : null,
+            validationConfidence: validationResult?.confidence,
           );
 
       // Implement ring buffer for pose retention (keep last N poses)
+      // Only add VALID poses to the session (filter out false positives)
       final currentPoses = _currentSession!.capturedPoses;
       List<TimestampedPose> updatedPoses;
 
-      if (timestampedPose != null) {
+      if (timestampedPose != null && poseIsValid) {
         if (currentPoses.length >= _maxPosesInMemory) {
           // Ring buffer: remove oldest pose
           updatedPoses = List<TimestampedPose>.from(currentPoses.sublist(1))
@@ -243,6 +272,8 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       _consecutiveErrors = 0;
 
       // Emit updated state
+      // Note: We emit the pose even if invalid so the UI can show feedback
+      // The session only stores valid poses though
       if (state is Detecting) {
         emit(
           (state as Detecting).copyWith(
@@ -252,6 +283,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
               event.image.height.toDouble(),
             ),
             session: _currentSession!,
+            validationResult: validationResult,
           ),
         );
       }

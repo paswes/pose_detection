@@ -12,6 +12,18 @@ class SessionMetrics {
   /// Total poses successfully detected (frames may have 0 poses if no person visible)
   final int totalPosesDetected;
 
+  /// Total poses that passed human validation (confirmed human, not false positive)
+  final int totalValidatedPoses;
+
+  /// Total poses rejected by human validation (likely non-human/false positive)
+  final int totalRejectedPoses;
+
+  /// Average validation confidence for accepted poses (0.0 to 1.0)
+  final double averageValidationConfidence;
+
+  /// Sum of validation confidences (for calculating running average)
+  final double _totalValidationConfidence;
+
   /// Average processing latency in milliseconds
   /// Time from ML Kit processImage start to completion
   final double averageLatencyMs;
@@ -35,13 +47,18 @@ class SessionMetrics {
     this.totalFramesProcessed = 0,
     this.totalFramesDropped = 0,
     this.totalPosesDetected = 0,
+    this.totalValidatedPoses = 0,
+    this.totalRejectedPoses = 0,
+    this.averageValidationConfidence = 0.0,
+    double totalValidationConfidence = 0.0,
     this.averageLatencyMs = 0.0,
     double totalLatencyMs = 0.0,
     this.averageEndToEndLatencyMs = 0.0,
     double totalEndToEndLatencyMs = 0.0,
     this.lastEndToEndLatencyMs = 0.0,
   })  : _totalLatencyMs = totalLatencyMs,
-        _totalEndToEndLatencyMs = totalEndToEndLatencyMs;
+        _totalEndToEndLatencyMs = totalEndToEndLatencyMs,
+        _totalValidationConfidence = totalValidationConfidence;
 
   /// Effective frames per second (based on processed frames)
   double effectiveFps(Duration sessionDuration) {
@@ -55,14 +72,31 @@ class SessionMetrics {
     return (totalFramesDropped / totalFramesReceived) * 100.0;
   }
 
+  /// Pose rejection rate as percentage (0.0 to 100.0)
+  /// Indicates how many detected poses were rejected as non-human
+  double get rejectionRate {
+    if (totalPosesDetected == 0) return 0.0;
+    return (totalRejectedPoses / totalPosesDetected) * 100.0;
+  }
+
+  /// Validation pass rate as percentage (0.0 to 100.0)
+  double get validationPassRate {
+    if (totalPosesDetected == 0) return 0.0;
+    return (totalValidatedPoses / totalPosesDetected) * 100.0;
+  }
+
   /// Update metrics with a new processed frame
   ///
   /// [latencyMs] - ML Kit processing time only
   /// [endToEndLatencyMs] - Optional total latency from frame capture to state emission
+  /// [poseValidated] - Whether the detected pose passed human validation
+  /// [validationConfidence] - Confidence score from validation (0.0 to 1.0)
   SessionMetrics withProcessedFrame({
     required bool poseDetected,
     required double latencyMs,
     double? endToEndLatencyMs,
+    bool? poseValidated,
+    double? validationConfidence,
   }) {
     final newProcessed = totalFramesProcessed + 1;
     final newPoses = poseDetected ? totalPosesDetected + 1 : totalPosesDetected;
@@ -78,11 +112,33 @@ class SessionMetrics {
         : averageEndToEndLatencyMs;
     final newLastE2E = endToEndLatencyMs ?? lastEndToEndLatencyMs;
 
+    // Calculate validation metrics
+    int newValidated = totalValidatedPoses;
+    int newRejected = totalRejectedPoses;
+    double newTotalValConf = _totalValidationConfidence;
+    double newAvgValConf = averageValidationConfidence;
+
+    if (poseDetected && poseValidated != null) {
+      if (poseValidated) {
+        newValidated++;
+        if (validationConfidence != null) {
+          newTotalValConf += validationConfidence;
+          newAvgValConf = newTotalValConf / newValidated;
+        }
+      } else {
+        newRejected++;
+      }
+    }
+
     return SessionMetrics(
       totalFramesReceived: totalFramesReceived,
       totalFramesProcessed: newProcessed,
       totalFramesDropped: totalFramesDropped,
       totalPosesDetected: newPoses,
+      totalValidatedPoses: newValidated,
+      totalRejectedPoses: newRejected,
+      averageValidationConfidence: newAvgValConf,
+      totalValidationConfidence: newTotalValConf,
       averageLatencyMs: newAverage,
       totalLatencyMs: newTotalLatency,
       averageEndToEndLatencyMs: newAverageE2E,
@@ -98,6 +154,10 @@ class SessionMetrics {
       totalFramesProcessed: totalFramesProcessed,
       totalFramesDropped: totalFramesDropped,
       totalPosesDetected: totalPosesDetected,
+      totalValidatedPoses: totalValidatedPoses,
+      totalRejectedPoses: totalRejectedPoses,
+      averageValidationConfidence: averageValidationConfidence,
+      totalValidationConfidence: _totalValidationConfidence,
       averageLatencyMs: averageLatencyMs,
       totalLatencyMs: _totalLatencyMs,
       averageEndToEndLatencyMs: averageEndToEndLatencyMs,
@@ -113,6 +173,10 @@ class SessionMetrics {
       totalFramesProcessed: totalFramesProcessed,
       totalFramesDropped: totalFramesDropped + 1,
       totalPosesDetected: totalPosesDetected,
+      totalValidatedPoses: totalValidatedPoses,
+      totalRejectedPoses: totalRejectedPoses,
+      averageValidationConfidence: averageValidationConfidence,
+      totalValidationConfidence: _totalValidationConfidence,
       averageLatencyMs: averageLatencyMs,
       totalLatencyMs: _totalLatencyMs,
       averageEndToEndLatencyMs: averageEndToEndLatencyMs,
@@ -123,6 +187,6 @@ class SessionMetrics {
 
   @override
   String toString() {
-    return 'SessionMetrics(received: $totalFramesReceived, processed: $totalFramesProcessed, dropped: $totalFramesDropped, poses: $totalPosesDetected, avgLatency: ${averageLatencyMs.toStringAsFixed(2)}ms, avgE2E: ${averageEndToEndLatencyMs.toStringAsFixed(2)}ms, dropRate: ${dropRate.toStringAsFixed(1)}%)';
+    return 'SessionMetrics(received: $totalFramesReceived, processed: $totalFramesProcessed, dropped: $totalFramesDropped, poses: $totalPosesDetected, validated: $totalValidatedPoses, rejected: $totalRejectedPoses, avgLatency: ${averageLatencyMs.toStringAsFixed(2)}ms, avgE2E: ${averageEndToEndLatencyMs.toStringAsFixed(2)}ms, dropRate: ${dropRate.toStringAsFixed(1)}%, rejectionRate: ${rejectionRate.toStringAsFixed(1)}%)';
   }
 }

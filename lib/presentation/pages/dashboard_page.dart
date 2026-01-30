@@ -7,8 +7,10 @@ import 'package:pose_detection/domain/models/pose_session.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
+import 'package:pose_detection/presentation/bloc/squat_analysis_bloc.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
 import 'package:pose_detection/presentation/pages/session_details_page.dart';
+import 'package:pose_detection/presentation/pages/squat_capture_page.dart';
 
 /// Main dashboard for the Pose Engine Core
 class DashboardPage extends StatefulWidget {
@@ -189,6 +191,10 @@ class _DashboardPageState extends State<DashboardPage>
             const SizedBox(height: 40),
 
             // Last session stats (if available)
+            // Squat session button
+            _buildSquatSessionButton(),
+            const SizedBox(height: 24),
+
             if (lastSession != null) ...[
               _buildLastSessionCard(lastSession),
               const SizedBox(height: 24),
@@ -225,6 +231,100 @@ class _DashboardPageState extends State<DashboardPage>
         ),
       ],
     );
+  }
+
+  Widget _buildSquatSessionButton() {
+    return GestureDetector(
+      onTap: () => _startSquatSession(),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.greenAccent.withValues(alpha: 0.2),
+              Colors.cyanAccent.withValues(alpha: 0.1),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.greenAccent.withValues(alpha: 0.4),
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.greenAccent.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.fitness_center,
+                color: Colors.greenAccent,
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Squat Analysis',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Real-time form feedback & rep counting',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.greenAccent,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startSquatSession() async {
+    final navigator = Navigator.of(context);
+
+    // Start pose detection
+    _bloc.add(StartCaptureEvent());
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    if (mounted) {
+      // Navigate to squat capture page with both blocs
+      await navigator.push(
+        MaterialPageRoute(
+          builder: (context) => MultiBlocProvider(
+            providers: [
+              BlocProvider.value(value: _bloc),
+              BlocProvider(
+                create: (_) => SquatAnalysisBloc(poseDetectionBloc: _bloc),
+              ),
+            ],
+            child: const SquatCapturePage(),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildEmptyStateCard() {

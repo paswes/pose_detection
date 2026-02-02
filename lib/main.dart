@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pose_detection/di/service_locator.dart';
-import 'package:pose_detection/presentation/pages/dashboard_page.dart';
+import 'package:pose_detection/presentation/pages/capture_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,7 +37,7 @@ class PoseEngineApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const DashboardPage(),
+      home: const CapturePage(),
     );
   }
 }

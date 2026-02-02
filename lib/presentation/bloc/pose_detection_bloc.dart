@@ -118,12 +118,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
     _sessionManager.endSession();
 
-    if (_sessionManager.lastSession != null) {
-      emit(SessionSummary(
-        cameraController: _cameraService.controller!,
-        session: _sessionManager.lastSession!,
-      ));
-    }
+    // Transition back to CameraReady instead of SessionSummary
+    // This keeps the user on the same page
+    emit(CameraReady(
+      _cameraService.controller!,
+      lastSession: _sessionManager.lastSession,
+    ));
 
     Logger.info('Bloc', 'Capture session stopped');
   }

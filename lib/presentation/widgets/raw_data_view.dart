@@ -17,14 +17,10 @@ class RawDataView extends StatelessWidget {
     if (pose == null) {
       return Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.8),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
         child: const Center(
           child: Text(
             'No pose detected',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
+            style: TextStyle(color: Color(0xFF666666), fontSize: 14),
           ),
         ),
       );
@@ -32,10 +28,6 @@ class RawDataView extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.9),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -71,31 +63,28 @@ class RawDataView extends StatelessWidget {
           children: [
             const Flexible(
               child: Text(
-                'Motion Data Stream',
+                'Raw Landmark Data',
                 style: TextStyle(
-                  color: Colors.cyan,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.cyan.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF333333),
+                borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
                 '${pose!.landmarks.length} pts',
                 style: const TextStyle(
-                  color: Colors.cyan,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF888888),
+                  fontSize: 12,
+                  fontFamily: 'monospace',
                 ),
               ),
             ),
@@ -106,15 +95,18 @@ class RawDataView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.cyan.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 1),
+            color: const Color(0xFF252525),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: const Color(0xFF333333), width: 1),
           ),
           child: Column(
             children: [
-              _buildMetadataRow('Frame Index', '#${pose!.frameIndex}'),
+              _buildMetadataRow('Frame', '#${pose!.frameIndex}'),
               _buildMetadataRow('Timestamp', '${pose!.timestampMicros} μs'),
-              _buildMetadataRow('Image Size', '${pose!.imageWidth.toInt()} × ${pose!.imageHeight.toInt()}'),
+              _buildMetadataRow(
+                'Image',
+                '${pose!.imageWidth.toInt()} × ${pose!.imageHeight.toInt()}',
+              ),
             ],
           ),
         ),
@@ -130,15 +122,14 @@ class RawDataView extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(color: Colors.white60, fontSize: 11),
+            style: const TextStyle(color: Color(0xFF666666), fontSize: 11),
           ),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.cyan,
+              color: Color(0xFF888888),
               fontSize: 11,
               fontFamily: 'monospace',
-              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -148,21 +139,21 @@ class RawDataView extends StatelessWidget {
 
   Widget _buildTableHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.cyan.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFF252525),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: const Row(
         children: [
           SizedBox(
-            width: 30,
+            width: 24,
             child: Text(
               '#',
               style: TextStyle(
-                color: Colors.cyan,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+                color: Color(0xFF888888),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
               ),
             ),
           ),
@@ -171,9 +162,9 @@ class RawDataView extends StatelessWidget {
             child: Text(
               'Landmark',
               style: TextStyle(
-                color: Colors.cyan,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+                color: Color(0xFF888888),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
               ),
             ),
           ),
@@ -182,9 +173,9 @@ class RawDataView extends StatelessWidget {
             child: Text(
               'X',
               style: TextStyle(
-                color: Colors.cyan,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+                color: Color(0xFF888888),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
               ),
               textAlign: TextAlign.right,
             ),
@@ -194,9 +185,9 @@ class RawDataView extends StatelessWidget {
             child: Text(
               'Y',
               style: TextStyle(
-                color: Colors.cyan,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+                color: Color(0xFF888888),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
               ),
               textAlign: TextAlign.right,
             ),
@@ -206,9 +197,9 @@ class RawDataView extends StatelessWidget {
             child: Text(
               'Z',
               style: TextStyle(
-                color: Colors.cyan,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+                color: Color(0xFF888888),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
               ),
               textAlign: TextAlign.right,
             ),
@@ -218,9 +209,9 @@ class RawDataView extends StatelessWidget {
             child: Text(
               'Conf',
               style: TextStyle(
-                color: Colors.cyan,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+                color: Color(0xFF888888),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
               ),
               textAlign: TextAlign.right,
             ),
@@ -232,23 +223,23 @@ class RawDataView extends StatelessWidget {
 
   Widget _buildLandmarkRow(int index, RawLandmark landmark) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+      margin: const EdgeInsets.only(bottom: 1),
       decoration: BoxDecoration(
         color: index.isEven
-            ? Colors.white.withValues(alpha: 0.05)
+            ? const Color(0xFF1A1A1A)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(2),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 30,
+            width: 24,
             child: Text(
               '${landmark.id}',
               style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
+                color: Color(0xFF666666),
+                fontSize: 10,
                 fontFamily: 'monospace',
               ),
             ),
@@ -257,7 +248,7 @@ class RawDataView extends StatelessWidget {
             flex: 3,
             child: Text(
               _getLandmarkName(landmark.id),
-              style: const TextStyle(color: Colors.white70, fontSize: 11),
+              style: const TextStyle(color: Color(0xFF888888), fontSize: 10),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -266,8 +257,8 @@ class RawDataView extends StatelessWidget {
             child: Text(
               landmark.x.toStringAsFixed(1),
               style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
+                color: Color(0xFF888888),
+                fontSize: 10,
                 fontFamily: 'monospace',
               ),
               textAlign: TextAlign.right,
@@ -278,8 +269,8 @@ class RawDataView extends StatelessWidget {
             child: Text(
               landmark.y.toStringAsFixed(1),
               style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
+                color: Color(0xFF888888),
+                fontSize: 10,
                 fontFamily: 'monospace',
               ),
               textAlign: TextAlign.right,
@@ -290,8 +281,8 @@ class RawDataView extends StatelessWidget {
             child: Text(
               landmark.z.toStringAsFixed(1),
               style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
+                color: Color(0xFF888888),
+                fontSize: 10,
                 fontFamily: 'monospace',
               ),
               textAlign: TextAlign.right,
@@ -300,12 +291,10 @@ class RawDataView extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              landmark.likelihood.toStringAsFixed(4),
+              landmark.likelihood.toStringAsFixed(2),
               style: TextStyle(
-                color: landmark.likelihood > 0.7
-                    ? Colors.greenAccent
-                    : Colors.orangeAccent,
-                fontSize: 11,
+                color: _getConfidenceColor(landmark.likelihood),
+                fontSize: 10,
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w600,
               ),
@@ -317,4 +306,9 @@ class RawDataView extends StatelessWidget {
     );
   }
 
+  Color _getConfidenceColor(double confidence) {
+    if (confidence > 0.8) return const Color(0xFF4CAF50);
+    if (confidence > 0.5) return const Color(0xFFFFEB3B);
+    return const Color(0xFFF44336);
+  }
 }

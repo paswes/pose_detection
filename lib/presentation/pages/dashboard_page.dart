@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/di/service_locator.dart';
-import 'package:pose_detection/domain/models/pose_session.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
-import 'package:pose_detection/presentation/pages/session_details_page.dart';
 
-/// Main dashboard for the Pose Engine Core
+/// Minimal dashboard - entry point to capture
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -58,7 +56,7 @@ class _DashboardPageState extends State<DashboardPage>
     return BlocProvider.value(
       value: _bloc,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0A0E21),
+        backgroundColor: const Color(0xFF121212),
         body: BlocBuilder<PoseDetectionBloc, PoseDetectionState>(
           builder: (context, state) {
             if (state is CameraInitializing || state is PoseDetectionInitial) {
@@ -70,43 +68,12 @@ class _DashboardPageState extends State<DashboardPage>
             }
 
             if (state is CameraReady || state is SessionSummary) {
-              final lastSession = state is CameraReady
-                  ? state.lastSession
-                  : (state as SessionSummary).session;
-
-              return _buildDashboard(lastSession);
+              return _buildDashboard();
             }
 
             return const SizedBox.shrink();
           },
         ),
-        floatingActionButton:
-            BlocBuilder<PoseDetectionBloc, PoseDetectionState>(
-              builder: (context, state) {
-                if (state is CameraReady || state is SessionSummary) {
-                  return FloatingActionButton(
-                    onPressed: () async {
-                      final navigator = Navigator.of(context);
-                      _bloc.add(StartCaptureEvent());
-                      await Future.delayed(const Duration(milliseconds: 100));
-                      if (mounted) {
-                        await navigator.push(
-                          MaterialPageRoute(
-                            builder: (context) => BlocProvider.value(
-                              value: _bloc,
-                              child: const CapturePage(),
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    backgroundColor: Colors.cyan,
-                    child: const Icon(Icons.play_arrow, size: 32),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
       ),
     );
   }
@@ -116,11 +83,11 @@ class _DashboardPageState extends State<DashboardPage>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: Colors.cyan),
+          CircularProgressIndicator(color: Color(0xFF888888)),
           SizedBox(height: 24),
           Text(
-            'Initializing Pose Engine...',
-            style: TextStyle(color: Colors.white70, fontSize: 18),
+            'Initializing...',
+            style: TextStyle(color: Color(0xFF888888), fontSize: 16),
           ),
         ],
       ),
@@ -134,38 +101,33 @@ class _DashboardPageState extends State<DashboardPage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 64),
+            const Icon(Icons.error_outline, color: Color(0xFFF44336), size: 48),
             const SizedBox(height: 24),
-            Text(
+            const Text(
               'Error',
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
               message,
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
+              style: const TextStyle(color: Color(0xFF888888), fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            ElevatedButton(
+            TextButton(
               onPressed: () => _bloc.add(InitializeEvent()),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.cyan,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF888888),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
+                  horizontal: 24,
+                  vertical: 12,
                 ),
               ),
-              child: const Text(
-                'Retry',
-                style: TextStyle(
-                  color: Colors.white,
-                ),
-              ),
+              child: const Text('Retry'),
             ),
           ],
         ),
@@ -173,7 +135,7 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  Widget _buildDashboard(dynamic lastSession) {
+  Widget _buildDashboard() {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -181,178 +143,71 @@ class _DashboardPageState extends State<DashboardPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            _buildHeader(),
-            const SizedBox(height: 40),
-
-            // Last session stats (if available)
-            if (lastSession != null) ...[
-              _buildLastSessionCard(lastSession),
-              const SizedBox(height: 24),
-            ] else ...[
-              _buildEmptyStateCard(),
-              const SizedBox(height: 24),
-            ],
+            const Text(
+              'Pose Engine',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w300,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Core Inspection Dashboard',
+              style: TextStyle(
+                color: Color(0xFF666666),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
 
             const Spacer(),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Pose Engine Core',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          'Generic Pose Detection System',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyStateCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 2,
-        ),
-      ),
-      child: const Column(
-        children: [
-          Text(
-            'No Session History',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Start a new capture to begin tracking poses',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 14,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLastSessionCard(PoseSession session) {
-    final duration = session.duration;
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    final metrics = session.metrics;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => SessionDetailsPage(session: session),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.cyan.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.cyan.withValues(alpha: 0.3),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.history, color: Colors.cyan, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Last Session',
-                      style: TextStyle(
-                        color: Colors.cyan,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+            // Start capture button
+            Center(
+              child: GestureDetector(
+                onTap: _startCapture,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF1E1E1E),
+                    border: Border.all(
+                      color: const Color(0xFF333333),
+                      width: 2,
                     ),
-                  ],
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow,
+                    color: Color(0xFF888888),
+                    size: 48,
+                  ),
                 ),
-                // Tap indicator
-                const Row(
-                  children: [
-                    Text(
-                      'View Details',
-                      style: TextStyle(
-                        color: Colors.white60,
-                        fontSize: 12,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(Icons.arrow_forward_ios, color: Colors.cyan, size: 14),
-                  ],
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatColumn('Duration', '${minutes}m ${seconds}s'),
-                _buildStatColumn('Poses', '${session.capturedPoses.length}'),
-                _buildStatColumn(
-                  'FPS',
-                  session.effectiveFps.toStringAsFixed(1),
+            const Center(
+              child: Text(
+                'Start Capture',
+                style: TextStyle(
+                  color: Color(0xFF666666),
+                  fontSize: 14,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Pipeline metrics
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
-                children: [
-                  _buildMetricRow(
-                    'Processed',
-                    '${metrics.totalFramesProcessed}',
-                  ),
-                  _buildMetricRow(
-                    'Dropped',
-                    '${metrics.totalFramesDropped} (${metrics.dropRate.toStringAsFixed(1)}%)',
-                  ),
-                  _buildMetricRow(
-                    'Avg Latency',
-                    '${metrics.averageLatencyMs.toStringAsFixed(1)} ms',
-                  ),
-                ],
+            ),
+
+            const Spacer(),
+
+            // Version info
+            const Center(
+              child: Text(
+                'v1.0 · ML Kit · 33 Landmarks',
+                style: TextStyle(
+                  color: Color(0xFF444444),
+                  fontSize: 11,
+                ),
               ),
             ),
           ],
@@ -361,49 +216,19 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  Widget _buildMetricRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white60, fontSize: 11),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatColumn(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+  void _startCapture() async {
+    final navigator = Navigator.of(context);
+    _bloc.add(StartCaptureEvent());
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (mounted) {
+      await navigator.push(
+        MaterialPageRoute(
+          builder: (context) => BlocProvider.value(
+            value: _bloc,
+            child: const CapturePage(),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white60,
-            fontSize: 12,
-          ),
-        ),
-      ],
-    );
+      );
+    }
   }
 }

@@ -10,6 +10,7 @@ import 'package:pose_detection/presentation/widgets/pose_painter.dart';
 import 'package:pose_detection/presentation/widgets/raw_data_view.dart';
 
 /// Fullscreen camera capture page with pose overlay
+/// Supports Minimal and Detail view modes
 class CapturePage extends StatefulWidget {
   const CapturePage({super.key});
 
@@ -18,6 +19,7 @@ class CapturePage extends StatefulWidget {
 }
 
 class _CapturePageState extends State<CapturePage> {
+  bool _isDetailMode = false;
   bool _showRawData = false;
   late final LatencyThresholds _thresholds;
 
@@ -30,18 +32,17 @@ class _CapturePageState extends State<CapturePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF121212),
       body: BlocConsumer<PoseDetectionBloc, PoseDetectionState>(
         listener: (context, state) {
           if (state is SessionSummary) {
-            // Navigate back to dashboard with summary
             Navigator.of(context).pop();
           }
         },
         builder: (context, state) {
           if (state is! Detecting) {
             return const Center(
-              child: CircularProgressIndicator(color: Colors.cyan),
+              child: CircularProgressIndicator(color: Color(0xFF888888)),
             );
           }
 
@@ -55,14 +56,16 @@ class _CapturePageState extends State<CapturePage> {
               if (state.currentPose != null && state.imageSize != null)
                 _buildPoseOverlay(state),
 
-              // Top stats bar
-              _buildTopBar(state),
+              // Top metrics bar
+              _isDetailMode
+                  ? _buildDetailTopBar(state)
+                  : _buildMinimalTopBar(state),
 
               // Bottom controls
               _buildBottomControls(),
 
-              // Raw data overlay (optional)
-              if (_showRawData) _buildRawDataOverlay(state),
+              // Raw data overlay (detail mode only)
+              if (_isDetailMode && _showRawData) _buildRawDataOverlay(state),
             ],
           );
         },
@@ -84,129 +87,37 @@ class _CapturePageState extends State<CapturePage> {
     );
   }
 
-  Widget _buildTopBar(Detecting state) {
-    final duration = state.session.duration;
-    final minutes = duration.inMinutes.toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+  // ============================================================
+  // MINIMAL MODE - 3 metrics only
+  // ============================================================
+
+  Widget _buildMinimalTopBar(Detecting state) {
     final metrics = state.session.metrics;
+    final duration = state.session.duration;
     final fps = metrics.effectiveFps(duration);
-    final avgConfidence = state.currentPose?.avgConfidence ?? 0.0;
+    final latency = metrics.lastEndToEndLatencyMs;
+    final confidence = state.currentPose?.avgConfidence ?? 0.0;
 
     return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withValues(alpha: 0.8),
-              Colors.transparent,
-            ],
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // Top row: Duration + FPS
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Duration
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: const Color(0xFF404040),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    '$minutes:$seconds',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-
-                // FPS + Poses
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: const Color(0xFF404040),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    '${fps.toStringAsFixed(1)} FPS  |  ${state.session.capturedPoses.length} poses',
-                    style: const TextStyle(
-                      color: Color(0xFFBBBBBB),
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-              ],
+            _buildMinimalMetric(
+              fps.toStringAsFixed(1),
+              'FPS',
+              _getFpsColor(fps),
             ),
-            const SizedBox(height: 8),
-            // Metrics grid - row 1
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A).withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: const Color(0xFF333333),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildMetricChip(
-                        'Latency',
-                        '${metrics.lastEndToEndLatencyMs.toStringAsFixed(0)}ms',
-                        _getLatencyColor(metrics.lastEndToEndLatencyMs),
-                      ),
-                      _buildMetricChip(
-                        'Drop',
-                        '${metrics.dropRate.toStringAsFixed(1)}%',
-                        metrics.dropRate > 5
-                            ? const Color(0xFFF44336)
-                            : const Color(0xFF888888),
-                      ),
-                      _buildMetricChip(
-                        'Detect',
-                        '${metrics.detectionRate.toStringAsFixed(0)}%',
-                        metrics.detectionRate > 90
-                            ? const Color(0xFF4CAF50)
-                            : const Color(0xFF888888),
-                      ),
-                      _buildMetricChip(
-                        'Conf',
-                        avgConfidence.toStringAsFixed(2),
-                        _getConfidenceColor(avgConfidence),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            _buildMinimalMetric(
+              '${latency.toStringAsFixed(0)}ms',
+              'Latency',
+              _getLatencyColor(latency),
+            ),
+            _buildMinimalMetric(
+              confidence.toStringAsFixed(2),
+              'Conf',
+              _getConfidenceColor(confidence),
             ),
           ],
         ),
@@ -214,20 +125,164 @@ class _CapturePageState extends State<CapturePage> {
     );
   }
 
-  Widget _buildMetricChip(String label, String value, Color valueColor) {
+  Widget _buildMinimalMetric(String value, String label, Color valueColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFF333333), width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF666666),
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // DETAIL MODE - All metrics
+  // ============================================================
+
+  Widget _buildDetailTopBar(Detecting state) {
+    final duration = state.session.duration;
+    final minutes = duration.inMinutes.toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    final metrics = state.session.metrics;
+    final fps = metrics.effectiveFps(duration);
+    final avgConfidence = state.currentPose?.avgConfidence ?? 0.0;
+    final highConf = state.currentPose?.highConfidenceLandmarks ?? 0;
+    final lowConf = state.currentPose?.lowConfidenceLandmarks ?? 0;
+
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E).withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF333333), width: 1),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Row 1: Duration + FPS + Poses
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$minutes:$seconds',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                Text(
+                  '${fps.toStringAsFixed(1)} FPS  ·  ${state.session.capturedPoses.length} poses',
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Row 2: Latency metrics
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildDetailMetric(
+                  'E2E',
+                  '${metrics.lastEndToEndLatencyMs.toStringAsFixed(0)}ms',
+                  _getLatencyColor(metrics.lastEndToEndLatencyMs),
+                ),
+                _buildDetailMetric(
+                  'ML',
+                  '${metrics.averageLatencyMs.toStringAsFixed(0)}ms',
+                  _getLatencyColor(metrics.averageLatencyMs),
+                ),
+                _buildDetailMetric(
+                  'Drop',
+                  '${metrics.dropRate.toStringAsFixed(1)}%',
+                  metrics.dropRate > 5
+                      ? const Color(0xFFF44336)
+                      : const Color(0xFF888888),
+                ),
+                _buildDetailMetric(
+                  'Detect',
+                  '${metrics.detectionRate.toStringAsFixed(0)}%',
+                  metrics.detectionRate > 90
+                      ? const Color(0xFF4CAF50)
+                      : const Color(0xFF888888),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Row 3: Confidence metrics
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildDetailMetric(
+                  'Avg Conf',
+                  avgConfidence.toStringAsFixed(2),
+                  _getConfidenceColor(avgConfidence),
+                ),
+                _buildDetailMetric(
+                  'High',
+                  '$highConf',
+                  const Color(0xFF4CAF50),
+                ),
+                _buildDetailMetric(
+                  'Low',
+                  '$lowConf',
+                  lowConf > 5
+                      ? const Color(0xFFF44336)
+                      : const Color(0xFF888888),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailMetric(String label, String value, Color valueColor) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,
-          style: const TextStyle(color: Colors.white60, fontSize: 9),
+          style: const TextStyle(color: Color(0xFF666666), fontSize: 9),
         ),
+        const SizedBox(height: 2),
         Text(
           value,
           style: TextStyle(
             color: valueColor,
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
             fontFamily: 'monospace',
           ),
         ),
@@ -235,58 +290,38 @@ class _CapturePageState extends State<CapturePage> {
     );
   }
 
-  /// Returns color based on end-to-end latency thresholds from config
-  Color _getLatencyColor(double latencyMs) {
-    if (latencyMs < _thresholds.excellent) {
-      return const Color(0xFF4CAF50); // Green
-    }
-    if (latencyMs < _thresholds.acceptable) {
-      return const Color(0xFFFFEB3B); // Yellow
-    }
-    if (latencyMs < _thresholds.warning) {
-      return const Color(0xFFFF9800); // Orange
-    }
-    return const Color(0xFFF44336); // Red
-  }
-
-  /// Returns color based on average confidence
-  Color _getConfidenceColor(double confidence) {
-    if (confidence > 0.8) {
-      return const Color(0xFF4CAF50); // Green
-    }
-    if (confidence > 0.5) {
-      return const Color(0xFFFFEB3B); // Yellow
-    }
-    return const Color(0xFFF44336); // Red
-  }
+  // ============================================================
+  // BOTTOM CONTROLS
+  // ============================================================
 
   Widget _buildBottomControls() {
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.7),
-                Colors.transparent,
-              ],
-            ),
-          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Toggle raw data
+              // Toggle mode button
               _buildControlButton(
-                icon: _showRawData ? Icons.visibility_off : Icons.data_array,
-                label: _showRawData ? 'Hide Data' : 'Show Data',
-                onTap: () => setState(() => _showRawData = !_showRawData),
+                icon: _isDetailMode ? Icons.visibility_off : Icons.visibility,
+                label: _isDetailMode ? 'Minimal' : 'Detail',
+                onTap: () => setState(() {
+                  _isDetailMode = !_isDetailMode;
+                  if (!_isDetailMode) _showRawData = false;
+                }),
               ),
 
-              // Stop button (larger, primary action)
+              // Raw data button (only in detail mode)
+              if (_isDetailMode)
+                _buildControlButton(
+                  icon: _showRawData ? Icons.close : Icons.data_array,
+                  label: _showRawData ? 'Hide' : 'Data',
+                  onTap: () => setState(() => _showRawData = !_showRawData),
+                ),
+
+              // Stop button
               _buildStopButton(),
             ],
           ),
@@ -301,19 +336,12 @@ class _CapturePageState extends State<CapturePage> {
         context.read<PoseDetectionBloc>().add(StopCaptureEvent());
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.red.withValues(alpha: 0.5),
-              blurRadius: 20,
-              spreadRadius: 2,
-            ),
-          ],
+          color: const Color(0xFFF44336),
+          borderRadius: BorderRadius.circular(24),
         ),
-        child: Icon(Icons.stop, color: Colors.white, size: 28),
+        child: const Icon(Icons.stop, color: Colors.white, size: 24),
       ),
     );
   }
@@ -326,26 +354,23 @@ class _CapturePageState extends State<CapturePage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.cyan.withValues(alpha: 0.3),
+          color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.cyan.withValues(alpha: 0.5),
-            width: 1,
-          ),
+          border: Border.all(color: const Color(0xFF333333), width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.cyan, size: 20),
-            const SizedBox(width: 8),
+            Icon(icon, color: const Color(0xFF888888), size: 18),
+            const SizedBox(width: 6),
             Text(
               label,
               style: const TextStyle(
-                color: Colors.cyan,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+                color: Color(0xFF888888),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -354,32 +379,36 @@ class _CapturePageState extends State<CapturePage> {
     );
   }
 
+  // ============================================================
+  // RAW DATA OVERLAY
+  // ============================================================
+
   Widget _buildRawDataOverlay(Detecting state) {
     return GestureDetector(
       onTap: () => setState(() => _showRawData = false),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        color: Colors.black.withValues(alpha: 0.7),
-        padding: EdgeInsets.all(16),
+        color: const Color(0xFF121212).withValues(alpha: 0.9),
+        padding: const EdgeInsets.all(16),
         child: SafeArea(
           child: Column(
             children: [
-              // Tap area to close
-              Expanded(
+              // Tap to close hint
+              const Expanded(
                 flex: 1,
-                child: const Center(
+                child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.keyboard_arrow_down,
-                        color: Colors.white54,
-                        size: 32,
+                        color: Color(0xFF444444),
+                        size: 28,
                       ),
-                      SizedBox(height: 8),
+                      SizedBox(height: 4),
                       Text(
                         'Tap to close',
-                        style: TextStyle(color: Colors.white54, fontSize: 14),
+                        style: TextStyle(color: Color(0xFF444444), fontSize: 12),
                       ),
                     ],
                   ),
@@ -389,14 +418,14 @@ class _CapturePageState extends State<CapturePage> {
               Expanded(
                 flex: 3,
                 child: GestureDetector(
-                  onTap: () {}, // Prevent close when tapping inside data view
+                  onTap: () {}, // Prevent close when tapping inside
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.95),
-                      borderRadius: const BorderRadius.all(Radius.circular(20)),
+                      color: const Color(0xFF1E1E1E),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.cyan.withValues(alpha: 0.3),
-                        width: 2,
+                        color: const Color(0xFF333333),
+                        width: 1,
                       ),
                     ),
                     child: RawDataView(pose: state.currentPose),
@@ -408,5 +437,28 @@ class _CapturePageState extends State<CapturePage> {
         ),
       ),
     );
+  }
+
+  // ============================================================
+  // COLOR HELPERS
+  // ============================================================
+
+  Color _getFpsColor(double fps) {
+    if (fps >= 25) return const Color(0xFF4CAF50);
+    if (fps >= 15) return const Color(0xFFFFEB3B);
+    return const Color(0xFFF44336);
+  }
+
+  Color _getLatencyColor(double latencyMs) {
+    if (latencyMs < _thresholds.excellent) return const Color(0xFF4CAF50);
+    if (latencyMs < _thresholds.acceptable) return const Color(0xFFFFEB3B);
+    if (latencyMs < _thresholds.warning) return const Color(0xFFFF9800);
+    return const Color(0xFFF44336);
+  }
+
+  Color _getConfidenceColor(double confidence) {
+    if (confidence > 0.8) return const Color(0xFF4CAF50);
+    if (confidence > 0.5) return const Color(0xFFFFEB3B);
+    return const Color(0xFFF44336);
   }
 }

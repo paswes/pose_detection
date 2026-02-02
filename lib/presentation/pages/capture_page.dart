@@ -49,8 +49,11 @@ class _CapturePageState extends State<CapturePage> {
           return Stack(
             fit: StackFit.expand,
             children: [
-              // Camera preview
-              CameraPreviewWidget(cameraController: state.cameraController),
+              // Camera preview (mirrored for front camera)
+              CameraPreviewWidget(
+                cameraController: state.cameraController,
+                isFrontCamera: state.isFrontCamera,
+              ),
 
               // Pose overlay
               if (state.currentPose != null && state.imageSize != null)
@@ -62,7 +65,7 @@ class _CapturePageState extends State<CapturePage> {
                   : _buildMinimalTopBar(state),
 
               // Bottom controls
-              _buildBottomControls(),
+              _buildBottomControls(state),
 
               // Raw data overlay (detail mode only)
               if (_isDetailMode && _showRawData) _buildRawDataOverlay(state),
@@ -76,7 +79,7 @@ class _CapturePageState extends State<CapturePage> {
   Widget _buildPoseOverlay(Detecting state) {
     final screenSize = MediaQuery.of(context).size;
 
-    return SizedBox.expand(
+    Widget overlay = SizedBox.expand(
       child: CustomPaint(
         painter: PosePainter(
           pose: state.currentPose!,
@@ -85,6 +88,16 @@ class _CapturePageState extends State<CapturePage> {
         ),
       ),
     );
+
+    // Mirror the pose overlay for front camera (to match mirrored preview)
+    if (state.isFrontCamera) {
+      overlay = Transform.flip(
+        flipX: true,
+        child: overlay,
+      );
+    }
+
+    return overlay;
   }
 
   // ============================================================
@@ -294,7 +307,7 @@ class _CapturePageState extends State<CapturePage> {
   // BOTTOM CONTROLS
   // ============================================================
 
-  Widget _buildBottomControls() {
+  Widget _buildBottomControls(Detecting state) {
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
@@ -312,6 +325,16 @@ class _CapturePageState extends State<CapturePage> {
                   if (!_isDetailMode) _showRawData = false;
                 }),
               ),
+
+              // Camera switch button (only if device has multiple cameras)
+              if (state.canSwitchCamera)
+                _buildControlButton(
+                  icon: Icons.flip_camera_ios,
+                  label: state.isFrontCamera ? 'Back' : 'Front',
+                  onTap: () {
+                    context.read<PoseDetectionBloc>().add(SwitchCameraEvent());
+                  },
+                ),
 
               // Raw data button (only in detail mode)
               if (_isDetailMode)

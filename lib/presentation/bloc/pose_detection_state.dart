@@ -33,29 +33,37 @@ class Detecting extends PoseDetectionState {
   final TimestampedPose? currentPose;
   final Size? imageSize;
   final PoseSession session;
+  final bool canSwitchCamera;
+  final bool isFrontCamera;
 
   Detecting({
     required this.cameraController,
     this.currentPose,
     this.imageSize,
     required this.session,
+    this.canSwitchCamera = false,
+    this.isFrontCamera = false,
   });
 
   Detecting copyWith({
     TimestampedPose? currentPose,
     Size? imageSize,
     PoseSession? session,
+    bool? canSwitchCamera,
+    bool? isFrontCamera,
   }) {
     return Detecting(
       cameraController: cameraController,
       currentPose: currentPose ?? this.currentPose,
       imageSize: imageSize ?? this.imageSize,
       session: session ?? this.session,
+      canSwitchCamera: canSwitchCamera ?? this.canSwitchCamera,
+      isFrontCamera: isFrontCamera ?? this.isFrontCamera,
     );
   }
 
   @override
-  List<Object?> get props => [cameraController, currentPose, imageSize, session];
+  List<Object?> get props => [cameraController, currentPose, imageSize, session, canSwitchCamera, isFrontCamera];
 }
 
 /// Session completed with summary

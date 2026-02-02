@@ -8,6 +8,8 @@ import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 class CameraService implements ICameraService {
   CameraController? _controller;
   List<CameraDescription>? _cameras;
+  CameraLensDirection _currentDirection = CameraLensDirection.back;
+  Function(CameraImage)? _imageStreamCallback;
 
   @override
   CameraController? get controller => _controller;
@@ -21,6 +23,17 @@ class CameraService implements ICameraService {
       isInitialized && _controller!.value.isStreamingImages;
 
   @override
+  CameraLensDirection get currentLensDirection => _currentDirection;
+
+  @override
+  bool get canSwitchCamera {
+    if (_cameras == null) return false;
+    final hasBack = _cameras!.any((c) => c.lensDirection == CameraLensDirection.back);
+    final hasFront = _cameras!.any((c) => c.lensDirection == CameraLensDirection.front);
+    return hasBack && hasFront;
+  }
+
+  @override
   Future<void> initialize() async {
     _cameras = await availableCameras();
 
@@ -28,14 +41,20 @@ class CameraService implements ICameraService {
       throw Exception('No cameras available');
     }
 
-    // Find the back camera
-    final backCamera = _cameras!.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.back,
+    await _initializeCameraWithDirection(_currentDirection);
+  }
+
+  Future<void> _initializeCameraWithDirection(CameraLensDirection direction) async {
+    // Find camera with requested direction, fallback to first available
+    final camera = _cameras!.firstWhere(
+      (camera) => camera.lensDirection == direction,
       orElse: () => _cameras!.first,
     );
 
+    _currentDirection = camera.lensDirection;
+
     _controller = CameraController(
-      backCamera,
+      camera,
       ResolutionPreset.medium,
       enableAudio: false,
       imageFormatGroup: Platform.isIOS
@@ -52,11 +71,43 @@ class CameraService implements ICameraService {
   }
 
   @override
+  Future<void> switchCamera() async {
+    if (!canSwitchCamera) return;
+
+    // Save current streaming state and callback
+    final wasStreaming = isStreamingImages;
+    final callback = _imageStreamCallback;
+
+    // Stop current stream
+    if (wasStreaming) {
+      stopImageStream();
+    }
+
+    // Dispose current controller
+    await _controller?.dispose();
+    _controller = null;
+
+    // Switch direction
+    final newDirection = _currentDirection == CameraLensDirection.back
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+
+    // Initialize with new direction
+    await _initializeCameraWithDirection(newDirection);
+
+    // Restart stream if was streaming
+    if (wasStreaming && callback != null) {
+      startImageStream(callback);
+    }
+  }
+
+  @override
   void startImageStream(Function(CameraImage) onImage) {
     if (!isInitialized) {
       throw Exception('Camera not initialized');
     }
 
+    _imageStreamCallback = onImage;
     _controller!.startImageStream(onImage);
   }
 
@@ -71,7 +122,7 @@ class CameraService implements ICameraService {
   CameraDescription? getCameraDescription() {
     if (_cameras == null || _cameras!.isEmpty) return null;
     return _cameras!.firstWhere(
-      (cam) => cam.lensDirection == CameraLensDirection.back,
+      (cam) => cam.lensDirection == _currentDirection,
       orElse: () => _cameras!.first,
     );
   }
@@ -79,6 +130,7 @@ class CameraService implements ICameraService {
   @override
   void dispose() {
     stopImageStream();
+    _imageStreamCallback = null;
     _controller?.dispose();
     _controller = null;
   }

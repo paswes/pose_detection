@@ -28,5 +28,8 @@ class ProcessFrameEvent extends PoseDetectionEvent {
   List<Object?> get props => [image, sensorOrientation, timestampMicros];
 }
 
+/// Switch between front and back camera
+class SwitchCameraEvent extends PoseDetectionEvent {}
+
 /// Dispose resources
 class DisposeEvent extends PoseDetectionEvent {}

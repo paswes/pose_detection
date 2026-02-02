@@ -4,12 +4,15 @@ import 'package:pose_detection/core/utils/transform_calculator.dart';
 
 /// Widget for displaying fullscreen camera preview.
 /// Uses BoxFit.cover to fill the screen while maintaining aspect ratio.
+/// Supports mirroring for front camera (selfie mode).
 class CameraPreviewWidget extends StatelessWidget {
   final CameraController cameraController;
+  final bool isFrontCamera;
 
   const CameraPreviewWidget({
     super.key,
     required this.cameraController,
+    this.isFrontCamera = false,
   });
 
   /// Calculates the BoxFit.cover transformation parameters.
@@ -67,7 +70,7 @@ class CameraPreviewWidget extends StatelessWidget {
     final imageWidth = previewSize.height; // Swap for portrait
     final imageHeight = previewSize.width;
 
-    return SizedBox.expand(
+    Widget preview = SizedBox.expand(
       child: FittedBox(
         fit: BoxFit.cover,
         clipBehavior: Clip.hardEdge,
@@ -78,5 +81,16 @@ class CameraPreviewWidget extends StatelessWidget {
         ),
       ),
     );
+
+    // Mirror the preview for front camera (like a mirror)
+    // This makes it more intuitive for the user - left is left
+    if (isFrontCamera) {
+      preview = Transform.flip(
+        flipX: true,
+        child: preview,
+      );
+    }
+
+    return preview;
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
+import 'package:camera/camera.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/config/pose_detection_config.dart';
 import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
@@ -34,6 +35,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     on<InitializeEvent>(_onInitialize);
     on<StartCaptureEvent>(_onStartCapture);
     on<StopCaptureEvent>(_onStopCapture);
+    on<SwitchCameraEvent>(_onSwitchCamera);
     on<ProcessFrameEvent>(_onProcessFrame, transformer: droppable());
     on<DisposeEvent>(_onDispose);
   }
@@ -80,6 +82,8 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     emit(Detecting(
       cameraController: controller,
       session: _sessionManager.getCurrentSessionSnapshot()!,
+      canSwitchCamera: _cameraService.canSwitchCamera,
+      isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
     ));
 
     final cameraDescription = _cameraService.getCameraDescription();
@@ -122,6 +126,78 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     }
 
     Logger.info('Bloc', 'Capture session stopped');
+  }
+
+  Future<void> _onSwitchCamera(
+    SwitchCameraEvent event,
+    Emitter<PoseDetectionState> emit,
+  ) async {
+    if (!_cameraService.canSwitchCamera) return;
+
+    // If currently detecting, pause the stream temporarily
+    final wasDetecting = state is Detecting;
+    final previousSession = wasDetecting
+        ? (state as Detecting).session
+        : null;
+    final previousPose = wasDetecting
+        ? (state as Detecting).currentPose
+        : null;
+    final previousImageSize = wasDetecting
+        ? (state as Detecting).imageSize
+        : null;
+
+    try {
+      // Emit initializing state to prevent UI from using disposed controller
+      emit(CameraInitializing());
+
+      // Switch camera (handles stream stop/start internally)
+      await _cameraService.switchCamera();
+
+      final controller = _cameraService.controller;
+      if (controller == null || !controller.value.isInitialized) {
+        throw Exception('Camera controller not properly initialized after switch');
+      }
+
+      // Re-emit state with new controller
+      if (wasDetecting && previousSession != null) {
+        // Restart image stream for detection
+        final cameraDescription = _cameraService.getCameraDescription();
+        if (cameraDescription != null && !_isStreamingActive) {
+          _isStreamingActive = true;
+          _cameraService.startImageStream((image) {
+            if (_sessionManager.hasActiveSession && _isStreamingActive) {
+              final timestampMicros = DateTime.now().microsecondsSinceEpoch;
+
+              if (!_isProcessingFrame) {
+                add(ProcessFrameEvent(
+                  image,
+                  cameraDescription.sensorOrientation,
+                  timestampMicros,
+                ));
+              } else {
+                _sessionManager.recordDroppedFrame();
+              }
+            }
+          });
+        }
+
+        emit(Detecting(
+          cameraController: controller,
+          session: previousSession,
+          currentPose: previousPose,
+          imageSize: previousImageSize,
+          canSwitchCamera: _cameraService.canSwitchCamera,
+          isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
+        ));
+      } else {
+        emit(CameraReady(controller, lastSession: _sessionManager.lastSession));
+      }
+
+      Logger.info('Bloc', 'Camera switched to ${_cameraService.currentLensDirection}');
+    } catch (e) {
+      Logger.error('Bloc', 'ERROR switching camera: $e');
+      emit(PoseDetectionError('Failed to switch camera: $e'));
+    }
   }
 
   Future<void> _onProcessFrame(
@@ -193,6 +269,8 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
           event.image.height.toDouble(),
         ),
         session: _sessionManager.getCurrentSessionSnapshot()!,
+        canSwitchCamera: _cameraService.canSwitchCamera,
+        isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
       ));
     }
   }

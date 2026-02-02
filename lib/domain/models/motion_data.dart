@@ -111,6 +111,21 @@ class TimestampedPose {
   /// Number of landmarks (should always be 33 for full body)
   int get landmarkCount => landmarks.length;
 
+  /// Average confidence across all landmarks
+  double get avgConfidence {
+    if (landmarks.isEmpty) return 0.0;
+    final sum = landmarks.fold(0.0, (acc, l) => acc + l.likelihood);
+    return sum / landmarks.length;
+  }
+
+  /// Count of landmarks with high confidence (>0.8)
+  int get highConfidenceLandmarks =>
+      landmarks.where((l) => l.likelihood > 0.8).length;
+
+  /// Count of landmarks with low confidence (<0.5)
+  int get lowConfidenceLandmarks =>
+      landmarks.where((l) => l.likelihood < 0.5).length;
+
   @override
   String toString() => 'TimestampedPose(frame: $frameIndex, time: $timestampMicros μs, delta: ${deltaTimeMicros != null ? '$deltaTimeMicros μs' : 'N/A'}, landmarks: ${landmarks.length}, size: ${imageWidth}x$imageHeight)';
 }

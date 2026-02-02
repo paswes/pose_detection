@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:pose_detection/core/utils/transform_calculator.dart';
 
-/// Widget for displaying fullscreen camera preview
-///
+/// Widget for displaying fullscreen camera preview.
 /// Uses BoxFit.cover to fill the screen while maintaining aspect ratio.
-/// The actual image dimensions and screen size are exposed via [getImageToScreenTransform]
-/// for synchronized coordinate mapping in overlay painters.
 class CameraPreviewWidget extends StatelessWidget {
   final CameraController cameraController;
 
@@ -15,33 +13,20 @@ class CameraPreviewWidget extends StatelessWidget {
   });
 
   /// Calculates the BoxFit.cover transformation parameters.
-  /// Returns a record with scale factor and offset for coordinate translation.
-  ///
-  /// This MUST match the exact behavior of FittedBox with BoxFit.cover.
+  /// @deprecated Use TransformCalculator.calculateCoverTransform instead.
+  @Deprecated('Use TransformCalculator.calculateCoverTransform instead')
   static ({double scale, Offset offset, Size fittedSize}) getImageToScreenTransform({
     required Size imageSize,
     required Size screenSize,
   }) {
-    // BoxFit.cover: Scale uniformly to cover the entire target,
-    // potentially clipping parts of the source.
-    final scaleX = screenSize.width / imageSize.width;
-    final scaleY = screenSize.height / imageSize.height;
-
-    // Use the LARGER scale to ensure full coverage (BoxFit.cover behavior)
-    final scale = scaleX > scaleY ? scaleX : scaleY;
-
-    // Calculate the fitted image size after scaling
-    final fittedWidth = imageSize.width * scale;
-    final fittedHeight = imageSize.height * scale;
-
-    // Center offset (parts extending beyond screen are clipped)
-    final offsetX = (screenSize.width - fittedWidth) / 2;
-    final offsetY = (screenSize.height - fittedHeight) / 2;
-
+    final transform = TransformCalculator.calculateCoverTransform(
+      imageSize: imageSize,
+      screenSize: screenSize,
+    );
     return (
-      scale: scale,
-      offset: Offset(offsetX, offsetY),
-      fittedSize: Size(fittedWidth, fittedHeight),
+      scale: transform.scale,
+      offset: transform.offset,
+      fittedSize: transform.fittedSize,
     );
   }
 

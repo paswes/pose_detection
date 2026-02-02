@@ -55,6 +55,13 @@ class SessionMetrics {
     return (totalFramesDropped / totalFramesReceived) * 100.0;
   }
 
+  /// Detection rate as percentage (0.0 to 100.0)
+  /// Percentage of processed frames where a pose was detected
+  double get detectionRate {
+    if (totalFramesProcessed == 0) return 0.0;
+    return (totalPosesDetected / totalFramesProcessed) * 100.0;
+  }
+
   /// Update metrics with a new processed frame
   ///
   /// [latencyMs] - ML Kit processing time only

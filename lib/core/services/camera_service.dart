@@ -1,19 +1,26 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
+import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 
-/// Service responsible for camera lifecycle management
-class CameraService {
+/// Service responsible for camera lifecycle management.
+/// Implements ICameraService for dependency injection.
+class CameraService implements ICameraService {
   CameraController? _controller;
   List<CameraDescription>? _cameras;
 
+  @override
   CameraController? get controller => _controller;
+
+  @override
   bool get isInitialized =>
       _controller != null && _controller!.value.isInitialized;
+
+  @override
   bool get isStreamingImages =>
       isInitialized && _controller!.value.isStreamingImages;
 
-  /// Initialize the camera with back-facing lens
+  @override
   Future<void> initialize() async {
     _cameras = await availableCameras();
 
@@ -44,7 +51,7 @@ class CameraService {
     );
   }
 
-  /// Start streaming camera images
+  @override
   void startImageStream(Function(CameraImage) onImage) {
     if (!isInitialized) {
       throw Exception('Camera not initialized');
@@ -53,14 +60,14 @@ class CameraService {
     _controller!.startImageStream(onImage);
   }
 
-  /// Stop streaming camera images
+  @override
   void stopImageStream() {
     if (isInitialized && isStreamingImages) {
       _controller!.stopImageStream();
     }
   }
 
-  /// Get camera description
+  @override
   CameraDescription? getCameraDescription() {
     if (_cameras == null || _cameras!.isEmpty) return null;
     return _cameras!.firstWhere(
@@ -69,7 +76,7 @@ class CameraService {
     );
   }
 
-  /// Dispose camera resources
+  @override
   void dispose() {
     stopImageStream();
     _controller?.dispose();

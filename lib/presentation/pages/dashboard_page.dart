@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pose_detection/core/services/camera_service.dart';
-import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/di/service_locator.dart';
 import 'package:pose_detection/domain/models/pose_session.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
@@ -32,11 +31,8 @@ class _DashboardPageState extends State<DashboardPage>
       DeviceOrientation.portraitUp,
     ]);
 
-    // Initialize BLoC
-    _bloc = PoseDetectionBloc(
-      cameraService: CameraService(),
-      poseDetectionService: PoseDetectionService(),
-    );
+    // Get BLoC from service locator (DI)
+    _bloc = sl<PoseDetectionBloc>();
 
     // Initialize camera
     _bloc.add(InitializeEvent());

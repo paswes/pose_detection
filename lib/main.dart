@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:pose_detection/di/service_locator.dart';
 import 'package:pose_detection/presentation/pages/dashboard_page.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize dependency injection
+  await initializeDependencies();
+
   runApp(const PoseEngineApp());
 }
 
@@ -15,11 +20,21 @@ class PoseEngineApp extends StatelessWidget {
       title: 'Pose Engine Core',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0A0E21),
-        primaryColor: Colors.cyan,
-        colorScheme: ColorScheme.dark(
-          primary: Colors.cyan,
-          secondary: Colors.cyan.shade700,
+        // Minimalist grey palette
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        primaryColor: const Color(0xFF888888),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF888888),
+          secondary: Color(0xFF666666),
+          surface: Color(0xFF1E1E1E),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1A1A1A),
+          elevation: 0,
+        ),
+        cardTheme: const CardThemeData(
+          color: Color(0xFF1E1E1E),
+          elevation: 0,
         ),
       ),
       home: const DashboardPage(),

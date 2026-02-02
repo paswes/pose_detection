@@ -2,12 +2,14 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
 
-/// Service responsible for ML Kit pose detection
-/// Converts ML Kit outputs to domain-agnostic motion data models
-class PoseDetectionService {
+/// Service responsible for ML Kit pose detection.
+/// Converts ML Kit outputs to domain-agnostic motion data models.
+/// Implements IPoseDetector for dependency injection.
+class PoseDetectionService implements IPoseDetector {
   PoseDetector? _poseDetector;
 
   /// Initialize the pose detector lazily to defer ML model loading
@@ -20,8 +22,7 @@ class PoseDetectionService {
     );
   }
 
-  /// Process a camera image and return timestamped pose data
-  /// Returns null if no pose detected or conversion fails
+  @override
   Future<TimestampedPose?> detectPose({
     required CameraImage image,
     required int sensorOrientation,
@@ -130,7 +131,7 @@ class PoseDetectionService {
     );
   }
 
-  /// Close the pose detector
+  @override
   void dispose() {
     _poseDetector?.close();
     _poseDetector = null;

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pose_detection/core/config/pose_detection_config.dart';
+import 'package:pose_detection/di/service_locator.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
@@ -17,6 +19,13 @@ class CapturePage extends StatefulWidget {
 
 class _CapturePageState extends State<CapturePage> {
   bool _showRawData = false;
+  late final LatencyThresholds _thresholds;
+
+  @override
+  void initState() {
+    super.initState();
+    _thresholds = sl<PoseDetectionConfig>().latencyThresholds;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,16 +90,17 @@ class _CapturePageState extends State<CapturePage> {
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
     final metrics = state.session.metrics;
     final fps = metrics.effectiveFps(duration);
+    final avgConfidence = state.currentPose?.avgConfidence ?? 0.0;
 
     return SafeArea(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withValues(alpha: 0.7),
+              Colors.black.withValues(alpha: 0.8),
               Colors.transparent,
             ],
           ),
@@ -98,101 +108,102 @@ class _CapturePageState extends State<CapturePage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Top row: Duration + FPS
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Duration
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    horizontal: 12,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.cyan.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(20),
+                    color: const Color(0xFF2A2A2A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFF404040),
+                      width: 1,
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.timer, color: Colors.cyan, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$minutes:$seconds',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    '$minutes:$seconds',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ),
 
-                // Stats
+                // FPS + Poses
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    horizontal: 12,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(20),
+                    color: const Color(0xFF2A2A2A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFF404040),
+                      width: 1,
+                    ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Poses: ${state.session.capturedPoses.length}',
-                        style: const TextStyle(
-                          color: Colors.cyan,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'FPS: ${fps.toStringAsFixed(1)}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    '${fps.toStringAsFixed(1)} FPS  |  ${state.session.capturedPoses.length} poses',
+                    style: const TextStyle(
+                      color: Color(0xFFBBBBBB),
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            // Live metrics bar
+            // Metrics grid - row 1
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF1A1A1A).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: const Color(0xFF333333),
+                  width: 1,
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+              child: Column(
                 children: [
-                  _buildMetricChip(
-                    'Processed',
-                    '${metrics.totalFramesProcessed}',
-                    Colors.greenAccent,
-                  ),
-                  _buildMetricChip(
-                    'Dropped',
-                    '${metrics.totalFramesDropped}',
-                    metrics.totalFramesDropped > 0
-                        ? Colors.orangeAccent
-                        : Colors.white70,
-                  ),
-                  _buildMetricChip(
-                    'ML Kit',
-                    '${metrics.averageLatencyMs.toStringAsFixed(0)}ms',
-                    Colors.cyanAccent,
-                  ),
-                  _buildMetricChip(
-                    'E2E Lag',
-                    '${metrics.lastEndToEndLatencyMs.toStringAsFixed(0)}ms',
-                    _getLatencyColor(metrics.lastEndToEndLatencyMs),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildMetricChip(
+                        'Latency',
+                        '${metrics.lastEndToEndLatencyMs.toStringAsFixed(0)}ms',
+                        _getLatencyColor(metrics.lastEndToEndLatencyMs),
+                      ),
+                      _buildMetricChip(
+                        'Drop',
+                        '${metrics.dropRate.toStringAsFixed(1)}%',
+                        metrics.dropRate > 5
+                            ? const Color(0xFFF44336)
+                            : const Color(0xFF888888),
+                      ),
+                      _buildMetricChip(
+                        'Detect',
+                        '${metrics.detectionRate.toStringAsFixed(0)}%',
+                        metrics.detectionRate > 90
+                            ? const Color(0xFF4CAF50)
+                            : const Color(0xFF888888),
+                      ),
+                      _buildMetricChip(
+                        'Conf',
+                        avgConfidence.toStringAsFixed(2),
+                        _getConfidenceColor(avgConfidence),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -224,13 +235,29 @@ class _CapturePageState extends State<CapturePage> {
     );
   }
 
-  /// Returns color based on end-to-end latency thresholds
-  /// Green: <50ms (excellent), Yellow: 50-100ms (acceptable), Orange: 100-150ms, Red: >150ms
+  /// Returns color based on end-to-end latency thresholds from config
   Color _getLatencyColor(double latencyMs) {
-    if (latencyMs < 50) return Colors.greenAccent;
-    if (latencyMs < 100) return Colors.yellowAccent;
-    if (latencyMs < 150) return Colors.orangeAccent;
-    return Colors.redAccent;
+    if (latencyMs < _thresholds.excellent) {
+      return const Color(0xFF4CAF50); // Green
+    }
+    if (latencyMs < _thresholds.acceptable) {
+      return const Color(0xFFFFEB3B); // Yellow
+    }
+    if (latencyMs < _thresholds.warning) {
+      return const Color(0xFFFF9800); // Orange
+    }
+    return const Color(0xFFF44336); // Red
+  }
+
+  /// Returns color based on average confidence
+  Color _getConfidenceColor(double confidence) {
+    if (confidence > 0.8) {
+      return const Color(0xFF4CAF50); // Green
+    }
+    if (confidence > 0.5) {
+      return const Color(0xFFFFEB3B); // Yellow
+    }
+    return const Color(0xFFF44336); // Red
   }
 
   Widget _buildBottomControls() {

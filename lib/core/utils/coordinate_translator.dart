@@ -1,6 +1,6 @@
 import 'dart:ui';
+import 'package:pose_detection/core/utils/transform_calculator.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
-import 'package:pose_detection/presentation/widgets/camera_preview_widget.dart';
 
 /// Utility class for coordinate space transformations
 ///
@@ -51,16 +51,13 @@ class CoordinateTranslator {
 
   /// Translates raw image coordinates to widget coordinates for UI rendering.
   /// Uses BoxFit.cover scaling to EXACTLY match camera preview display.
-  ///
-  /// This method delegates to [CameraPreviewWidget.getImageToScreenTransform]
-  /// to ensure the transformation is identical to the camera preview rendering.
   static Offset translatePoint(
     double x,
     double y,
     Size imageSize,
     Size widgetSize,
   ) {
-    final transform = CameraPreviewWidget.getImageToScreenTransform(
+    final transform = TransformCalculator.calculateCoverTransform(
       imageSize: imageSize,
       screenSize: widgetSize,
     );
@@ -90,7 +87,7 @@ class CoordinateTranslator {
     Size imageSize,
     Size widgetSize,
   ) {
-    final transform = CameraPreviewWidget.getImageToScreenTransform(
+    final transform = TransformCalculator.calculateCoverTransform(
       imageSize: imageSize,
       screenSize: widgetSize,
     );
@@ -115,7 +112,7 @@ class CoordinateTranslator {
     Size imageSize,
     Size widgetSize,
   ) {
-    final transform = CameraPreviewWidget.getImageToScreenTransform(
+    final transform = TransformCalculator.calculateCoverTransform(
       imageSize: imageSize,
       screenSize: widgetSize,
     );

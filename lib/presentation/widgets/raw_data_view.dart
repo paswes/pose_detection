@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:pose_detection/core/config/landmark_schema.dart';
+import 'package:pose_detection/di/service_locator.dart';
 import 'package:pose_detection/domain/models/motion_data.dart';
 
 /// Widget to display raw landmark data in a structured format
 class RawDataView extends StatelessWidget {
   final TimestampedPose? pose;
+  final LandmarkSchema _schema;
 
-  const RawDataView({super.key, this.pose});
+  RawDataView({super.key, this.pose}) : _schema = sl<LandmarkSchema>();
+
+  String _getLandmarkName(int id) => _schema.getLandmarkName(id);
 
   @override
   Widget build(BuildContext context) {
@@ -312,18 +317,4 @@ class RawDataView extends StatelessWidget {
     );
   }
 
-  String _getLandmarkName(int id) {
-    // Standard 33 pose landmark names
-    const landmarkNames = [
-      'Nose', 'Left Eye Inner', 'Left Eye', 'Left Eye Outer',
-      'Right Eye Inner', 'Right Eye', 'Right Eye Outer', 'Left Ear', 'Right Ear',
-      'Mouth Left', 'Mouth Right', 'Left Shoulder', 'Right Shoulder',
-      'Left Elbow', 'Right Elbow', 'Left Wrist', 'Right Wrist',
-      'Left Pinky', 'Right Pinky', 'Left Index', 'Right Index',
-      'Left Thumb', 'Right Thumb', 'Left Hip', 'Right Hip',
-      'Left Knee', 'Right Knee', 'Left Ankle', 'Right Ankle',
-      'Left Heel', 'Right Heel', 'Left Foot Index', 'Right Foot Index',
-    ];
-    return id < landmarkNames.length ? landmarkNames[id] : 'Unknown $id';
-  }
 }

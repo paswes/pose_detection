@@ -5,6 +5,7 @@ import 'package:pose_detection/di/service_locator.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
+import 'package:pose_detection/presentation/pages/inspection_page.dart';
 import 'package:pose_detection/presentation/widgets/camera_preview_widget.dart';
 import 'package:pose_detection/presentation/widgets/pose_painter.dart';
 import 'package:pose_detection/presentation/widgets/raw_data_view.dart';
@@ -343,6 +344,19 @@ class _CapturePageState extends State<CapturePage> {
                   label: _showRawData ? 'Hide' : 'Data',
                   onTap: () => setState(() => _showRawData = !_showRawData),
                 ),
+
+              // Inspection button
+              _buildControlButton(
+                icon: Icons.bug_report,
+                label: 'Inspect',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const InspectionPage(),
+                    ),
+                  );
+                },
+              ),
 
               // Stop button
               _buildStopButton(),

@@ -7,8 +7,8 @@ class RingBuffer<T> {
   int _length = 0;
 
   RingBuffer(int capacity)
-      : _capacity = capacity,
-        _buffer = List<T?>.filled(capacity, null) {
+    : _capacity = capacity,
+      _buffer = List<T?>.filled(capacity, null) {
     if (capacity <= 0) {
       throw ArgumentError('Capacity must be positive');
     }

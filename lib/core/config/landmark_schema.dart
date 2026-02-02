@@ -66,24 +66,19 @@ class LandmarkSchema {
       [9, 10], // Mouth
       [0, 1], [0, 4], // Nose to eyes
       [9, 7], [10, 8], // Mouth to ears
-
       // Torso
       [11, 12], // Shoulders
       [11, 23], [12, 24], // Shoulders to hips
       [23, 24], // Hips
-
       // Left arm
       [11, 13], [13, 15], // Shoulder to wrist
       [15, 17], [15, 19], [17, 19], [15, 21], // Hand
-
       // Right arm
       [12, 14], [14, 16], // Shoulder to wrist
       [16, 18], [16, 20], [18, 20], [16, 22], // Hand
-
       // Left leg
       [23, 25], [25, 27], // Hip to ankle
       [27, 29], [27, 31], [29, 31], // Foot
-
       // Right leg
       [24, 26], [26, 28], // Hip to ankle
       [28, 30], [28, 32], [30, 32], // Foot

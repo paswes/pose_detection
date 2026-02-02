@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pose_detection/di/service_locator.dart';
+import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
 
 Future<void> main() async {

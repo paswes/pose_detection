@@ -7,7 +7,7 @@ class ErrorTracker {
   int _consecutiveErrors = 0;
 
   ErrorTracker({required PoseDetectionConfig config})
-      : _maxConsecutiveErrors = config.maxConsecutiveErrors;
+    : _maxConsecutiveErrors = config.maxConsecutiveErrors;
 
   /// Current consecutive error count
   int get consecutiveErrors => _consecutiveErrors;

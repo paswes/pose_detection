@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/config/pose_detection_config.dart';
-import 'package:pose_detection/di/service_locator.dart';
+import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
@@ -177,8 +177,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         ),
 
         // Pose overlay (skeleton with connected landmarks)
-        if (state.currentPose != null && state.imageSize != null)
-          _buildPoseOverlay(state),
+        if (state.currentPose != null) _buildPoseOverlay(state),
 
         // Top metrics bar (live data)
         _buildMinimalTopBar(state),
@@ -191,12 +190,13 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
 
   Widget _buildPoseOverlay(Detecting state) {
     final screenSize = MediaQuery.of(context).size;
+    final pose = state.currentPose!;
 
     Widget overlay = SizedBox.expand(
       child: CustomPaint(
         painter: PosePainter(
-          pose: state.currentPose!,
-          imageSize: state.imageSize!,
+          pose: pose,
+          imageSize: pose.imageSize,
           widgetSize: screenSize,
         ),
       ),
@@ -218,10 +218,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
   // ============================================================
 
   Widget _buildMinimalTopBar(Detecting state) {
-    final metrics = state.session.metrics;
-    final duration = state.session.duration;
-    final fps = metrics.effectiveFps(duration);
-    final latency = metrics.lastEndToEndLatencyMs;
+    final metrics = state.metrics;
+    final fps = metrics.fps;
+    final latency = metrics.latencyMs;
     final confidence = state.currentPose?.avgConfidence ?? 0.0;
 
     return SafeArea(
@@ -348,7 +347,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           color: const Color(0xFF4CAF50),
           borderRadius: BorderRadius.circular(99),
         ),
-        child: Icon(
+        child: const Icon(
           Icons.play_arrow,
           color: Colors.white,
           size: 24,
@@ -368,7 +367,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           color: const Color(0xFFFF5252),
           borderRadius: BorderRadius.circular(99),
         ),
-        child: Icon(
+        child: const Icon(
           Icons.stop,
           color: Colors.white,
           size: 24,
@@ -388,7 +387,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(99),
         ),
-        child: Icon(
+        child: const Icon(
           Icons.flip_camera_ios,
           color: Color(0xFF888888),
           size: 24,

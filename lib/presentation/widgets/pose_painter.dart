@@ -2,8 +2,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
-import 'package:pose_detection/di/service_locator.dart';
-import 'package:pose_detection/domain/models/motion_data.dart';
+import 'package:pose_detection/core/di/service_locator.dart';
+import 'package:pose_detection/domain/models/detected_pose.dart';
 
 /// High-performance painter for pose landmarks with confidence heatmap.
 ///
@@ -12,7 +12,7 @@ import 'package:pose_detection/domain/models/motion_data.dart';
 /// - Depth-based sizing (closer = larger)
 /// - Minimal, academic aesthetic
 class PosePainter extends CustomPainter {
-  final TimestampedPose pose;
+  final DetectedPose pose;
   final Size imageSize;
   final Size widgetSize;
   final LandmarkSchema _schema;
@@ -43,16 +43,17 @@ class PosePainter extends CustomPainter {
     if (pose.landmarks.isEmpty) return;
 
     // Pre-compute ALL translations with depth info ONCE
-    final translatedPoints = CoordinateTranslator.translateAllLandmarksWithDepth(
-      pose.landmarks,
-      imageSize,
-      widgetSize,
-    );
+    final translatedPoints =
+        CoordinateTranslator.translateAllLandmarksWithDepth(
+          pose.landmarks,
+          imageSize,
+          widgetSize,
+        );
 
     // Build a quick lookup for confidence values
     final confidenceMap = <int, double>{};
     for (final landmark in pose.landmarks) {
-      confidenceMap[landmark.id] = landmark.likelihood;
+      confidenceMap[landmark.id] = landmark.confidence;
     }
 
     // Draw all skeletal connections first (below landmarks)
@@ -143,7 +144,6 @@ class PosePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PosePainter oldDelegate) {
-    // Check all three dimensions that affect rendering
     return oldDelegate.pose != pose ||
         oldDelegate.imageSize != imageSize ||
         oldDelegate.widgetSize != widgetSize;

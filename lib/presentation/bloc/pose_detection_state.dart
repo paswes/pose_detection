@@ -1,10 +1,9 @@
-import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:equatable/equatable.dart';
-import 'package:pose_detection/domain/models/motion_data.dart';
-import 'package:pose_detection/domain/models/pose_session.dart';
+import 'package:pose_detection/domain/models/detected_pose.dart';
+import 'package:pose_detection/domain/models/detection_metrics.dart';
 
-/// States for generic PoseDetectionBloc
+/// States for PoseDetectionBloc
 abstract class PoseDetectionState extends Equatable {
   @override
   List<Object?> get props => [];
@@ -19,65 +18,46 @@ class CameraInitializing extends PoseDetectionState {}
 /// Camera initialized and ready to start capture
 class CameraReady extends PoseDetectionState {
   final CameraController cameraController;
-  final PoseSession? lastSession;
 
-  CameraReady(this.cameraController, {this.lastSession});
+  CameraReady(this.cameraController);
 
   @override
-  List<Object?> get props => [cameraController, lastSession];
+  List<Object?> get props => [cameraController];
 }
 
 /// Actively detecting poses with real-time metrics
 class Detecting extends PoseDetectionState {
   final CameraController cameraController;
-  final TimestampedPose? currentPose;
-  final Size? imageSize;
-  final PoseSession session;
+  final DetectedPose? currentPose;
+  final DetectionMetrics metrics;
   final bool canSwitchCamera;
   final bool isFrontCamera;
 
   Detecting({
     required this.cameraController,
     this.currentPose,
-    this.imageSize,
-    required this.session,
+    this.metrics = const DetectionMetrics(),
     this.canSwitchCamera = false,
     this.isFrontCamera = false,
   });
 
   Detecting copyWith({
-    TimestampedPose? currentPose,
-    Size? imageSize,
-    PoseSession? session,
+    DetectedPose? currentPose,
+    DetectionMetrics? metrics,
     bool? canSwitchCamera,
     bool? isFrontCamera,
   }) {
     return Detecting(
       cameraController: cameraController,
       currentPose: currentPose ?? this.currentPose,
-      imageSize: imageSize ?? this.imageSize,
-      session: session ?? this.session,
+      metrics: metrics ?? this.metrics,
       canSwitchCamera: canSwitchCamera ?? this.canSwitchCamera,
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
     );
   }
 
   @override
-  List<Object?> get props => [cameraController, currentPose, imageSize, session, canSwitchCamera, isFrontCamera];
-}
-
-/// Session completed with summary
-class SessionSummary extends PoseDetectionState {
-  final CameraController cameraController;
-  final PoseSession session;
-
-  SessionSummary({
-    required this.cameraController,
-    required this.session,
-  });
-
-  @override
-  List<Object?> get props => [cameraController, session];
+  List<Object?> get props => [cameraController, currentPose, metrics, canSwitchCamera, isFrontCamera];
 }
 
 /// Error state

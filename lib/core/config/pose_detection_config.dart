@@ -1,30 +1,19 @@
 /// Central configuration for pose detection pipeline.
-/// All magic numbers extracted here for clarity and testability.
+/// Contains error handling and performance thresholds.
 class PoseDetectionConfig {
-  /// Maximum poses to retain in ring buffer.
-  /// At 30 FPS, 900 = 30 seconds of data.
-  final int maxPosesInMemory;
-
   /// Maximum consecutive errors before stopping capture.
   final int maxConsecutiveErrors;
 
   /// Latency thresholds for performance categorization.
   final LatencyThresholds latencyThresholds;
 
-  /// Number of landmarks expected from pose model.
-  final int expectedLandmarkCount;
-
   const PoseDetectionConfig({
-    this.maxPosesInMemory = 900,
     this.maxConsecutiveErrors = 10,
     this.latencyThresholds = const LatencyThresholds(),
-    this.expectedLandmarkCount = 33,
   });
 
-  /// Default configuration for ML Kit 33-landmark model
-  static const mlKit33 = PoseDetectionConfig(
-    expectedLandmarkCount: 33,
-  );
+  /// Default configuration
+  static const defaultConfig = PoseDetectionConfig();
 }
 
 /// Latency thresholds for performance categorization (milliseconds).

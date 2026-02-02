@@ -17,7 +17,7 @@ Future<void> initializeDependencies({
 }) async {
   // Configuration
   sl.registerSingleton<PoseDetectionConfig>(
-    config ?? PoseDetectionConfig.mlKit33,
+    config ?? PoseDetectionConfig.defaultConfig,
   );
 
   sl.registerSingleton<LandmarkSchema>(
@@ -33,7 +33,7 @@ Future<void> initializeDependencies({
     () => PoseDetectionService(),
   );
 
-  // BLoC (factory - new instance each time, but we use singleton for now)
+  // BLoC
   sl.registerLazySingleton<PoseDetectionBloc>(
     () => PoseDetectionBloc(
       cameraService: sl<ICameraService>(),

@@ -2,10 +2,13 @@ import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/config/pose_detection_config.dart';
+import 'package:pose_detection/core/data_structures/ring_buffer.dart';
+import 'package:pose_detection/core/errors/pose_detection_errors.dart';
 import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/error_tracker.dart';
 import 'package:pose_detection/core/services/frame_processor.dart';
+import 'package:pose_detection/core/services/pose_smoother.dart';
 import 'package:pose_detection/core/utils/logger.dart';
 import 'package:pose_detection/domain/models/detection_metrics.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
@@ -17,13 +20,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   final ICameraService _cameraService;
   final FrameProcessor _frameProcessor;
   final ErrorTracker _errorTracker;
+  final PoseSmoother _poseSmoother;
+  final PoseDetectionConfig _config;
 
   bool _isProcessingFrame = false;
   bool _isStreamingActive = false;
 
-  // FPS calculation using rolling window
-  final List<int> _frameTimestamps = [];
-  static const _fpsWindowMs = 1000;
+  // FPS calculation using RingBuffer for O(1) operations
+  late final RingBuffer<int> _frameTimestamps;
 
   // Current metrics
   double _lastLatencyMs = 0.0;
@@ -32,9 +36,13 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     required ICameraService cameraService,
     required IPoseDetector poseDetector,
     required PoseDetectionConfig config,
+    required PoseSmoother poseSmoother,
   })  : _cameraService = cameraService,
         _frameProcessor = FrameProcessor(poseDetector: poseDetector),
         _errorTracker = ErrorTracker(config: config),
+        _poseSmoother = poseSmoother,
+        _config = config,
+        _frameTimestamps = RingBuffer(config.fpsBufferSize),
         super(PoseDetectionInitial()) {
     on<InitializeEvent>(_onInitialize);
     on<StartCaptureEvent>(_onStartCapture);
@@ -44,10 +52,20 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     on<DisposeEvent>(_onDispose);
   }
 
+  /// Calculate FPS using ring buffer (O(1) amortized)
   double _calculateFps() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    _frameTimestamps.removeWhere((t) => now - t > _fpsWindowMs);
-    return _frameTimestamps.length.toDouble();
+    final windowMs = _config.fpsWindowMs;
+
+    // Count frames within the window
+    int count = 0;
+    for (final timestamp in _frameTimestamps.items) {
+      if (now - timestamp <= windowMs) {
+        count++;
+      }
+    }
+
+    return count.toDouble();
   }
 
   void _recordFrame() {
@@ -57,6 +75,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   void _resetMetrics() {
     _frameTimestamps.clear();
     _lastLatencyMs = 0.0;
+    _poseSmoother.reset();
   }
 
   Future<void> _onInitialize(
@@ -69,14 +88,21 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       final controller = _cameraService.controller;
       if (controller == null || !controller.value.isInitialized) {
-        throw Exception('Camera controller not properly initialized');
+        throw PoseDetectionException.cameraNotInitialized();
       }
 
       Logger.info('Bloc', 'Camera initialized');
       emit(CameraReady(controller));
     } catch (e) {
       Logger.error('Bloc', 'ERROR initializing: $e');
-      emit(PoseDetectionError('Failed to initialize camera: $e'));
+      if (e is PoseDetectionException) {
+        emit(PoseDetectionError(e.message, errorCode: e.code));
+      } else {
+        emit(PoseDetectionError(
+          'Failed to initialize camera: $e',
+          errorCode: PoseDetectionErrorCode.cameraInitFailed,
+        ));
+      }
     }
   }
 
@@ -94,14 +120,18 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
     final controller = _cameraService.controller;
     if (controller == null || !controller.value.isInitialized) {
-      emit(PoseDetectionError('Camera not initialized'));
+      emit(PoseDetectionError(
+        'Camera not initialized',
+        errorCode: PoseDetectionErrorCode.cameraNotInitialized,
+      ));
       return;
     }
 
     emit(Detecting(
       cameraController: controller,
       canSwitchCamera: _cameraService.canSwitchCamera,
-      isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
+      isFrontCamera:
+          _cameraService.currentLensDirection == CameraLensDirection.front,
     ));
 
     final cameraDescription = _cameraService.getCameraDescription();
@@ -145,16 +175,24 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     if (!_cameraService.canSwitchCamera) return;
 
     final wasDetecting = state is Detecting;
-    final previousPose = wasDetecting ? (state as Detecting).currentPose : null;
-    final previousMetrics = wasDetecting ? (state as Detecting).metrics : const DetectionMetrics();
+    final previousPose =
+        wasDetecting ? (state as Detecting).currentPose : null;
+    final previousMetrics =
+        wasDetecting ? (state as Detecting).metrics : const DetectionMetrics();
 
     try {
       emit(CameraInitializing());
+
+      // Reset smoother when switching cameras
+      _poseSmoother.reset();
+
       await _cameraService.switchCamera();
 
       final controller = _cameraService.controller;
       if (controller == null || !controller.value.isInitialized) {
-        throw Exception('Camera controller not properly initialized after switch');
+        throw PoseDetectionException.cameraSwitchFailed(
+          'Camera controller not properly initialized after switch',
+        );
       }
 
       if (wasDetecting) {
@@ -182,16 +220,25 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
           currentPose: previousPose,
           metrics: previousMetrics,
           canSwitchCamera: _cameraService.canSwitchCamera,
-          isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
+          isFrontCamera:
+              _cameraService.currentLensDirection == CameraLensDirection.front,
         ));
       } else {
         emit(CameraReady(controller));
       }
 
-      Logger.info('Bloc', 'Camera switched to ${_cameraService.currentLensDirection}');
+      Logger.info(
+          'Bloc', 'Camera switched to ${_cameraService.currentLensDirection}');
     } catch (e) {
       Logger.error('Bloc', 'ERROR switching camera: $e');
-      emit(PoseDetectionError('Failed to switch camera: $e'));
+      if (e is PoseDetectionException) {
+        emit(PoseDetectionError(e.message, errorCode: e.code));
+      } else {
+        emit(PoseDetectionError(
+          'Failed to switch camera: $e',
+          errorCode: PoseDetectionErrorCode.cameraSwitchFailed,
+        ));
+      }
     }
   }
 
@@ -214,38 +261,56 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         _recordFrame();
         _lastLatencyMs = result.latencyMs;
 
+        // Apply smoothing if we have a pose
+        final smoothedPose =
+            result.pose != null ? _poseSmoother.smooth(result.pose!) : null;
+
         if (state is Detecting) {
           emit((state as Detecting).copyWith(
-            currentPose: result.pose,
+            currentPose: smoothedPose,
             metrics: DetectionMetrics(
               fps: _calculateFps(),
               latencyMs: _lastLatencyMs,
             ),
             canSwitchCamera: _cameraService.canSwitchCamera,
-            isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
+            isFrontCamera:
+                _cameraService.currentLensDirection == CameraLensDirection.front,
           ));
         }
       } else {
-        _handleError(emit, result.error ?? 'Unknown error');
+        _handleError(
+          emit,
+          PoseDetectionException.mlKitDetectionFailed(result.error),
+        );
       }
     } catch (e) {
-      _handleError(emit, e.toString());
+      _handleError(
+        emit,
+        e is PoseDetectionException
+            ? e
+            : PoseDetectionException.unknown(e),
+      );
     } finally {
       _isProcessingFrame = false;
     }
   }
 
-  void _handleError(Emitter<PoseDetectionState> emit, String message) {
+  void _handleError(
+      Emitter<PoseDetectionState> emit, PoseDetectionException exception) {
     _errorTracker.recordError();
     Logger.error(
       'Bloc',
-      'ERROR: $message (${_errorTracker.consecutiveErrors}/${_errorTracker.maxConsecutiveErrors})',
+      'ERROR [${exception.code}]: ${exception.message} '
+      '(${_errorTracker.consecutiveErrors}/${_errorTracker.maxConsecutiveErrors})',
     );
 
     if (_errorTracker.hasExceededThreshold) {
       _cameraService.stopImageStream();
       _isStreamingActive = false;
-      emit(PoseDetectionError('Too many consecutive errors. Last: $message'));
+      emit(PoseDetectionError(
+        'Too many consecutive errors. Last: ${exception.message}',
+        errorCode: PoseDetectionErrorCode.tooManyConsecutiveErrors,
+      ));
     }
   }
 
@@ -255,5 +320,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   ) async {
     _cameraService.dispose();
     _frameProcessor.dispose();
+    _poseSmoother.dispose();
   }
 }

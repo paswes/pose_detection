@@ -5,6 +5,8 @@ import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/core/services/pose_smoother.dart';
+import 'package:pose_detection/domain/motion/services/motion_analyzer.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 
 final GetIt sl = GetIt.instance;
@@ -14,17 +16,28 @@ final GetIt sl = GetIt.instance;
 Future<void> initializeDependencies({
   PoseDetectionConfig? config,
   LandmarkSchema? schema,
+  MotionAnalyzerConfig? motionConfig,
 }) async {
+  // ============================================
   // Configuration
+  // ============================================
+
   sl.registerSingleton<PoseDetectionConfig>(
-    config ?? PoseDetectionConfig.defaultConfig,
+    config ?? PoseDetectionConfig.defaultConfig(),
   );
 
   sl.registerSingleton<LandmarkSchema>(
     schema ?? LandmarkSchema.mlKit33,
   );
 
-  // Core Services (lazy singletons - created on first access)
+  sl.registerSingleton<MotionAnalyzerConfig>(
+    motionConfig ?? MotionAnalyzerConfig.defaultConfig(),
+  );
+
+  // ============================================
+  // Core Services (lazy singletons)
+  // ============================================
+
   sl.registerLazySingleton<ICameraService>(
     () => CameraService(),
   );
@@ -33,12 +46,29 @@ Future<void> initializeDependencies({
     () => PoseDetectionService(),
   );
 
-  // BLoC
+  // Pose Smoother (uses config for smoothing parameters)
+  sl.registerLazySingleton<PoseSmoother>(
+    () => PoseSmoother(config: sl<PoseDetectionConfig>()),
+  );
+
+  // ============================================
+  // Domain Services (lazy singletons)
+  // ============================================
+
+  sl.registerLazySingleton<MotionAnalyzer>(
+    () => MotionAnalyzer(config: sl<MotionAnalyzerConfig>()),
+  );
+
+  // ============================================
+  // BLoC (lazy singleton)
+  // ============================================
+
   sl.registerLazySingleton<PoseDetectionBloc>(
     () => PoseDetectionBloc(
       cameraService: sl<ICameraService>(),
       poseDetector: sl<IPoseDetector>(),
       config: sl<PoseDetectionConfig>(),
+      poseSmoother: sl<PoseSmoother>(),
     ),
   );
 }
@@ -51,3 +81,15 @@ Future<void> resetDependencies() async {
 
 /// Check if dependencies have been initialized
 bool get dependenciesInitialized => sl.isRegistered<PoseDetectionConfig>();
+
+/// Get the config instance
+PoseDetectionConfig get config => sl<PoseDetectionConfig>();
+
+/// Get the landmark schema instance
+LandmarkSchema get landmarkSchema => sl<LandmarkSchema>();
+
+/// Get the motion analyzer instance
+MotionAnalyzer get motionAnalyzer => sl<MotionAnalyzer>();
+
+/// Get the pose smoother instance
+PoseSmoother get poseSmoother => sl<PoseSmoother>();

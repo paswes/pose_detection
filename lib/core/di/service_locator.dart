@@ -93,3 +93,47 @@ MotionAnalyzer get motionAnalyzer => sl<MotionAnalyzer>();
 
 /// Get the pose smoother instance
 PoseSmoother get poseSmoother => sl<PoseSmoother>();
+
+// ============================================
+// Dynamic Config Updates (for Playground)
+// ============================================
+
+/// Update PoseDetectionConfig at runtime.
+/// Recreates dependent services with new config.
+void updatePoseConfig(PoseDetectionConfig newConfig) {
+  // Unregister old instances
+  if (sl.isRegistered<PoseDetectionConfig>()) {
+    sl.unregister<PoseDetectionConfig>();
+  }
+  if (sl.isRegistered<PoseSmoother>()) {
+    sl.unregister<PoseSmoother>();
+  }
+
+  // Register new config
+  sl.registerSingleton<PoseDetectionConfig>(newConfig);
+
+  // Recreate dependent services
+  sl.registerLazySingleton<PoseSmoother>(
+    () => PoseSmoother(config: sl<PoseDetectionConfig>()),
+  );
+}
+
+/// Update MotionAnalyzerConfig at runtime.
+/// Recreates MotionAnalyzer with new config.
+void updateMotionConfig(MotionAnalyzerConfig newConfig) {
+  // Unregister old instances
+  if (sl.isRegistered<MotionAnalyzerConfig>()) {
+    sl.unregister<MotionAnalyzerConfig>();
+  }
+  if (sl.isRegistered<MotionAnalyzer>()) {
+    sl.unregister<MotionAnalyzer>();
+  }
+
+  // Register new config
+  sl.registerSingleton<MotionAnalyzerConfig>(newConfig);
+
+  // Recreate motion analyzer
+  sl.registerLazySingleton<MotionAnalyzer>(
+    () => MotionAnalyzer(config: sl<MotionAnalyzerConfig>()),
+  );
+}

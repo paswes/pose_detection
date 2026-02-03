@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
+import 'package:pose_detection/presentation/pages/playground_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,7 +38,11 @@ class PoseEngineApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const CapturePage(),
+      home: const PlaygroundPage(),
+      routes: {
+        '/capture': (context) => const CapturePage(),
+        '/playground': (context) => const PlaygroundPage(),
+      },
     );
   }
 }

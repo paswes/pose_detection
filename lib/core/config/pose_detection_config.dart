@@ -8,7 +8,7 @@ class PoseDetectionConfig {
   final LatencyThresholds latencyThresholds;
 
   const PoseDetectionConfig({
-    this.maxConsecutiveErrors = 10,
+    this.maxConsecutiveErrors = 5,
     this.latencyThresholds = const LatencyThresholds(),
   });
 

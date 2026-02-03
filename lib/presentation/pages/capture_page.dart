@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/config/pose_detection_config.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
@@ -22,6 +23,7 @@ class CapturePage extends StatefulWidget {
 class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
   late final PoseDetectionBloc _bloc;
   late final LatencyThresholds _thresholds;
+  late final LandmarkSchema _landmarkSchema;
 
   @override
   void initState() {
@@ -35,6 +37,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     _thresholds = sl<PoseDetectionConfig>().latencyThresholds;
+    _landmarkSchema = sl<LandmarkSchema>();
 
     // Initialize BLoC from service locator
     _bloc = sl<PoseDetectionBloc>();
@@ -198,6 +201,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           pose: pose,
           imageSize: pose.imageSize,
           widgetSize: screenSize,
+          schema: _landmarkSchema,
         ),
       ),
     );

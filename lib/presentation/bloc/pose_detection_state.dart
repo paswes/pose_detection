@@ -57,7 +57,7 @@ class Detecting extends PoseDetectionState {
   }
 
   @override
-  List<Object?> get props => [cameraController, currentPose, metrics, canSwitchCamera, isFrontCamera];
+  List<Object?> get props => [currentPose, metrics, canSwitchCamera, isFrontCamera];
 }
 
 /// Error state

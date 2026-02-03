@@ -215,9 +215,10 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         _lastLatencyMs = result.latencyMs;
 
         if (state is Detecting) {
-          emit((state as Detecting).copyWith(
+          final currentState = state as Detecting;
+          emit(currentState.copyWith(
             currentPose: result.pose,
-            metrics: DetectionMetrics(
+            metrics: currentState.metrics.copyWith(
               fps: _calculateFps(),
               latencyMs: _lastLatencyMs,
             ),

@@ -2,7 +2,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
-import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/domain/models/detected_pose.dart';
 
 /// High-performance painter for pose landmarks with confidence heatmap.
@@ -15,17 +14,17 @@ class PosePainter extends CustomPainter {
   final DetectedPose pose;
   final Size imageSize;
   final Size widgetSize;
-  final LandmarkSchema _schema;
+  final LandmarkSchema schema;
 
-  /// Get skeleton connections from injected schema
-  List<List<int>> get _connections => _schema.skeletonConnections;
+  /// Get skeleton connections from schema
+  List<List<int>> get _connections => schema.skeletonConnections;
 
   PosePainter({
     required this.pose,
     required this.imageSize,
     required this.widgetSize,
-    LandmarkSchema? schema,
-  }) : _schema = schema ?? sl<LandmarkSchema>();
+    required this.schema,
+  });
 
   /// Get confidence-based color (heatmap)
   Color _getConfidenceColor(double confidence) {

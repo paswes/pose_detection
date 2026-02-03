@@ -1,6 +1,8 @@
+import 'package:equatable/equatable.dart';
+
 /// Real-time detection metrics for UI display.
 /// Simple, immutable metrics updated per frame.
-class DetectionMetrics {
+class DetectionMetrics extends Equatable {
   /// Current frames per second
   final double fps;
 
@@ -21,4 +23,7 @@ class DetectionMetrics {
       latencyMs: latencyMs ?? this.latencyMs,
     );
   }
+
+  @override
+  List<Object?> get props => [fps, latencyMs];
 }

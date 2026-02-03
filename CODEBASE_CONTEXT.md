@@ -27,13 +27,13 @@
 
 ```
 lib/
-├── main.dart                              # App Entry Point
+├── main.dart                              # App Entry Point (→ HomePage)
 ├── core/                                  # Infrastructure Layer
 │   ├── config/
 │   │   ├── pose_detection_config.dart     # Zentrale Config (Factory Constructors)
 │   │   └── landmark_schema.dart           # ML Kit Schema Definition
 │   ├── di/
-│   │   └── service_locator.dart           # GetIt DI Setup
+│   │   └── service_locator.dart           # GetIt DI Setup + Dynamic Config Updates
 │   ├── errors/
 │   │   └── pose_detection_errors.dart     # Enum-basierte Errors
 │   ├── filters/
@@ -70,28 +70,80 @@ lib/
 │       │   ├── vector3.dart               # 3D Vektor Mathematik
 │       │   └── pose_sequence.dart         # Temporal Pose History
 │       └── services/
-│           ├── motion_analyzer.dart       # Facade Service
+│           ├── motion_analyzer.dart       # Facade Service + MotionAnalyzerConfig
 │           ├── angle_calculator.dart      # Winkelberechnungen
 │           ├── velocity_tracker.dart      # Geschwindigkeits-Tracking
 │           └── range_of_motion_analyzer.dart  # ROM Analyse
 │
 └── presentation/                          # UI Layer
+    ├── theme/
+    │   └── playground_theme.dart          # Theme Constants (Colors, Spacing, Styles)
     ├── bloc/
-    │   ├── pose_detection_bloc.dart       # Haupt-BLoC
+    │   ├── pose_detection_bloc.dart       # Basis-BLoC (Simple Capture)
     │   ├── pose_detection_event.dart      # BLoC Events
-    │   └── pose_detection_state.dart      # BLoC States
+    │   ├── pose_detection_state.dart      # BLoC States
+    │   └── playground/                    # Developer Playground BLoC
+    │       ├── playground_bloc.dart       # Extended BLoC mit Motion Analysis
+    │       ├── playground_event.dart      # Config Changes, Panel Toggles, Presets
+    │       └── playground_state.dart      # PlaygroundState, PlaygroundMetrics
     ├── pages/
-    │   └── capture_page.dart              # Kamera-Seite
+    │   ├── home_page.dart                 # Navigation Hub
+    │   ├── capture_page.dart              # Simple Capture View
+    │   ├── playground_page.dart           # Developer Playground
+    │   └── documentation_page.dart        # Inline Developer Docs
     └── widgets/
         ├── camera_preview_widget.dart     # Kamera Preview
-        └── pose_painter.dart              # Skeleton Overlay
+        ├── pose_painter.dart              # Skeleton Overlay
+        └── playground/                    # Playground UI Components
+            ├── playground_overlay.dart    # Main Overlay Container
+            ├── top_metrics_bar.dart       # FPS, Latency, Confidence, Pose Count
+            ├── config_panel/              # Left Panel - Configuration
+            │   ├── config_panel.dart      # Collapsible Container
+            │   ├── preset_button_row.dart # Quick Preset Switching
+            │   ├── smoothing_sliders.dart # OneEuroFilter Parameters
+            │   ├── confidence_sliders.dart# Confidence Thresholds
+            │   └── motion_config_section.dart # Motion Analyzer Toggles
+            ├── data_panel/                # Right Panel - Data Visualization
+            │   ├── data_visualization_panel.dart # Collapsible Container
+            │   ├── joint_angles_section.dart     # Angle Gauges Grid
+            │   ├── velocities_section.dart       # Speed + Direction List
+            │   └── rom_section.dart              # ROM Progress Bars
+            └── visualizations/            # Reusable Visualization Widgets
+                ├── angle_gauge.dart       # Semi-circular Angle Gauge
+                ├── velocity_indicator.dart# Speed + Direction Arrow
+                └── rom_progress_bar.dart  # Min/Max Range Bar
 ```
 
 ---
 
-## 3. Schlüssel-Konzepte
+## 3. App Navigation
 
-### 3.1 Config System (Factory Constructors)
+```
+HomePage (Entry Point)
+├── Developer Playground  → PlaygroundPage
+│   ├── Real-time motion analysis
+│   ├── Config presets & sliders
+│   └── Performance metrics
+├── Simple Capture        → CapturePage
+│   ├── Skeleton overlay
+│   └── Basic metrics
+└── Documentation         → DocumentationPage
+    ├── Configuration reference
+    ├── Data model docs
+    └── Usage examples
+```
+
+**Routes:**
+- `/home` - HomePage
+- `/playground` - PlaygroundPage
+- `/capture` - CapturePage
+- `/docs` - DocumentationPage
+
+---
+
+## 4. Schlüssel-Konzepte
+
+### 4.1 Config System (Factory Constructors)
 
 ```dart
 // lib/core/config/pose_detection_config.dart
@@ -99,6 +151,7 @@ PoseDetectionConfig.defaultConfig()    // Standard-Einstellungen
 PoseDetectionConfig.smoothVisuals()    // Mehr Smoothing
 PoseDetectionConfig.responsive()       // Weniger Smoothing
 PoseDetectionConfig.raw()              // Kein Smoothing
+PoseDetectionConfig.highPrecision()    // Strikte Confidence Filter
 
 // lib/domain/motion/services/motion_analyzer.dart
 MotionAnalyzerConfig.defaultConfig()   // Alle Features
@@ -108,7 +161,7 @@ MotionAnalyzerConfig.romFocused()      // ROM Tracking
 MotionAnalyzerConfig.velocityFocused() // Velocity Tracking
 ```
 
-### 3.2 Semantische Enums
+### 4.2 Semantische Enums
 
 ```dart
 // lib/domain/models/landmark_type.dart - 33 ML Kit Landmarks
@@ -134,22 +187,19 @@ enum LandmarkType {
 
 // lib/domain/models/body_joint.dart - Semantische Gelenke
 enum BodyJoint {
-  leftElbow(first: LandmarkType.leftShoulder, vertex: LandmarkType.leftElbow, third: LandmarkType.leftWrist),
-  rightElbow(...),
-  leftShoulder(...),
-  rightShoulder(...),
-  leftHip(...),
-  rightHip(...),
-  leftKnee(...),
-  rightKnee(...),
-  leftAnkle(...),
-  rightAnkle(...);
+  leftElbow, rightElbow,       // Shoulder → Elbow → Wrist
+  leftShoulder, rightShoulder, // Elbow → Shoulder → Hip
+  leftHip, rightHip,           // Shoulder → Hip → Knee
+  leftKnee, rightKnee,         // Hip → Knee → Ankle
+  leftAnkle, rightAnkle,       // Knee → Ankle → Heel
+  leftTorsoLean, rightTorsoLean, neckLean;
 
-  static List<BodyJoint> get primaryJoints => [leftElbow, rightElbow, leftKnee, rightKnee, leftHip, rightHip];
+  static List<BodyJoint> get primaryJoints; // 8 wichtigste
+  static List<(BodyJoint, BodyJoint)> get pairedJoints; // L/R Paare
 }
 ```
 
-### 3.3 Motion Analysis API
+### 4.3 Motion Analysis API
 
 ```dart
 // Verwendung
@@ -160,9 +210,10 @@ analyzer.startSession();
 final result = analyzer.analyze(detectedPose);
 
 // Zugriff auf Daten
-result.angles['leftElbow']?.degrees           // Winkel in Grad
-result.velocities[LandmarkType.leftWrist.id]  // Handgeschwindigkeit
-result.rangeOfMotion['leftKnee']?.rangeDegrees // ROM in Grad
+result.angles['11_13_15']?.degrees           // Winkel in Grad
+result.velocities[15]?.speed                 // Handgeschwindigkeit (px/s)
+result.rangeOfMotion['23_25_27']?.rangeDegrees // ROM in Grad
+result.isStationary                          // Body movement state
 
 // Mit BodyJoint
 final angle = angleCalculator.calculateFromBodyJoint(
@@ -171,47 +222,100 @@ final angle = angleCalculator.calculateFromBodyJoint(
 );
 ```
 
-### 3.4 Jitter-Reduktion (OneEuroFilter)
+### 4.4 OneEuroFilter (Jitter-Reduktion)
 
 ```dart
 // Automatisch via PoseSmoother angewandt wenn smoothingEnabled: true
-// Config in pose_detection_config.dart:
 smoothingEnabled: true,           // Default: true
-smoothingMinCutoff: 1.0,          // Frequenz-Cutoff
-smoothingBeta: 0.007,             // Speed Coefficient
-smoothingDerivativeCutoff: 1.0,   // Derivative Cutoff
+smoothingMinCutoff: 1.0,          // Frequenz-Cutoff (0.1-10.0)
+smoothingBeta: 0.007,             // Speed Coefficient (0.0-1.0)
+smoothingDerivativeCutoff: 1.0,   // Derivative Cutoff (0.1-10.0)
 ```
 
-### 3.5 Error Handling
+### 4.5 Error Handling
 
 ```dart
-// lib/core/errors/pose_detection_errors.dart
 enum PoseDetectionErrorCode {
-  cameraInitFailed,
-  cameraNotInitialized,
-  streamStartFailed,
-  cameraSwitchFailed,
-  mlKitDetectionFailed,
-  imageConversionFailed,
-  tooManyConsecutiveErrors,
-  processingTimeout,
-  unknown,
+  cameraInitFailed, cameraNotInitialized, streamStartFailed,
+  cameraSwitchFailed, mlKitDetectionFailed, imageConversionFailed,
+  tooManyConsecutiveErrors, processingTimeout, unknown;
 }
 
-// Factory Methods
-PoseDetectionException.cameraInitFailed(cause);
-PoseDetectionException.mlKitDetectionFailed(cause);
 exception.isRecoverable; // bool
 ```
 
 ---
 
-## 4. Data Flow Pipeline
+## 5. Developer Playground UI
+
+### 5.1 Layout
+
+```
+┌────────────────────────────────────────────────────────────┐
+│              TOP METRICS BAR (FPS, Latency, Confidence)    │
+├────────────────────────────────────────────────────────────┤
+│ ┌──────┐                                    ┌──────────┐   │
+│ │ CFG  │      CAMERA PREVIEW                │  DATA    │   │
+│ │PANEL │      + POSE OVERLAY                │  PANEL   │   │
+│ │  <   │                                    │    >     │   │
+│ └──────┘                                    └──────────┘   │
+├────────────────────────────────────────────────────────────┤
+│  [Camera]  [Config Toggle]  [Start/Stop]  [Data Toggle]    │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Config Panel (Links)
+
+- **Pose Presets**: Default, Smooth, Responsive, Raw, High Precision
+- **Motion Presets**: Full, Minimal, ROM, Velocity
+- **Smoothing Sliders**: minCutoff, beta, derivativeCutoff, enabled toggle
+- **Confidence Sliders**: high/low/min thresholds, filter toggle
+- **Motion Config**: trackAngles, trackVelocities, trackRom, use3DAngles, historyCapacity
+
+### 5.3 Data Panel (Rechts)
+
+- **Joint Angles Section**: Semi-circular gauges mit Confidence-Coloring
+- **Velocities Section**: Speed + Direction arrows, Category badges (STILL/SLOW/MOD/FAST/V.FAST)
+- **ROM Section**: Progress bars mit Min/Max markers, Category badges
+
+### 5.4 Top Metrics Bar
+
+| Metric | Color Coding |
+|--------|--------------|
+| FPS | Green ≥25, Yellow ≥15, Red <15 |
+| Latency | Green <50ms, Yellow <100ms, Orange <150ms, Red ≥150ms |
+| Confidence | Green >0.8, Yellow >0.5, Red ≤0.5 |
+| Pose Count | Total detections |
+| Dropped | Skipped frames |
+| Body State | Stationary/Moving icon |
+
+### 5.5 PlaygroundBloc Events
+
+```dart
+// Lifecycle
+InitializePlaygroundEvent, StartCaptureEvent, StopCaptureEvent
+SwitchCameraEvent, DisposePlaygroundEvent, ProcessFrameEvent
+
+// Configuration
+ApplyPresetEvent(ConfigPreset)    // Quick preset switch
+UpdatePoseConfigEvent(config)     // Custom pose config
+UpdateMotionConfigEvent(config)   // Custom motion config
+
+// UI State
+TogglePanelEvent(PanelType)       // Expand/collapse panels
+SelectJointsEvent(Set<BodyJoint>) // Filter displayed joints
+ToggleAllVelocitiesEvent          // Show all vs key landmarks
+ResetMotionAnalysisEvent          // Clear ROM/velocity data
+```
+
+---
+
+## 6. Data Flow Pipeline
 
 ```
 CameraService.startImageStream()
     ↓ 30 FPS
-PoseDetectionBloc (droppable transformer)
+PlaygroundBloc (droppable transformer)
     ↓
 FrameProcessor.processFrame()
     ↓
@@ -221,12 +325,14 @@ PoseSmoother.smooth()              [OneEuroFilter]
     ↓
 MotionAnalyzer.analyze()           [Angles, Velocity, ROM]
     ↓
-State Emission → UI
+PlaygroundState Emission → UI
+    ↓
+TopMetricsBar + DataVisualizationPanel + ConfigPanel
 ```
 
 ---
 
-## 5. Dependency Injection
+## 7. Dependency Injection
 
 ```dart
 // lib/core/di/service_locator.dart
@@ -240,49 +346,65 @@ await initializeDependencies(
 sl<PoseDetectionBloc>()
 sl<MotionAnalyzer>()
 sl<PoseSmoother>()
+
+// Dynamic Config Updates (für Playground)
+updatePoseConfig(newConfig);   // Recreates PoseSmoother
+updateMotionConfig(newConfig); // Recreates MotionAnalyzer
 ```
 
 ---
 
-## 6. Abgeschlossene Refactorings (Stand 2026-02-03)
+## 8. Abgeschlossene Features
 
-| Änderung | Status | Dateien |
-|----------|--------|---------|
-| Factory Constructors statt static vars | ✅ | `pose_detection_config.dart`, `motion_analyzer.dart` |
-| LandmarkType Enum (33 Landmarks) | ✅ | `landmark_type.dart` |
-| BodyJoint Enum (semantische Gelenke) | ✅ | `body_joint.dart` |
-| Equatable für Domain Models | ✅ | `joint_angle.dart`, `velocity.dart`, `range_of_motion.dart` |
-| Error Handling mit Enum Codes | ✅ | `pose_detection_errors.dart` |
-| OneEuroFilter Smoothing | ✅ | `one_euro_filter.dart`, `pose_smoother.dart` |
-| RingBuffer für FPS | ✅ | `ring_buffer.dart`, `pose_detection_bloc.dart` |
-| AngleCalculator mit BodyJoint | ✅ | `angle_calculator.dart` |
+| Feature | Status | Key Files |
+|---------|--------|-----------|
+| Factory Constructors | ✅ | `pose_detection_config.dart`, `motion_analyzer.dart` |
+| LandmarkType Enum | ✅ | `landmark_type.dart` |
+| BodyJoint Enum | ✅ | `body_joint.dart` |
+| Equatable Models | ✅ | `joint_angle.dart`, `velocity.dart`, `range_of_motion.dart` |
+| Error Handling | ✅ | `pose_detection_errors.dart` |
+| OneEuroFilter | ✅ | `one_euro_filter.dart`, `pose_smoother.dart` |
+| RingBuffer FPS | ✅ | `ring_buffer.dart` |
+| Developer Playground UI | ✅ | `playground/` (BLoC + Widgets) |
+| HomePage Navigation | ✅ | `home_page.dart` |
+| Documentation Page | ✅ | `documentation_page.dart` |
+| Theme System | ✅ | `playground_theme.dart` |
+| Dynamic Config Updates | ✅ | `service_locator.dart` |
+| Visualization Widgets | ✅ | `angle_gauge.dart`, `velocity_indicator.dart`, `rom_progress_bar.dart` |
 
 ---
 
-## 7. Nächste Schritte / Offene Punkte
+## 9. Nächste Schritte / Offene Punkte
 
-- [ ] Konkrete Use Cases / Features planen
-- [ ] UI für Motion Feedback
 - [ ] Persistenz für ROM-Daten
 - [ ] Unit Tests für Domain Layer
+- [ ] Export Motion Data (JSON/CSV)
+- [ ] Custom Joint Selection UI
+- [ ] Landscape Layout Support
 
 ---
 
-## 8. Wichtige Code-Referenzen
+## 10. Wichtige Code-Referenzen
 
-| Konzept | Datei:Zeile |
-|---------|-------------|
-| BLoC Frame Processing | `pose_detection_bloc.dart:110-123` |
-| Smoothing Integration | `pose_detection_bloc.dart:180-190` |
-| Angle Calculation | `angle_calculator.dart:86-157` |
-| Velocity Tracking | `velocity_tracker.dart:40-80` |
-| ROM Update | `range_of_motion.dart:104-123` |
-| DI Setup | `service_locator.dart:14-74` |
-| Config Factory | `pose_detection_config.dart:50-90` |
+| Konzept | Datei |
+|---------|-------|
+| App Entry Point | `main.dart` |
+| Playground BLoC | `playground_bloc.dart` |
+| Motion Analysis | `motion_analyzer.dart` |
+| Angle Calculation | `angle_calculator.dart` |
+| Velocity Tracking | `velocity_tracker.dart` |
+| ROM Analysis | `range_of_motion_analyzer.dart` |
+| Pose Smoothing | `pose_smoother.dart` |
+| DI Setup | `service_locator.dart` |
+| Config Presets | `pose_detection_config.dart` |
+| Theme Constants | `playground_theme.dart` |
+| Top Metrics Bar | `top_metrics_bar.dart` |
+| Data Panel | `data_visualization_panel.dart` |
+| Config Panel | `config_panel.dart` |
 
 ---
 
-## 9. Build Status
+## 11. Build Status
 
 ```bash
 flutter analyze  # ✅ No issues found

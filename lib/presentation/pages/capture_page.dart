@@ -172,8 +172,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           isFrontCamera: state.isFrontCamera,
         ),
 
-        // Pose overlay (skeleton with connected landmarks)
-        if (state.currentPose != null) _buildPoseOverlay(state),
+        // Pose overlay (skeleton) - only show when person is detected
+        if (state.currentPose != null && state.personDetection.isPersonDetected)
+          _buildPoseOverlay(state),
 
         // Person detection status
         _buildPersonStatusBanner(state),

@@ -175,8 +175,8 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         // Pose overlay (skeleton with connected landmarks)
         if (state.currentPose != null) _buildPoseOverlay(state),
 
-        // Top metrics bar (live data)
-        _buildMinimalTopBar(state),
+        // Person detection status
+        _buildPersonStatusBanner(state),
 
         // Bottom controls with Stop button
         _buildDetectingControls(state),
@@ -209,172 +209,45 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     return overlay;
   }
 
-  // ============================================================
-  // MINIMAL MODE - 3 metrics only
-  // ============================================================
-
-  Widget _buildMinimalTopBar(Detecting state) {
-    final detection = state.personDetection;
+  Widget _buildPersonStatusBanner(Detecting state) {
+    final isDetected = state.personDetection.isPersonDetected;
 
     return SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Haupt-Status
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: detection.isPersonDetected
-                        ? const Color(0xFF4CAF50)
-                        : const Color(0xFFFF5252),
-                    width: 2,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDetected ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                width: 2,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isDetected ? Icons.person : Icons.person_off,
+                  color: isDetected ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  isDetected ? 'Person erkannt' : 'Keine Person',
+                  style: TextStyle(
+                    color: isDetected ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      detection.isPersonDetected ? Icons.person : Icons.person_off,
-                      color: detection.isPersonDetected
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFFFF5252),
-                      size: 28,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      detection.isPersonDetected ? 'Person erkannt' : 'Keine Person',
-                      style: TextStyle(
-                        color: detection.isPersonDetected
-                            ? const Color(0xFF4CAF50)
-                            : const Color(0xFFFF5252),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Debug-Info Panel
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Größe & Proportionen
-                    _buildDebugRow('Size', [
-                      Text(
-                        'SW:${detection.shoulderWidth.toStringAsFixed(0)} T:${detection.torsoLength.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: detection.minSizeOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                          fontSize: 11, fontFamily: 'monospace',
-                        ),
-                      ),
-                      _debugCheck('min', detection.minSizeOk),
-                      _debugCheck('ratio', detection.proportionsOk),
-                    ]),
-                    const SizedBox(height: 4),
-                    // Geometrie
-                    _buildDebugRow('Geo', [
-                      _debugCheck('K>S', detection.headAboveShoulders),
-                      _debugCheck('S>H', detection.shouldersAboveHips),
-                    ]),
-                    const SizedBox(height: 4),
-                    // Symmetrie
-                    _buildDebugRow('Sym', [
-                      Text(
-                        'S:${detection.shoulderSymmetry.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: detection.shoulderSymmetryOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                          fontSize: 11, fontFamily: 'monospace',
-                        ),
-                      ),
-                      _debugCheck('', detection.shoulderSymmetryOk),
-                      Text(
-                        'H:${detection.hipSymmetry.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: detection.hipSymmetryOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                          fontSize: 11, fontFamily: 'monospace',
-                        ),
-                      ),
-                      _debugCheck('', detection.hipSymmetryOk),
-                    ]),
-                    const SizedBox(height: 4),
-                    // Nacken & Gesicht
-                    _buildDebugRow('Head', [
-                      Text(
-                        'Neck:${detection.neckRatio.toStringAsFixed(1)}',
-                        style: TextStyle(
-                          color: detection.neckOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                          fontSize: 11, fontFamily: 'monospace',
-                        ),
-                      ),
-                      _debugCheck('', detection.neckOk),
-                      Text(
-                        'Face:${detection.facePartsDetected}/4',
-                        style: TextStyle(
-                          color: detection.faceOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                          fontSize: 11, fontFamily: 'monospace',
-                        ),
-                      ),
-                      _debugCheck('', detection.faceOk),
-                    ]),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDebugRow(String label, List<Widget> children) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 40,
-          child: Text(
-            label,
-            style: const TextStyle(color: Color(0xFF888888), fontSize: 10),
-          ),
-        ),
-        ...children,
-      ],
-    );
-  }
-
-  Widget _debugCheck(String label, bool ok) {
-    return Container(
-      margin: const EdgeInsets.only(right: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (label.isNotEmpty) ...[
-            Text(label, style: const TextStyle(color: Color(0xFF888888), fontSize: 10)),
-            const SizedBox(width: 4),
-          ],
-          Icon(
-            ok ? Icons.check : Icons.close,
-            size: 12,
-            color: ok ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-          ),
-        ],
       ),
     );
   }

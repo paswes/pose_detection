@@ -67,7 +67,7 @@ class CameraService implements ICameraService {
 
     _controller = CameraController(
       camera,
-      ResolutionPreset.ultraHigh,
+      ResolutionPreset.medium,
       enableAudio: false,
       imageFormatGroup: Platform.isIOS
           ? ImageFormatGroup.bgra8888

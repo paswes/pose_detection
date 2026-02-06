@@ -11,6 +11,7 @@ import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 import 'package:pose_detection/presentation/widgets/camera_preview_widget.dart';
 import 'package:pose_detection/presentation/widgets/pose_painter.dart';
+import 'package:pose_detection/presentation/widgets/box_painter.dart';
 
 /// Fullscreen camera capture page with pose overlay
 /// Single-screen app with start/stop detection controls
@@ -266,6 +267,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           isLandscape: !_isPortrait,
         ),
 
+        // Silhouette overlay (target position guide)
+        _buildSilhouetteOverlay(state),
+
         // Pose overlay (skeleton) - only show when person is detected
         if (state.currentPose !=
             null /* && state.personDetection.isPersonDetected */ )
@@ -308,6 +312,20 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     }
 
     return overlay;
+  }
+
+  /// Silhouette overlay showing target position
+  Widget _buildSilhouetteOverlay(Detecting state) {
+    final isProperlyPositioned =
+        state.positionValidation?.isProperlyPositioned ?? false;
+
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: SilhouettePainter(
+          isProperlyPositioned: isProperlyPositioned,
+        ),
+      ),
+    );
   }
 
   /// Small icon indicator for person-in-view status (top-left)

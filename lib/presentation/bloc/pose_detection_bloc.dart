@@ -4,11 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/config/pose_detection_config.dart';
 import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
+import 'package:pose_detection/core/interfaces/position_validator_interface.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/error_tracker.dart';
 import 'package:pose_detection/core/services/frame_processor.dart';
 import 'package:pose_detection/core/utils/logger.dart';
 import 'package:pose_detection/domain/models/detection_metrics.dart';
+import 'package:pose_detection/domain/models/position_validation_result.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 
@@ -19,6 +21,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   final FrameProcessor _frameProcessor;
   final ErrorTracker _errorTracker;
   final IPersonValidator _personValidator;
+  final IPositionValidator _positionValidator;
 
   bool _isProcessingFrame = false;
   bool _isStreamingActive = false;
@@ -35,11 +38,13 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     required IPoseDetector poseDetector,
     required PoseDetectionConfig config,
     required IPersonValidator personValidator,
-  })  : _cameraService = cameraService,
-        _frameProcessor = FrameProcessor(poseDetector: poseDetector),
-        _errorTracker = ErrorTracker(config: config),
-        _personValidator = personValidator,
-        super(PoseDetectionInitial()) {
+    required IPositionValidator positionValidator,
+  }) : _cameraService = cameraService,
+       _frameProcessor = FrameProcessor(poseDetector: poseDetector),
+       _errorTracker = ErrorTracker(config: config),
+       _personValidator = personValidator,
+       _positionValidator = positionValidator,
+       super(PoseDetectionInitial()) {
     on<InitializeEvent>(_onInitialize);
     on<StartCaptureEvent>(_onStartCapture);
     on<StopCaptureEvent>(_onStopCapture);
@@ -103,11 +108,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       return;
     }
 
-    emit(Detecting(
-      cameraController: controller,
-      canSwitchCamera: _cameraService.canSwitchCamera,
-      isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
-    ));
+    emit(
+      Detecting(
+        cameraController: controller,
+        canSwitchCamera: _cameraService.canSwitchCamera,
+        isFrontCamera:
+            _cameraService.currentLensDirection == CameraLensDirection.front,
+      ),
+    );
 
     final cameraDescription = _cameraService.getCameraDescription();
     if (cameraDescription != null) {
@@ -117,11 +125,13 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
           final timestampMicros = DateTime.now().microsecondsSinceEpoch;
 
           if (!_isProcessingFrame) {
-            add(ProcessFrameEvent(
-              image,
-              cameraDescription.sensorOrientation,
-              timestampMicros,
-            ));
+            add(
+              ProcessFrameEvent(
+                image,
+                cameraDescription.sensorOrientation,
+                timestampMicros,
+              ),
+            );
           }
           // Dropped frames are simply not processed - no tracking needed
         }
@@ -151,7 +161,9 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
     final wasDetecting = state is Detecting;
     final previousPose = wasDetecting ? (state as Detecting).currentPose : null;
-    final previousMetrics = wasDetecting ? (state as Detecting).metrics : const DetectionMetrics();
+    final previousMetrics = wasDetecting
+        ? (state as Detecting).metrics
+        : const DetectionMetrics();
 
     try {
       emit(CameraInitializing());
@@ -159,7 +171,9 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       final controller = _cameraService.controller;
       if (controller == null || !controller.value.isInitialized) {
-        throw Exception('Camera controller not properly initialized after switch');
+        throw Exception(
+          'Camera controller not properly initialized after switch',
+        );
       }
 
       if (wasDetecting) {
@@ -172,28 +186,37 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
               final timestampMicros = DateTime.now().microsecondsSinceEpoch;
 
               if (!_isProcessingFrame) {
-                add(ProcessFrameEvent(
-                  image,
-                  cameraDescription.sensorOrientation,
-                  timestampMicros,
-                ));
+                add(
+                  ProcessFrameEvent(
+                    image,
+                    cameraDescription.sensorOrientation,
+                    timestampMicros,
+                  ),
+                );
               }
             }
           });
         }
 
-        emit(Detecting(
-          cameraController: controller,
-          currentPose: previousPose,
-          metrics: previousMetrics,
-          canSwitchCamera: _cameraService.canSwitchCamera,
-          isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
-        ));
+        emit(
+          Detecting(
+            cameraController: controller,
+            currentPose: previousPose,
+            metrics: previousMetrics,
+            canSwitchCamera: _cameraService.canSwitchCamera,
+            isFrontCamera:
+                _cameraService.currentLensDirection ==
+                CameraLensDirection.front,
+          ),
+        );
       } else {
         emit(CameraReady(controller));
       }
 
-      Logger.info('Bloc', 'Camera switched to ${_cameraService.currentLensDirection}');
+      Logger.info(
+        'Bloc',
+        'Camera switched to ${_cameraService.currentLensDirection}',
+      );
     } catch (e) {
       Logger.error('Bloc', 'ERROR switching camera: $e');
       emit(PoseDetectionError('Failed to switch camera: $e'));
@@ -205,7 +228,9 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Emitter<PoseDetectionState> emit,
   ) async {
     final wasDetecting = state is Detecting;
-    final previousMetrics = wasDetecting ? (state as Detecting).metrics : const DetectionMetrics();
+    final previousMetrics = wasDetecting
+        ? (state as Detecting).metrics
+        : const DetectionMetrics();
 
     try {
       emit(CameraInitializing());
@@ -213,7 +238,9 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       final controller = _cameraService.controller;
       if (controller == null || !controller.value.isInitialized) {
-        throw Exception('Camera controller not properly initialized after orientation change');
+        throw Exception(
+          'Camera controller not properly initialized after orientation change',
+        );
       }
 
       if (wasDetecting) {
@@ -226,23 +253,29 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
               final timestampMicros = DateTime.now().microsecondsSinceEpoch;
 
               if (!_isProcessingFrame) {
-                add(ProcessFrameEvent(
-                  image,
-                  cameraDescription.sensorOrientation,
-                  timestampMicros,
-                ));
+                add(
+                  ProcessFrameEvent(
+                    image,
+                    cameraDescription.sensorOrientation,
+                    timestampMicros,
+                  ),
+                );
               }
             }
           });
         }
 
-        emit(Detecting(
-          cameraController: controller,
-          currentPose: null, // Clear pose since image dimensions changed
-          metrics: previousMetrics,
-          canSwitchCamera: _cameraService.canSwitchCamera,
-          isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
-        ));
+        emit(
+          Detecting(
+            cameraController: controller,
+            currentPose: null, // Clear pose since image dimensions changed
+            metrics: previousMetrics,
+            canSwitchCamera: _cameraService.canSwitchCamera,
+            isFrontCamera:
+                _cameraService.currentLensDirection ==
+                CameraLensDirection.front,
+          ),
+        );
       } else {
         emit(CameraReady(controller));
       }
@@ -276,16 +309,28 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         if (state is Detecting) {
           final personDetection = _personValidator.validate(result.pose);
 
-          emit((state as Detecting).copyWith(
-            currentPose: result.pose,
-            metrics: DetectionMetrics(
-              fps: _calculateFps(),
-              latencyMs: _lastLatencyMs,
+          // Only run position validation if person is detected
+          PositionValidationResult? positionValidation;
+          // if (personDetection.isPersonDetected) {
+          //   positionValidation = _positionValidator.validate(result.pose);
+          // }
+          positionValidation = _positionValidator.validate(result.pose);
+
+          emit(
+            (state as Detecting).copyWith(
+              currentPose: result.pose,
+              metrics: DetectionMetrics(
+                fps: _calculateFps(),
+                latencyMs: _lastLatencyMs,
+              ),
+              canSwitchCamera: _cameraService.canSwitchCamera,
+              isFrontCamera:
+                  _cameraService.currentLensDirection ==
+                  CameraLensDirection.front,
+              personDetection: personDetection,
+              positionValidation: positionValidation,
             ),
-            canSwitchCamera: _cameraService.canSwitchCamera,
-            isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
-            personDetection: personDetection,
-          ));
+          );
         }
       } else {
         _handleError(emit, result.error ?? 'Unknown error');

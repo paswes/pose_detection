@@ -3,10 +3,12 @@ import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/config/pose_detection_config.dart';
 import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
+import 'package:pose_detection/core/interfaces/position_validator_interface.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
 import 'package:pose_detection/core/services/person_validator.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/core/services/position_validator.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 
 final GetIt sl = GetIt.instance;
@@ -39,6 +41,10 @@ Future<void> initializeDependencies({
     () => PersonValidator(),
   );
 
+  sl.registerLazySingleton<IPositionValidator>(
+    () => PositionValidator(),
+  );
+
   // BLoC
   sl.registerLazySingleton<PoseDetectionBloc>(
     () => PoseDetectionBloc(
@@ -46,6 +52,7 @@ Future<void> initializeDependencies({
       poseDetector: sl<IPoseDetector>(),
       config: sl<PoseDetectionConfig>(),
       personValidator: sl<IPersonValidator>(),
+      positionValidator: sl<IPositionValidator>(),
     ),
   );
 }

@@ -103,7 +103,8 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
 
       final result = await ImageGallerySaver.saveImage(
         bytes,
-        name: 'pose_debug_${_isPortrait ? "portrait" : "landscape"}_${width}x$height',
+        name:
+            'pose_debug_${_isPortrait ? "portrait" : "landscape"}_${width}x$height',
       );
 
       // Log for debugging
@@ -111,8 +112,12 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       debugPrint('DEBUG CAPTURE:');
       debugPrint('  UI Mode: ${_isPortrait ? "PORTRAIT" : "LANDSCAPE"}');
       debugPrint('  Image Size: ${width}x$height');
-      debugPrint('  Actual Orientation: ${isActuallyPortrait ? "PORTRAIT" : "LANDSCAPE"}');
-      debugPrint('  Match: ${_isPortrait == isActuallyPortrait ? "YES" : "NO !!!"}');
+      debugPrint(
+        '  Actual Orientation: ${isActuallyPortrait ? "PORTRAIT" : "LANDSCAPE"}',
+      );
+      debugPrint(
+        '  Match: ${_isPortrait == isActuallyPortrait ? "YES" : "NO !!!"}',
+      );
       debugPrint('  Saved: $result');
       debugPrint('========================================');
 
@@ -122,7 +127,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
             content: Text(
               '${width}x$height (${isActuallyPortrait ? "Portrait" : "Landscape"}) ${_isPortrait == isActuallyPortrait ? "" : "MISMATCH!"}',
             ),
-            backgroundColor: _isPortrait == isActuallyPortrait ? Colors.green : Colors.red,
+            backgroundColor: _isPortrait == isActuallyPortrait
+                ? Colors.green
+                : Colors.red,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -260,15 +267,17 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         ),
 
         // Pose overlay (skeleton) - only show when person is detected
-        if (state.currentPose != null && state.personDetection.isPersonDetected)
+        if (state.currentPose !=
+            null /* && state.personDetection.isPersonDetected */ )
           _buildPoseOverlay(state),
 
         // Person-in-view indicator (small icon, top-left)
         _buildPersonIndicator(state),
 
         // Position guidance banner (only when person detected but not positioned)
-        if (state.personDetection.isPersonDetected)
-          _buildPositionBanner(state),
+        /*  if (state.personDetection.isPersonDetected) */ _buildPositionBanner(
+          state,
+        ),
 
         // Bottom controls with Stop button
         _buildDetectingControls(state),
@@ -331,7 +340,8 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
 
   /// Position guidance banner (top-center, only when person detected)
   Widget _buildPositionBanner(Detecting state) {
-    final isProperlyPositioned = state.positionValidation?.isProperlyPositioned ?? false;
+    final isProperlyPositioned =
+        state.positionValidation?.isProperlyPositioned ?? false;
     final guidanceMessages = state.positionValidation?.guidanceMessages ?? [];
 
     // Determine status color and text
@@ -356,7 +366,10 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
             children: [
               // Status banner
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(12),
@@ -372,12 +385,15 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                 ),
               ),
 
-              // Guidance messages
-              if (!isProperlyPositioned && guidanceMessages.isNotEmpty)
+              // Guidance messages (always show for debugging)
+              if (guidanceMessages.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(8),
@@ -385,13 +401,15 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: guidanceMessages
-                          .map((msg) => Text(
-                                msg,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ))
+                          .map(
+                            (msg) => Text(
+                              msg,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          )
                           .toList(),
                     ),
                   ),
@@ -545,7 +563,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           borderRadius: BorderRadius.circular(99),
         ),
         child: Icon(
-          _isPortrait ? Icons.stay_current_landscape : Icons.stay_current_portrait,
+          _isPortrait
+              ? Icons.stay_current_landscape
+              : Icons.stay_current_portrait,
           color: const Color(0xFF888888),
           size: 24,
         ),
@@ -571,5 +591,4 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       ),
     );
   }
-
 }

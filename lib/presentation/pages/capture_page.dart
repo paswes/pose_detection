@@ -263,8 +263,12 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         if (state.currentPose != null && state.personDetection.isPersonDetected)
           _buildPoseOverlay(state),
 
-        // Person detection status
-        _buildPersonStatusBanner(state),
+        // Person-in-view indicator (small icon, top-left)
+        _buildPersonIndicator(state),
+
+        // Position guidance banner (only when person detected but not positioned)
+        if (state.personDetection.isPersonDetected)
+          _buildPositionBanner(state),
 
         // Bottom controls with Stop button
         _buildDetectingControls(state),
@@ -297,43 +301,102 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     return overlay;
   }
 
-  Widget _buildPersonStatusBanner(Detecting state) {
-    final isDetected = state.personDetection.isPersonDetected;
+  /// Small icon indicator for person-in-view status (top-left)
+  Widget _buildPersonIndicator(Detecting state) {
+    final isPersonDetected = state.personDetection.isPersonDetected;
+
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E).withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              isPersonDetected ? Icons.person : Icons.person_off,
+              color: isPersonDetected
+                  ? const Color(0xFF4CAF50)
+                  : const Color(0xFFFF5252),
+              size: 24,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Position guidance banner (top-center, only when person detected)
+  Widget _buildPositionBanner(Detecting state) {
+    final isProperlyPositioned = state.positionValidation?.isProperlyPositioned ?? false;
+    final guidanceMessages = state.positionValidation?.guidanceMessages ?? [];
+
+    // Determine status color and text
+    final Color statusColor;
+    final String statusText;
+
+    if (isProperlyPositioned) {
+      statusColor = const Color(0xFF4CAF50); // Green
+      statusText = 'Bereit';
+    } else {
+      statusColor = const Color(0xFFFFEB3B); // Yellow
+      statusText = 'Position anpassen';
+    }
 
     return SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDetected ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                width: 2,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isDetected ? Icons.person : Icons.person_off,
-                  color: isDetected ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                  size: 28,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Status banner
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor, width: 2),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  isDetected ? 'Person erkannt' : 'Keine Person',
+                child: Text(
+                  statusText,
                   style: TextStyle(
-                    color: isDetected ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                    fontSize: 18,
+                    color: statusColor,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
-            ),
+              ),
+
+              // Guidance messages
+              if (!isProperlyPositioned && guidanceMessages.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: guidanceMessages
+                          .map((msg) => Text(
+                                msg,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

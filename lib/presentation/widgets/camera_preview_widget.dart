@@ -18,7 +18,8 @@ class CameraPreviewWidget extends StatelessWidget {
   /// Calculates the BoxFit.cover transformation parameters.
   /// @deprecated Use TransformCalculator.calculateCoverTransform instead.
   @Deprecated('Use TransformCalculator.calculateCoverTransform instead')
-  static ({double scale, Offset offset, Size fittedSize}) getImageToScreenTransform({
+  static ({double scale, Offset offset, Size fittedSize})
+  getImageToScreenTransform({
     required Size imageSize,
     required Size screenSize,
   }) {
@@ -70,7 +71,7 @@ class CameraPreviewWidget extends StatelessWidget {
     final imageWidth = previewSize.height; // Swap for portrait
     final imageHeight = previewSize.width;
 
-    Widget preview = SizedBox.expand(
+    return SizedBox.expand(
       child: FittedBox(
         fit: BoxFit.cover,
         clipBehavior: Clip.hardEdge,
@@ -84,13 +85,14 @@ class CameraPreviewWidget extends StatelessWidget {
 
     // Mirror the preview for front camera (like a mirror)
     // This makes it more intuitive for the user - left is left
-    if (isFrontCamera) {
-      preview = Transform.flip(
-        flipX: true,
-        child: preview,
-      );
-    }
+    // if (isFrontCamera) {
+    //   preview = Transform.flip(
+    //     //flipX: true,
+    //     flipX: false,
+    //     child: preview,
+    //   );
+    // }
 
-    return preview;
+    // return preview;
   }
 }

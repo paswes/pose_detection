@@ -44,6 +44,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     on<StartCaptureEvent>(_onStartCapture);
     on<StopCaptureEvent>(_onStopCapture);
     on<SwitchCameraEvent>(_onSwitchCamera);
+    on<ChangeOrientationEvent>(_onChangeOrientation);
     on<ProcessFrameEvent>(_onProcessFrame, transformer: droppable());
     on<DisposeEvent>(_onDispose);
   }
@@ -196,6 +197,60 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     } catch (e) {
       Logger.error('Bloc', 'ERROR switching camera: $e');
       emit(PoseDetectionError('Failed to switch camera: $e'));
+    }
+  }
+
+  Future<void> _onChangeOrientation(
+    ChangeOrientationEvent event,
+    Emitter<PoseDetectionState> emit,
+  ) async {
+    final wasDetecting = state is Detecting;
+    final previousMetrics = wasDetecting ? (state as Detecting).metrics : const DetectionMetrics();
+
+    try {
+      emit(CameraInitializing());
+      await _cameraService.setOrientation(event.orientation);
+
+      final controller = _cameraService.controller;
+      if (controller == null || !controller.value.isInitialized) {
+        throw Exception('Camera controller not properly initialized after orientation change');
+      }
+
+      if (wasDetecting) {
+        // Restart image stream for detection
+        final cameraDescription = _cameraService.getCameraDescription();
+        if (cameraDescription != null && !_isStreamingActive) {
+          _isStreamingActive = true;
+          _cameraService.startImageStream((image) {
+            if (_isStreamingActive) {
+              final timestampMicros = DateTime.now().microsecondsSinceEpoch;
+
+              if (!_isProcessingFrame) {
+                add(ProcessFrameEvent(
+                  image,
+                  cameraDescription.sensorOrientation,
+                  timestampMicros,
+                ));
+              }
+            }
+          });
+        }
+
+        emit(Detecting(
+          cameraController: controller,
+          currentPose: null, // Clear pose since image dimensions changed
+          metrics: previousMetrics,
+          canSwitchCamera: _cameraService.canSwitchCamera,
+          isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
+        ));
+      } else {
+        emit(CameraReady(controller));
+      }
+
+      Logger.info('Bloc', 'Orientation changed to ${event.orientation}');
+    } catch (e) {
+      Logger.error('Bloc', 'ERROR changing orientation: $e');
+      emit(PoseDetectionError('Failed to change orientation: $e'));
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:flutter/services.dart';
 
 /// Abstract interface for camera operations.
 /// Enables mocking for tests and alternative implementations.
@@ -15,6 +16,9 @@ abstract class ICameraService {
   /// Current camera lens direction (front or back)
   CameraLensDirection get currentLensDirection;
 
+  /// Current capture orientation
+  DeviceOrientation get currentOrientation;
+
   /// Whether the device has multiple cameras and can switch
   bool get canSwitchCamera;
 
@@ -30,6 +34,10 @@ abstract class ICameraService {
   /// Switch between front and back camera
   /// Handles stopping stream, disposing, reinitializing, and restarting stream
   Future<void> switchCamera();
+
+  /// Change capture orientation (portrait/landscape)
+  /// Handles stopping stream, disposing, reinitializing with new orientation, and restarting stream
+  Future<void> setOrientation(DeviceOrientation orientation);
 
   /// Get the camera description
   CameraDescription? getCameraDescription();

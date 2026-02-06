@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/services.dart';
 
 /// Events for generic PoseDetectionBloc
 abstract class PoseDetectionEvent extends Equatable {
@@ -30,6 +31,16 @@ class ProcessFrameEvent extends PoseDetectionEvent {
 
 /// Switch between front and back camera
 class SwitchCameraEvent extends PoseDetectionEvent {}
+
+/// Change device orientation (portrait/landscape)
+class ChangeOrientationEvent extends PoseDetectionEvent {
+  final DeviceOrientation orientation;
+
+  ChangeOrientationEvent(this.orientation);
+
+  @override
+  List<Object?> get props => [orientation];
+}
 
 /// Dispose resources
 class DisposeEvent extends PoseDetectionEvent {}

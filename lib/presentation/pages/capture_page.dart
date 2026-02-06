@@ -20,6 +20,7 @@ class CapturePage extends StatefulWidget {
 
 class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
   late final PoseDetectionBloc _bloc;
+  bool _isPortrait = true;
 
   @override
   void initState() {
@@ -49,7 +50,39 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _bloc.add(DisposeEvent());
     _bloc.close();
+    // Reset to allow all orientations on dispose
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     super.dispose();
+  }
+
+  void _toggleOrientation() {
+    setState(() {
+      _isPortrait = !_isPortrait;
+    });
+
+    final newOrientation = _isPortrait
+        ? DeviceOrientation.portraitUp
+        : DeviceOrientation.landscapeLeft;
+
+    // Update system orientation
+    if (_isPortrait) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+
+    // Trigger camera reinitialization via BLoC
+    _bloc.add(ChangeOrientationEvent(newOrientation));
   }
 
   @override
@@ -154,6 +187,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           isFrontCamera:
               state.cameraController.description.lensDirection ==
               CameraLensDirection.front,
+          isLandscape: !_isPortrait,
         ),
 
         // Bottom controls with Start button
@@ -170,6 +204,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         CameraPreviewWidget(
           cameraController: state.cameraController,
           isFrontCamera: state.isFrontCamera,
+          isLandscape: !_isPortrait,
         ),
 
         // Pose overlay (skeleton) - only show when person is detected
@@ -266,10 +301,18 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Camera switch button
-              _buildCameraSwitchButton(
-                state.cameraController.description.lensDirection ==
-                    CameraLensDirection.front,
+              // Left side controls
+              Row(
+                children: [
+                  // Camera switch button
+                  _buildCameraSwitchButton(
+                    state.cameraController.description.lensDirection ==
+                        CameraLensDirection.front,
+                  ),
+                  const SizedBox(width: 16),
+                  // Orientation switch button
+                  _buildOrientationSwitchButton(),
+                ],
               ),
 
               // Start button
@@ -290,9 +333,17 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Camera switch button
-              if (state.canSwitchCamera)
-                _buildCameraSwitchButton(state.isFrontCamera),
+              // Left side controls
+              Row(
+                children: [
+                  // Camera switch button
+                  if (state.canSwitchCamera)
+                    _buildCameraSwitchButton(state.isFrontCamera),
+                  if (state.canSwitchCamera) const SizedBox(width: 16),
+                  // Orientation switch button
+                  _buildOrientationSwitchButton(),
+                ],
+              ),
 
               // Stop button
               _buildStopButton(),
@@ -357,6 +408,24 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         child: const Icon(
           Icons.flip_camera_ios,
           color: Color(0xFF888888),
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrientationSwitchButton() {
+    return GestureDetector(
+      onTap: _toggleOrientation,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Icon(
+          _isPortrait ? Icons.stay_current_landscape : Icons.stay_current_portrait,
+          color: const Color(0xFF888888),
           size: 24,
         ),
       ),

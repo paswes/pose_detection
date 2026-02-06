@@ -8,11 +8,13 @@ import 'package:pose_detection/core/utils/transform_calculator.dart';
 class CameraPreviewWidget extends StatelessWidget {
   final CameraController cameraController;
   final bool isFrontCamera;
+  final bool isLandscape;
 
   const CameraPreviewWidget({
     super.key,
     required this.cameraController,
     this.isFrontCamera = false,
+    this.isLandscape = false,
   });
 
   /// Calculates the BoxFit.cover transformation parameters.
@@ -64,12 +66,21 @@ class CameraPreviewWidget extends StatelessWidget {
       );
     }
 
-    // For portrait mode on iOS, the image comes rotated:
-    // previewSize.width is the shorter dimension (portrait width)
-    // previewSize.height is the longer dimension (portrait height)
-    // We need to use the image as-is since ML Kit coordinates match this orientation
-    final imageWidth = previewSize.height; // Swap for portrait
-    final imageHeight = previewSize.width;
+    // Determine image dimensions based on camera orientation
+    final double imageWidth;
+    final double imageHeight;
+
+    if (isLandscape) {
+      // Landscape mode: use previewSize as-is
+      imageWidth = previewSize.width;
+      imageHeight = previewSize.height;
+    } else {
+      // Portrait mode on iOS: the image comes rotated, so swap dimensions
+      // previewSize.width is the shorter dimension (portrait width)
+      // previewSize.height is the longer dimension (portrait height)
+      imageWidth = previewSize.height;
+      imageHeight = previewSize.width;
+    }
 
     return SizedBox.expand(
       child: FittedBox(

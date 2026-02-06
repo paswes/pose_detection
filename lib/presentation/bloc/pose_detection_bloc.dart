@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/config/pose_detection_config.dart';
 import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
+import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/error_tracker.dart';
 import 'package:pose_detection/core/services/frame_processor.dart';
@@ -17,6 +18,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   final ICameraService _cameraService;
   final FrameProcessor _frameProcessor;
   final ErrorTracker _errorTracker;
+  final IPersonValidator _personValidator;
 
   bool _isProcessingFrame = false;
   bool _isStreamingActive = false;
@@ -32,9 +34,11 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     required ICameraService cameraService,
     required IPoseDetector poseDetector,
     required PoseDetectionConfig config,
+    required IPersonValidator personValidator,
   })  : _cameraService = cameraService,
         _frameProcessor = FrameProcessor(poseDetector: poseDetector),
         _errorTracker = ErrorTracker(config: config),
+        _personValidator = personValidator,
         super(PoseDetectionInitial()) {
     on<InitializeEvent>(_onInitialize);
     on<StartCaptureEvent>(_onStartCapture);
@@ -215,6 +219,8 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         _lastLatencyMs = result.latencyMs;
 
         if (state is Detecting) {
+          final personDetection = _personValidator.validate(result.pose);
+
           emit((state as Detecting).copyWith(
             currentPose: result.pose,
             metrics: DetectionMetrics(
@@ -223,6 +229,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
             ),
             canSwitchCamera: _cameraService.canSwitchCamera,
             isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
+            personDetection: personDetection,
           ));
         }
       } else {

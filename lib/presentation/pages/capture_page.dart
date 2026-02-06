@@ -2,7 +2,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pose_detection/core/config/pose_detection_config.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
@@ -21,7 +20,6 @@ class CapturePage extends StatefulWidget {
 
 class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
   late final PoseDetectionBloc _bloc;
-  late final LatencyThresholds _thresholds;
 
   @override
   void initState() {
@@ -33,8 +31,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     ]);
 
     WidgetsBinding.instance.addObserver(this);
-
-    _thresholds = sl<PoseDetectionConfig>().latencyThresholds;
 
     // Initialize BLoC from service locator
     _bloc = sl<PoseDetectionBloc>();
@@ -218,33 +214,126 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
   // ============================================================
 
   Widget _buildMinimalTopBar(Detecting state) {
-    final metrics = state.metrics;
-    final fps = metrics.fps;
-    final latency = metrics.latencyMs;
-    final confidence = state.currentPose?.avgConfidence ?? 0.0;
+    final detection = state.personDetection;
 
     return SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildMinimalMetric(
-                fps.toStringAsFixed(1),
-                'FPS',
-                _getFpsColor(fps),
+              // Haupt-Status
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: detection.isPersonDetected
+                        ? const Color(0xFF4CAF50)
+                        : const Color(0xFFFF5252),
+                    width: 2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      detection.isPersonDetected ? Icons.person : Icons.person_off,
+                      color: detection.isPersonDetected
+                          ? const Color(0xFF4CAF50)
+                          : const Color(0xFFFF5252),
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      detection.isPersonDetected ? 'Person erkannt' : 'Keine Person',
+                      style: TextStyle(
+                        color: detection.isPersonDetected
+                            ? const Color(0xFF4CAF50)
+                            : const Color(0xFFFF5252),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              _buildMinimalMetric(
-                '${latency.toStringAsFixed(0)}ms',
-                'Latency',
-                _getLatencyColor(latency),
-              ),
-              _buildMinimalMetric(
-                confidence.toStringAsFixed(2),
-                'Conf',
-                _getConfidenceColor(confidence),
+
+              const SizedBox(height: 8),
+
+              // Debug-Info Panel
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Größe & Proportionen
+                    _buildDebugRow('Size', [
+                      Text(
+                        'SW:${detection.shoulderWidth.toStringAsFixed(0)} T:${detection.torsoLength.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: detection.minSizeOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                          fontSize: 11, fontFamily: 'monospace',
+                        ),
+                      ),
+                      _debugCheck('min', detection.minSizeOk),
+                      _debugCheck('ratio', detection.proportionsOk),
+                    ]),
+                    const SizedBox(height: 4),
+                    // Geometrie
+                    _buildDebugRow('Geo', [
+                      _debugCheck('K>S', detection.headAboveShoulders),
+                      _debugCheck('S>H', detection.shouldersAboveHips),
+                    ]),
+                    const SizedBox(height: 4),
+                    // Symmetrie
+                    _buildDebugRow('Sym', [
+                      Text(
+                        'S:${detection.shoulderSymmetry.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: detection.shoulderSymmetryOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                          fontSize: 11, fontFamily: 'monospace',
+                        ),
+                      ),
+                      _debugCheck('', detection.shoulderSymmetryOk),
+                      Text(
+                        'H:${detection.hipSymmetry.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: detection.hipSymmetryOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                          fontSize: 11, fontFamily: 'monospace',
+                        ),
+                      ),
+                      _debugCheck('', detection.hipSymmetryOk),
+                    ]),
+                    const SizedBox(height: 4),
+                    // Nacken & Gesicht
+                    _buildDebugRow('Head', [
+                      Text(
+                        'Neck:${detection.neckRatio.toStringAsFixed(1)}',
+                        style: TextStyle(
+                          color: detection.neckOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                          fontSize: 11, fontFamily: 'monospace',
+                        ),
+                      ),
+                      _debugCheck('', detection.neckOk),
+                      Text(
+                        'Face:${detection.facePartsDetected}/4',
+                        style: TextStyle(
+                          color: detection.faceOk ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                          fontSize: 11, fontFamily: 'monospace',
+                        ),
+                      ),
+                      _debugCheck('', detection.faceOk),
+                    ]),
+                  ],
+                ),
               ),
             ],
           ),
@@ -253,33 +342,37 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMinimalMetric(String value, String label, Color valueColor) {
+  Widget _buildDebugRow(String label, List<Widget> children) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 40,
+          child: Text(
+            label,
+            style: const TextStyle(color: Color(0xFF888888), fontSize: 10),
+          ),
+        ),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _debugCheck(String label, bool ok) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFF333333), width: 1),
-      ),
-      child: Column(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'monospace',
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF666666),
-              fontSize: 10,
-            ),
+          if (label.isNotEmpty) ...[
+            Text(label, style: const TextStyle(color: Color(0xFF888888), fontSize: 10)),
+            const SizedBox(width: 4),
+          ],
+          Icon(
+            ok ? Icons.check : Icons.close,
+            size: 12,
+            color: ok ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
           ),
         ],
       ),
@@ -396,26 +489,4 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
-  // ============================================================
-  // COLOR HELPERS
-  // ============================================================
-
-  Color _getFpsColor(double fps) {
-    if (fps >= 25) return const Color(0xFF4CAF50);
-    if (fps >= 15) return const Color(0xFFFFEB3B);
-    return const Color(0xFFF44336);
-  }
-
-  Color _getLatencyColor(double latencyMs) {
-    if (latencyMs < _thresholds.excellent) return const Color(0xFF4CAF50);
-    if (latencyMs < _thresholds.acceptable) return const Color(0xFFFFEB3B);
-    if (latencyMs < _thresholds.warning) return const Color(0xFFFF9800);
-    return const Color(0xFFF44336);
-  }
-
-  Color _getConfidenceColor(double confidence) {
-    if (confidence > 0.8) return const Color(0xFF4CAF50);
-    if (confidence > 0.5) return const Color(0xFFFFEB3B);
-    return const Color(0xFFF44336);
-  }
 }

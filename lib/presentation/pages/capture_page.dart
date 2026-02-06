@@ -1,7 +1,10 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
@@ -83,6 +86,55 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
 
     // Trigger camera reinitialization via BLoC
     _bloc.add(ChangeOrientationEvent(newOrientation));
+  }
+
+  // DEBUG: Capture frame and save to gallery
+  Future<void> _captureFrame(CameraController controller) async {
+    try {
+      final XFile file = await controller.takePicture();
+      final bytes = await File(file.path).readAsBytes();
+
+      // Decode image to get actual dimensions
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final int width = frame.image.width;
+      final int height = frame.image.height;
+      final bool isActuallyPortrait = height > width;
+
+      final result = await ImageGallerySaver.saveImage(
+        bytes,
+        name: 'pose_debug_${_isPortrait ? "portrait" : "landscape"}_${width}x$height',
+      );
+
+      // Log for debugging
+      debugPrint('========================================');
+      debugPrint('DEBUG CAPTURE:');
+      debugPrint('  UI Mode: ${_isPortrait ? "PORTRAIT" : "LANDSCAPE"}');
+      debugPrint('  Image Size: ${width}x$height');
+      debugPrint('  Actual Orientation: ${isActuallyPortrait ? "PORTRAIT" : "LANDSCAPE"}');
+      debugPrint('  Match: ${_isPortrait == isActuallyPortrait ? "YES" : "NO !!!"}');
+      debugPrint('  Saved: $result');
+      debugPrint('========================================');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${width}x$height (${isActuallyPortrait ? "Portrait" : "Landscape"}) ${_isPortrait == isActuallyPortrait ? "" : "MISMATCH!"}',
+            ),
+            backgroundColor: _isPortrait == isActuallyPortrait ? Colors.green : Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Failed to capture: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -312,6 +364,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                   const SizedBox(width: 16),
                   // Orientation switch button
                   _buildOrientationSwitchButton(),
+                  const SizedBox(width: 16),
+                  // DEBUG: Capture button
+                  _buildCaptureButton(state.cameraController),
                 ],
               ),
 
@@ -342,6 +397,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                   if (state.canSwitchCamera) const SizedBox(width: 16),
                   // Orientation switch button
                   _buildOrientationSwitchButton(),
+                  const SizedBox(width: 16),
+                  // DEBUG: Capture button
+                  _buildCaptureButton(state.cameraController),
                 ],
               ),
 
@@ -426,6 +484,25 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         child: Icon(
           _isPortrait ? Icons.stay_current_landscape : Icons.stay_current_portrait,
           color: const Color(0xFF888888),
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  // DEBUG: Capture button
+  Widget _buildCaptureButton(CameraController controller) {
+    return GestureDetector(
+      onTap: () => _captureFrame(controller),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF9800).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: const Icon(
+          Icons.camera_alt,
+          color: Colors.white,
           size: 24,
         ),
       ),

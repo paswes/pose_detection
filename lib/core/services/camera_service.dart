@@ -32,8 +32,12 @@ class CameraService implements ICameraService {
   @override
   bool get canSwitchCamera {
     if (_cameras == null) return false;
-    final hasBack = _cameras!.any((c) => c.lensDirection == CameraLensDirection.back);
-    final hasFront = _cameras!.any((c) => c.lensDirection == CameraLensDirection.front);
+    final hasBack = _cameras!.any(
+      (c) => c.lensDirection == CameraLensDirection.back,
+    );
+    final hasFront = _cameras!.any(
+      (c) => c.lensDirection == CameraLensDirection.front,
+    );
     return hasBack && hasFront;
   }
 
@@ -63,7 +67,7 @@ class CameraService implements ICameraService {
 
     _controller = CameraController(
       camera,
-      ResolutionPreset.medium,
+      ResolutionPreset.ultraHigh,
       enableAudio: false,
       imageFormatGroup: Platform.isIOS
           ? ImageFormatGroup.bgra8888

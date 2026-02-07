@@ -250,6 +250,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           isLandscape: !_isPortrait,
         ),
 
+        // Back button (top-left)
+        _buildBackButton(),
+
         // Bottom controls with Start button
         _buildIdleControls(state),
       ],
@@ -275,7 +278,10 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
             null /* && state.personDetection.isPersonDetected */ )
           _buildPoseOverlay(state),
 
-        // Person-in-view indicator (small icon, top-left)
+        // Back button (top-left)
+        _buildBackButton(),
+
+        // Person-in-view indicator (small icon, top-left but offset)
         _buildPersonIndicator(state),
 
         // Position guidance banner (only when person detected but not positioned)
@@ -286,6 +292,32 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         // Bottom controls with Stop button
         _buildDetectingControls(state),
       ],
+    );
+  }
+
+  Widget _buildBackButton() {
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E).withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.arrow_back,
+                color: Color(0xFF888888),
+                size: 24,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -328,13 +360,13 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
-  /// Small icon indicator for person-in-view status (top-left)
+  /// Small icon indicator for person-in-view status (top-right)
   Widget _buildPersonIndicator(Detecting state) {
     final isPersonDetected = state.personDetection.isPersonDetected;
 
     return SafeArea(
       child: Align(
-        alignment: Alignment.topLeft,
+        alignment: Alignment.topRight,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Container(
@@ -463,9 +495,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                   const SizedBox(width: 16),
                   // Orientation switch button
                   _buildOrientationSwitchButton(),
-                  const SizedBox(width: 16),
+                  // const SizedBox(width: 16),
                   // DEBUG: Capture button
-                  _buildCaptureButton(state.cameraController),
+                  // _buildCaptureButton(state.cameraController),
                 ],
               ),
 
@@ -496,9 +528,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                   if (state.canSwitchCamera) const SizedBox(width: 16),
                   // Orientation switch button
                   _buildOrientationSwitchButton(),
-                  const SizedBox(width: 16),
+                  // const SizedBox(width: 16),
                   // DEBUG: Capture button
-                  _buildCaptureButton(state.cameraController),
+                  // _buildCaptureButton(state.cameraController),
                 ],
               ),
 

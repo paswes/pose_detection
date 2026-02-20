@@ -3,7 +3,6 @@ import 'package:equatable/equatable.dart';
 import 'package:pose_detection/domain/models/detected_pose.dart';
 import 'package:pose_detection/domain/models/detection_metrics.dart';
 import 'package:pose_detection/domain/models/person_detection_result.dart';
-import 'package:pose_detection/domain/models/position_validation_result.dart';
 
 /// States for PoseDetectionBloc
 abstract class PoseDetectionState extends Equatable {
@@ -35,7 +34,6 @@ class Detecting extends PoseDetectionState {
   final bool canSwitchCamera;
   final bool isFrontCamera;
   final PersonDetectionResult personDetection;
-  final PositionValidationResult? positionValidation;
 
   Detecting({
     required this.cameraController,
@@ -44,7 +42,6 @@ class Detecting extends PoseDetectionState {
     this.canSwitchCamera = false,
     this.isFrontCamera = false,
     PersonDetectionResult? personDetection,
-    this.positionValidation,
   }) : personDetection = personDetection ?? PersonDetectionResult.noPose();
 
   Detecting copyWith({
@@ -53,7 +50,6 @@ class Detecting extends PoseDetectionState {
     bool? canSwitchCamera,
     bool? isFrontCamera,
     PersonDetectionResult? personDetection,
-    PositionValidationResult? positionValidation,
   }) {
     return Detecting(
       cameraController: cameraController,
@@ -62,12 +58,11 @@ class Detecting extends PoseDetectionState {
       canSwitchCamera: canSwitchCamera ?? this.canSwitchCamera,
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
       personDetection: personDetection ?? this.personDetection,
-      positionValidation: positionValidation ?? this.positionValidation,
     );
   }
 
   @override
-  List<Object?> get props => [cameraController, currentPose, metrics, canSwitchCamera, isFrontCamera, personDetection, positionValidation];
+  List<Object?> get props => [cameraController, currentPose, metrics, canSwitchCamera, isFrontCamera, personDetection];
 }
 
 /// Error state

@@ -4,6 +4,7 @@ import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
+import 'package:pose_detection/presentation/pages/session_details_page.dart';
 
 /// Home page showing recorded sessions with navigation to capture.
 class HomePage extends StatefulWidget {
@@ -161,7 +162,14 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.only(right: 24),
         child: const Icon(Icons.delete_rounded, color: Colors.white),
       ),
-      child: Card(
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SessionDetailsPage(session: session),
+          ),
+        ),
+        child: Card(
         margin: const EdgeInsets.only(bottom: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
@@ -215,6 +223,7 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

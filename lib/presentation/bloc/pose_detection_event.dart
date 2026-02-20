@@ -48,11 +48,14 @@ class RecordingTickEvent extends PoseDetectionEvent {}
 /// Start recording a session (video + pose tracking)
 class StartRecordingEvent extends PoseDetectionEvent {}
 
-/// Stop recording and save session
-class StopRecordingEvent extends PoseDetectionEvent {
+/// Stop recording (video + image stream stop immediately)
+class StopRecordingEvent extends PoseDetectionEvent {}
+
+/// Save the stopped recording with a title
+class SaveSessionEvent extends PoseDetectionEvent {
   final String title;
 
-  StopRecordingEvent({required this.title});
+  SaveSessionEvent({required this.title});
 
   @override
   List<Object?> get props => [title];

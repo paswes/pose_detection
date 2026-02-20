@@ -110,6 +110,9 @@ class Recording extends PoseDetectionState {
   ];
 }
 
+/// Recording stopped, waiting for user to provide title
+class RecordingStopped extends PoseDetectionState {}
+
 /// Session saved successfully after recording
 class SessionSaved extends PoseDetectionState {
   final String sessionId;

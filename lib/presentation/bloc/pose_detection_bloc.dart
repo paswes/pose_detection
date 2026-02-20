@@ -30,6 +30,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   bool _isProcessingFrame = false;
   bool _isStreamingActive = false;
   Timer? _recordingTimer;
+  RecordingResult? _pendingResult;
 
   // FPS calculation using rolling window
   final List<int> _frameTimestamps = [];
@@ -60,6 +61,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     on<ProcessFrameEvent>(_onProcessFrame, transformer: droppable());
     on<StartRecordingEvent>(_onStartRecording);
     on<StopRecordingEvent>(_onStopRecording);
+    on<SaveSessionEvent>(_onSaveSession);
     on<RecordingTickEvent>(_onRecordingTick);
     on<DisposeEvent>(_onDispose);
   }
@@ -187,7 +189,9 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
 
     try {
-      // Start video recording first, then image stream
+      // Start image stream before video recording (iOS requires this order)
+      _startImageStream();
+
       await _recordingService.startRecording(controller, sessionId);
 
       emit(
@@ -197,9 +201,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
               _cameraService.currentLensDirection == CameraLensDirection.front,
         ),
       );
-
-      // Start image streaming for pose tracking alongside video recording
-      _startImageStream();
 
       // Timer to update recording duration via event
       _recordingTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
@@ -226,16 +227,36 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     _cameraService.stopImageStream();
     _isStreamingActive = false;
 
-    emit(SavingSession());
-
     try {
       final controller = _cameraService.controller;
       if (controller == null) {
         throw Exception('Camera controller not available');
       }
 
-      final result = await _recordingService.stopRecording(controller);
+      _pendingResult = await _recordingService.stopRecording(controller);
 
+      Logger.info('Bloc', 'Recording stopped (${_pendingResult!.frames.length} frames)');
+      emit(RecordingStopped());
+    } catch (e) {
+      Logger.error('Bloc', 'ERROR stopping recording: $e');
+      _recordingService.reset();
+      emit(PoseDetectionError('Failed to stop recording: $e'));
+    }
+  }
+
+  Future<void> _onSaveSession(
+    SaveSessionEvent event,
+    Emitter<PoseDetectionState> emit,
+  ) async {
+    final result = _pendingResult;
+    if (result == null) {
+      emit(PoseDetectionError('No recording to save'));
+      return;
+    }
+
+    emit(SavingSession());
+
+    try {
       final now = DateTime.now();
       final session = Session(
         id: now.millisecondsSinceEpoch.toString(),
@@ -249,6 +270,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       );
 
       await _sessionRepository.saveSession(session, result.frames);
+      _pendingResult = null;
 
       Logger.info('Bloc', 'Session saved: ${session.id} (${result.frames.length} frames)');
       emit(SessionSaved(session.id));

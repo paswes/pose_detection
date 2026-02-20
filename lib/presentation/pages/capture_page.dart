@@ -84,6 +84,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         backgroundColor: const Color(0xFF121212),
         body: BlocConsumer<PoseDetectionBloc, PoseDetectionState>(
           listener: (context, state) {
+            if (state is RecordingStopped) {
+              _showSaveSessionDialog();
+            }
             if (state is SessionSaved) {
               Navigator.pop(context, true);
             }
@@ -101,7 +104,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
             if (state is Recording) {
               return _buildRecordingView(state);
             }
-            if (state is SavingSession) {
+            if (state is RecordingStopped || state is SavingSession) {
               return _buildSavingView();
             }
             return const SizedBox.shrink();
@@ -354,7 +357,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
             final title = value.trim().isEmpty
                 ? _defaultSessionTitle()
                 : value.trim();
-            _bloc.add(StopRecordingEvent(title: title));
+            _bloc.add(SaveSessionEvent(title: title));
           },
         ),
         actions: [
@@ -364,7 +367,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
               final title = controller.text.trim().isEmpty
                   ? _defaultSessionTitle()
                   : controller.text.trim();
-              _bloc.add(StopRecordingEvent(title: title));
+              _bloc.add(SaveSessionEvent(title: title));
             },
             child: const Text(
               'Speichern',
@@ -474,7 +477,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
 
               // Red stop button
               GestureDetector(
-                onTap: _showSaveSessionDialog,
+                onTap: () => _bloc.add(StopRecordingEvent()),
                 child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(

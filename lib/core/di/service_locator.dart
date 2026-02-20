@@ -10,7 +10,9 @@ import 'package:pose_detection/core/services/pose_detection_service.dart';
 import 'package:pose_detection/core/services/recording_service.dart';
 import 'package:pose_detection/data/database/app_database.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
+import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
+import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
 
 final GetIt sl = GetIt.instance;
@@ -71,6 +73,13 @@ Future<void> initializeDependencies({
 
   sl.registerFactory<SessionListCubit>(
     () => SessionListCubit(repository: sl<SessionRepository>()),
+  );
+
+  sl.registerFactoryParam<SessionDetailsCubit, Session, void>(
+    (session, _) => SessionDetailsCubit(
+      session: session,
+      repository: sl<SessionRepository>(),
+    ),
   );
 }
 

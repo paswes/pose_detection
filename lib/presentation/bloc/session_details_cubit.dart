@@ -11,13 +11,16 @@ import 'package:pose_detection/presentation/bloc/session_details_state.dart';
 /// Manages video playback and landmark frame synchronization
 /// for a recorded session.
 class SessionDetailsCubit extends Cubit<SessionDetailsState> {
+  /// Forward offset to compensate for VideoPlayer position reporting lag on iOS.
+  /// The video_player package reports position ~30-80ms behind the rendered frame.
+  static const _positionLookaheadMicros = 50000; // 50ms
+
   final Session session;
   final SessionRepository _repository;
 
   VideoPlayerController? _videoController;
   List<TrackedFrame> _frames = [];
   List<int> _relativeOffsetsMicros = [];
-  int _lastEmittedFrameTimestamp = -1;
 
   /// Access the video controller for the UI layer.
   VideoPlayerController? get videoController => _videoController;
@@ -41,11 +44,12 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
 
       _frames = await _repository.getFramesForSession(session.id);
 
-      // Pre-compute relative offsets for binary search
+      // Frame timestamps are already relative to video start
+      // (computed as captureTimestamp - videoStartTimestamp in RecordingService).
+      // Use them directly — video player position 0 = video start, not first frame.
       if (_frames.isNotEmpty) {
-        final baseTimestamp = _frames.first.timestampMicros;
         _relativeOffsetsMicros = _frames
-            .map((f) => f.timestampMicros - baseTimestamp)
+            .map((f) => f.timestampMicros)
             .toList();
       }
 
@@ -79,29 +83,28 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
 
     final position = controller.value.position;
     final isPlaying = controller.value.isPlaying;
-    final frame = _findNearestFrame(position);
 
-    final frameTimestamp = frame?.timestampMicros ?? -1;
-    final frameChanged = frameTimestamp != _lastEmittedFrameTimestamp;
     final playStateChanged = isPlaying != currentState.isPlaying;
     final positionChanged = position != currentState.position;
 
-    if (!frameChanged && !playStateChanged && !positionChanged) return;
-
-    _lastEmittedFrameTimestamp = frameTimestamp;
+    if (!playStateChanged && !positionChanged) return;
 
     emit(currentState.copyWith(
       position: position,
       isPlaying: isPlaying,
-      currentFrame: frame,
     ));
   }
 
   /// Find the nearest tracked frame for a given video position.
+  /// Exposed for direct use by the overlay widget to bypass BLoC rebuild latency.
+  TrackedFrame? findFrameForPosition(Duration position) {
+    return _findNearestFrame(position);
+  }
+
   TrackedFrame? _findNearestFrame(Duration position) {
     if (_frames.isEmpty || _relativeOffsetsMicros.isEmpty) return null;
 
-    final targetMicros = position.inMicroseconds;
+    final targetMicros = position.inMicroseconds + _positionLookaheadMicros;
 
     // Binary search for the closest frame
     int low = 0;

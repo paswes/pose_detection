@@ -208,30 +208,6 @@ class _VideoWithOverlay extends StatelessWidget {
               constraints.maxHeight,
             );
 
-            final frame = state.currentFrame;
-
-            Widget? overlay;
-            if (frame != null && frame.isPersonDetected) {
-              final pose = _buildPoseForPlayback(
-                frame,
-                videoSize,
-                state.session,
-              );
-
-              overlay = CustomPaint(
-                size: widgetSize,
-                painter: PosePainter(
-                  pose: pose,
-                  imageSize: videoSize,
-                  widgetSize: widgetSize,
-                ),
-              );
-
-              if (state.session.isFrontCamera) {
-                overlay = Transform.flip(flipX: true, child: overlay);
-              }
-            }
-
             return Stack(
               fit: StackFit.expand,
               children: [
@@ -245,8 +221,38 @@ class _VideoWithOverlay extends StatelessWidget {
                     child: VideoPlayer(controller),
                   ),
                 ),
-                // Landmark overlay
-                if (overlay != null) overlay,
+                // Landmark overlay — driven directly by VideoPlayerController
+                // to bypass BLoC rebuild latency
+                ValueListenableBuilder<VideoPlayerValue>(
+                  valueListenable: controller,
+                  builder: (context, value, child) {
+                    final frame = cubit.findFrameForPosition(value.position);
+                    if (frame == null || !frame.isPersonDetected) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final pose = _buildPoseForPlayback(
+                      frame,
+                      videoSize,
+                      state.session,
+                    );
+
+                    Widget overlay = CustomPaint(
+                      size: widgetSize,
+                      painter: PosePainter(
+                        pose: pose,
+                        imageSize: videoSize,
+                        widgetSize: widgetSize,
+                      ),
+                    );
+
+                    if (state.session.isFrontCamera) {
+                      overlay = Transform.flip(flipX: true, child: overlay);
+                    }
+
+                    return overlay;
+                  },
+                ),
               ],
             );
           },

@@ -29,12 +29,12 @@ class RecordingService {
     _recordingStartTime = DateTime.now();
     _frames.clear();
 
-    await controller.startVideoRecording();
-
-    // Record the timestamp after video recording has started.
-    // Frames captured before this point precede the video and must be
-    // discarded to keep landmarks in sync with video playback.
+    // Record timestamp BEFORE the await — the platform begins recording
+    // as soon as it receives the command, so this is the closest
+    // approximation of the actual video start time.
     _videoStartTimestampMicros = DateTime.now().microsecondsSinceEpoch;
+
+    await controller.startVideoRecording();
   }
 
   void recordFrame(

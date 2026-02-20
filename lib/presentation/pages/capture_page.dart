@@ -270,8 +270,8 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         ),
 
         // Pose overlay (skeleton) - only show when person is detected
-        if (state.currentPose !=
-            null /* && state.personDetection.isPersonDetected */ )
+        if (state.currentPose != null &&
+            state.personDetection.isPersonDetected)
           _buildPoseOverlay(state),
 
         // Back button (top-left)

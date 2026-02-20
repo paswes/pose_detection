@@ -43,22 +43,24 @@ class RecordingService {
     int captureTimestampMicros,
   ) {
     if (!isRecording || _sessionId == null) return;
-    if (pose == null) return;
 
     // Discard frames captured before video recording started
     final videoStart = _videoStartTimestampMicros;
     if (videoStart == null || captureTimestampMicros < videoStart) return;
 
-    // Store raw ML Kit image dimensions from the first frame
-    _imageSize ??= pose.imageSize;
+    // Store raw ML Kit image dimensions from the first frame with valid pose
+    if (pose != null) {
+      _imageSize ??= pose.imageSize;
+    }
 
     final frame = TrackedFrame(
       sessionId: _sessionId!,
       // Use original capture timestamp (not post-detection) relative to video start
       timestampMicros: captureTimestampMicros - videoStart,
-      landmarks: pose.landmarks.map((l) => LandmarkData.fromLandmark(l)).toList(),
+      // Store empty landmarks array when no person detected (pose == null)
+      landmarks: pose?.landmarks.map((l) => LandmarkData.fromLandmark(l)).toList() ?? [],
       isPersonDetected: personDetection.isPersonDetected,
-      personConfidence: pose.avgLikelihood,
+      personConfidence: pose?.avgLikelihood ?? 0.0,
     );
 
     _frames.add(frame);

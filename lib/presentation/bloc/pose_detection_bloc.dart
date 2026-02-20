@@ -423,15 +423,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
         final personDetection = _personValidator.validate(result.pose);
 
-        // Only record frames with a validated person detection.
-        // This ensures stored data matches what is painted on screen.
-        if (personDetection.isPersonDetected) {
-          _recordingService.recordFrame(
-            result.pose,
-            personDetection,
-            event.timestampMicros,
-          );
-        }
+        // Record ALL frames during recording, including no-person frames.
+        // This enables true 1:1 playback matching the recording experience.
+        // Frames without person detection will have empty landmarks array.
+        _recordingService.recordFrame(
+          result.pose,
+          personDetection,
+          event.timestampMicros,
+        );
 
         emit(
           (state as Recording).copyWith(

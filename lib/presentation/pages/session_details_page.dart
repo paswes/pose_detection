@@ -226,7 +226,15 @@ class _VideoWithOverlay extends StatelessWidget {
                 ValueListenableBuilder<VideoPlayerValue>(
                   valueListenable: controller,
                   builder: (context, value, child) {
+                    // Hide overlay when paused at start (position 0 and not playing)
+                    if (value.position == Duration.zero && !value.isPlaying) {
+                      return const SizedBox.shrink();
+                    }
+
                     final frame = cubit.findFrameForPosition(value.position);
+
+                    // Show overlay only when frame exists AND person was detected in that frame.
+                    // Since we now store ALL frames (including no-person), this check is meaningful.
                     if (frame == null || !frame.isPersonDetected) {
                       return const SizedBox.shrink();
                     }

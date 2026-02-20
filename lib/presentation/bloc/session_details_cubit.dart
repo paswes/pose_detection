@@ -59,7 +59,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       _videoController!.addListener(_onVideoPositionChanged);
 
       final duration = _videoController!.value.duration;
-      final initialFrame = _frames.isNotEmpty ? _frames.first : null;
 
       emit(SessionDetailsLoaded(
         session: session,
@@ -67,7 +66,9 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         isPlaying: false,
         position: Duration.zero,
         duration: duration,
-        currentFrame: initialFrame,
+        // Don't show frame until playback starts - prevents landmarks
+        // from appearing before video plays
+        currentFrame: null,
       ));
     } catch (e) {
       emit(SessionDetailsError(message: 'Fehler beim Laden: $e'));

@@ -1,13 +1,17 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pose_detection/core/di/service_locator.dart';
+import 'package:pose_detection/domain/models/detected_pose.dart';
+import 'package:pose_detection/domain/models/person_detection_result.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 import 'package:pose_detection/presentation/widgets/camera_preview_widget.dart';
 import 'package:pose_detection/presentation/widgets/pose_painter.dart';
-import 'package:pose_detection/presentation/widgets/raw_data_view.dart';
 
-/// Fullscreen camera capture page with pose overlay
+/// Fullscreen camera capture page with pose overlay and recording.
 class CapturePage extends StatefulWidget {
   const CapturePage({super.key});
 
@@ -15,187 +19,155 @@ class CapturePage extends StatefulWidget {
   State<CapturePage> createState() => _CapturePageState();
 }
 
-class _CapturePageState extends State<CapturePage> {
-  bool _showRawData = false;
+class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
+  late final PoseDetectionBloc _bloc;
+  bool _isPortrait = true;
+
+  @override
+  void initState() {
+    super.initState();
+
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    WidgetsBinding.instance.addObserver(this);
+
+    _bloc = sl<PoseDetectionBloc>();
+    _bloc.add(InitializeEvent());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _bloc.add(InitializeEvent());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _bloc.add(DisposeEvent());
+    _bloc.close();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    super.dispose();
+  }
+
+  void _toggleOrientation() {
+    setState(() {
+      _isPortrait = !_isPortrait;
+    });
+
+    final newOrientation = _isPortrait
+        ? DeviceOrientation.portraitUp
+        : DeviceOrientation.landscapeLeft;
+
+    if (_isPortrait) {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+
+    _bloc.add(ChangeOrientationEvent(newOrientation));
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: BlocConsumer<PoseDetectionBloc, PoseDetectionState>(
-        listener: (context, state) {
-          if (state is SessionSummary) {
-            // Navigate back to dashboard with summary
-            Navigator.of(context).pop();
-          }
-        },
-        builder: (context, state) {
-          if (state is! Detecting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.cyan),
-            );
-          }
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // Camera preview
-              CameraPreviewWidget(cameraController: state.cameraController),
-
-              // Pose overlay
-              if (state.currentPose != null && state.imageSize != null)
-                _buildPoseOverlay(state),
-
-              // Top stats bar
-              _buildTopBar(state),
-
-              // Bottom controls
-              _buildBottomControls(),
-
-              // Raw data overlay (optional)
-              if (_showRawData) _buildRawDataOverlay(state),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildPoseOverlay(Detecting state) {
-    final screenSize = MediaQuery.of(context).size;
-
-    return SizedBox.expand(
-      child: CustomPaint(
-        painter: PosePainter(
-          pose: state.currentPose!,
-          imageSize: state.imageSize!,
-          widgetSize: screenSize,
+    return BlocProvider.value(
+      value: _bloc,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF121212),
+        body: BlocConsumer<PoseDetectionBloc, PoseDetectionState>(
+          listener: (context, state) {
+            if (state is RecordingStopped) {
+              _showSaveSessionDialog();
+            }
+            if (state is SessionSaved) {
+              Navigator.pop(context, true);
+            }
+          },
+          builder: (context, state) {
+            if (state is PoseDetectionInitial || state is CameraInitializing) {
+              return _buildLoadingView();
+            }
+            if (state is PoseDetectionError) {
+              return _buildErrorView(state.message);
+            }
+            if (state is CameraReady) {
+              return _buildIdleView(state);
+            }
+            if (state is Recording) {
+              return _buildRecordingView(state);
+            }
+            if (state is RecordingStopped || state is SavingSession) {
+              return _buildSavingView();
+            }
+            return const SizedBox.shrink();
+          },
         ),
       ),
     );
   }
 
-  Widget _buildTopBar(Detecting state) {
-    final duration = state.session.duration;
-    final minutes = duration.inMinutes.toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    final metrics = state.session.metrics;
-    final fps = metrics.effectiveFps(duration);
+  // ============================================================
+  // VIEWS
+  // ============================================================
 
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withValues(alpha: 0.7),
-              Colors.transparent,
-            ],
+  Widget _buildLoadingView() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Color(0xFF888888)),
+          SizedBox(height: 24),
+          Text(
+            'Initializing...',
+            style: TextStyle(color: Color(0xFF888888), fontSize: 16),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Duration
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.cyan.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.timer, color: Colors.cyan, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$minutes:$seconds',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+        ],
+      ),
+    );
+  }
 
-                // Stats
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Poses: ${state.session.capturedPoses.length}',
-                        style: const TextStyle(
-                          color: Colors.cyan,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'FPS: ${fps.toStringAsFixed(1)}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+  Widget _buildErrorView(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Color(0xFFF44336), size: 48),
+            const SizedBox(height: 24),
+            const Text(
+              'Error',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            const SizedBox(height: 8),
-            // Live metrics bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              style: const TextStyle(color: Color(0xFF888888), fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            TextButton(
+              onPressed: () => _bloc.add(InitializeEvent()),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF888888),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildMetricChip(
-                    'Processed',
-                    '${metrics.totalFramesProcessed}',
-                    Colors.greenAccent,
-                  ),
-                  _buildMetricChip(
-                    'Dropped',
-                    '${metrics.totalFramesDropped}',
-                    metrics.totalFramesDropped > 0
-                        ? Colors.orangeAccent
-                        : Colors.white70,
-                  ),
-                  _buildMetricChip(
-                    'ML Kit',
-                    '${metrics.averageLatencyMs.toStringAsFixed(0)}ms',
-                    Colors.cyanAccent,
-                  ),
-                  _buildMetricChip(
-                    'E2E Lag',
-                    '${metrics.lastEndToEndLatencyMs.toStringAsFixed(0)}ms',
-                    _getLatencyColor(metrics.lastEndToEndLatencyMs),
-                  ),
-                ],
-              ),
+              child: const Text('Retry'),
             ),
           ],
         ),
@@ -203,64 +175,251 @@ class _CapturePageState extends State<CapturePage> {
     );
   }
 
-  Widget _buildMetricChip(String label, String value, Color valueColor) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white60, fontSize: 9),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: valueColor,
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'monospace',
+  Widget _buildSavingView() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Color(0xFF4CAF50)),
+          SizedBox(height: 24),
+          Text(
+            'Saving session...',
+            style: TextStyle(color: Color(0xFF888888), fontSize: 16),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdleView(CameraReady state) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        CameraPreviewWidget(
+          cameraController: state.cameraController,
+          isFrontCamera:
+              state.cameraController.description.lensDirection ==
+              CameraLensDirection.front,
+          isLandscape: !_isPortrait,
         ),
+        _buildBackButton(),
+        _buildIdleControls(state),
       ],
     );
   }
 
-  /// Returns color based on end-to-end latency thresholds
-  /// Green: <50ms (excellent), Yellow: 50-100ms (acceptable), Orange: 100-150ms, Red: >150ms
-  Color _getLatencyColor(double latencyMs) {
-    if (latencyMs < 50) return Colors.greenAccent;
-    if (latencyMs < 100) return Colors.yellowAccent;
-    if (latencyMs < 150) return Colors.orangeAccent;
-    return Colors.redAccent;
+  Widget _buildRecordingView(Recording state) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        CameraPreviewWidget(
+          cameraController: state.cameraController,
+          isFrontCamera: state.isFrontCamera,
+          isLandscape: !_isPortrait,
+        ),
+
+        // Pose overlay
+        if (state.currentPose != null && state.personDetection.isPersonDetected)
+          _buildPoseOverlayFromRecording(state),
+
+        // Back button (top-left)
+        _buildBackButton(),
+
+        // Person indicator (top-right)
+        _buildPersonIndicatorFromResult(state.personDetection),
+
+        // Bottom: recording time (left) + stop button (right)
+        _buildRecordingControls(state),
+      ],
+    );
   }
 
-  Widget _buildBottomControls() {
+  // ============================================================
+  // OVERLAYS & INDICATORS
+  // ============================================================
+
+  Widget _buildBackButton() {
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E).withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF888888),
+                size: 24,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPoseOverlayFromRecording(Recording state) {
+    return _buildPoseOverlay(
+      state.currentPose!,
+      state.isFrontCamera,
+    );
+  }
+
+  Widget _buildPoseOverlay(DetectedPose pose, bool isFrontCamera) {
+    final screenSize = MediaQuery.of(context).size;
+
+    Widget overlay = SizedBox.expand(
+      child: CustomPaint(
+        painter: PosePainter(
+          pose: pose,
+          imageSize: pose.imageSize,
+          widgetSize: screenSize,
+        ),
+      ),
+    );
+
+    if (isFrontCamera) {
+      overlay = Transform.flip(flipX: true, child: overlay);
+    }
+
+    return overlay;
+  }
+
+  Widget _buildPersonIndicatorFromResult(
+    PersonDetectionResult personDetection,
+  ) {
+    final isPersonDetected = personDetection.isPersonDetected;
+
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topRight,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E).withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              isPersonDetected
+                  ? Icons.person_rounded
+                  : Icons.person_off_rounded,
+              color: isPersonDetected
+                  ? const Color(0xFF4CAF50)
+                  : const Color(0xFFFF5252),
+              size: 24,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // DIALOGS
+  // ============================================================
+
+  void _showSaveSessionDialog() {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          'Session speichern',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Session Name',
+            hintStyle: TextStyle(color: Color(0xFF666666)),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF444444)),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF4CAF50)),
+            ),
+          ),
+          onSubmitted: (value) {
+            Navigator.pop(context);
+            final title = value.trim().isEmpty
+                ? _defaultSessionTitle()
+                : value.trim();
+            _bloc.add(SaveSessionEvent(title: title));
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              final title = controller.text.trim().isEmpty
+                  ? _defaultSessionTitle()
+                  : controller.text.trim();
+              _bloc.add(SaveSessionEvent(title: title));
+            },
+            child: const Text(
+              'Speichern',
+              style: TextStyle(color: Color(0xFF4CAF50)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _defaultSessionTitle() {
+    final now = DateTime.now();
+    return 'Session ${now.day}.${now.month}.${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+  }
+
+  // ============================================================
+  // BOTTOM CONTROLS
+  // ============================================================
+
+  Widget _buildIdleControls(CameraReady state) {
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.7),
-                Colors.transparent,
-              ],
-            ),
-          ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Toggle raw data
-              _buildControlButton(
-                icon: _showRawData ? Icons.visibility_off : Icons.data_array,
-                label: _showRawData ? 'Hide Data' : 'Show Data',
-                onTap: () => setState(() => _showRawData = !_showRawData),
+              Row(
+                children: [
+                  _buildCameraSwitchButton(),
+                  const SizedBox(width: 16),
+                  _buildOrientationSwitchButton(),
+                ],
               ),
-
-              // Stop button (larger, primary action)
-              _buildStopButton(),
+              // Green play button — starts recording
+              GestureDetector(
+                onTap: () => _bloc.add(StartRecordingEvent()),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -268,116 +427,110 @@ class _CapturePageState extends State<CapturePage> {
     );
   }
 
-  Widget _buildStopButton() {
-    return GestureDetector(
-      onTap: () {
-        context.read<PoseDetectionBloc>().add(StopCaptureEvent());
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.red.withValues(alpha: 0.5),
-              blurRadius: 20,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Icon(Icons.stop, color: Colors.white, size: 28),
-      ),
-    );
-  }
+  Widget _buildRecordingControls(Recording state) {
+    final duration = state.recordingDuration;
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
 
-  Widget _buildControlButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.cyan.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.cyan.withValues(alpha: 0.5),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.cyan, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.cyan,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRawDataOverlay(Detecting state) {
-    return GestureDetector(
-      onTap: () => setState(() => _showRawData = false),
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.7),
-        padding: EdgeInsets.all(16),
-        child: SafeArea(
-          child: Column(
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Tap area to close
-              Expanded(
-                flex: 1,
-                child: const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.keyboard_arrow_down,
-                        color: Colors.white54,
-                        size: 32,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Tap to close',
-                        style: TextStyle(color: Colors.white54, fontSize: 14),
-                      ),
-                    ],
-                  ),
+              // Recording time indicator (replaces camera/orientation buttons)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
                 ),
-              ),
-              // Data view
-              Expanded(
-                flex: 3,
-                child: GestureDetector(
-                  onTap: () {}, // Prevent close when tapping inside data view
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.95),
-                      borderRadius: const BorderRadius.all(Radius.circular(20)),
-                      border: Border.all(
-                        color: Colors.cyan.withValues(alpha: 0.3),
-                        width: 2,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF5252),
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    child: RawDataView(pose: state.currentPose),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Red stop button
+              GestureDetector(
+                onTap: () => _bloc.add(StopRecordingEvent()),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF5252),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const Icon(
+                    Icons.stop_rounded,
+                    color: Colors.white,
+                    size: 24,
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCameraSwitchButton() {
+    return GestureDetector(
+      onTap: () => _bloc.add(SwitchCameraEvent()),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: const Icon(
+          Icons.flip_camera_ios_rounded,
+          color: Color(0xFF888888),
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrientationSwitchButton() {
+    return GestureDetector(
+      onTap: _toggleOrientation,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Icon(
+          _isPortrait
+              ? Icons.stay_current_landscape_rounded
+              : Icons.stay_current_portrait_rounded,
+          color: const Color(0xFF888888),
+          size: 24,
         ),
       ),
     );

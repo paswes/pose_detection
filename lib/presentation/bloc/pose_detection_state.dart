@@ -1,10 +1,10 @@
-import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:equatable/equatable.dart';
-import 'package:pose_detection/domain/models/motion_data.dart';
-import 'package:pose_detection/domain/models/pose_session.dart';
+import 'package:pose_detection/domain/models/detected_pose.dart';
+import 'package:pose_detection/domain/models/detection_metrics.dart';
+import 'package:pose_detection/domain/models/person_detection_result.dart';
 
-/// States for generic PoseDetectionBloc
+/// States for PoseDetectionBloc
 abstract class PoseDetectionState extends Equatable {
   @override
   List<Object?> get props => [];
@@ -19,58 +19,113 @@ class CameraInitializing extends PoseDetectionState {}
 /// Camera initialized and ready to start capture
 class CameraReady extends PoseDetectionState {
   final CameraController cameraController;
-  final PoseSession? lastSession;
 
-  CameraReady(this.cameraController, {this.lastSession});
+  CameraReady(this.cameraController);
 
   @override
-  List<Object?> get props => [cameraController, lastSession];
+  List<Object?> get props => [cameraController];
 }
 
 /// Actively detecting poses with real-time metrics
 class Detecting extends PoseDetectionState {
   final CameraController cameraController;
-  final TimestampedPose? currentPose;
-  final Size? imageSize;
-  final PoseSession session;
+  final DetectedPose? currentPose;
+  final DetectionMetrics metrics;
+  final bool canSwitchCamera;
+  final bool isFrontCamera;
+  final PersonDetectionResult personDetection;
 
   Detecting({
     required this.cameraController,
     this.currentPose,
-    this.imageSize,
-    required this.session,
-  });
+    this.metrics = const DetectionMetrics(),
+    this.canSwitchCamera = false,
+    this.isFrontCamera = false,
+    PersonDetectionResult? personDetection,
+  }) : personDetection = personDetection ?? PersonDetectionResult.noPose();
 
   Detecting copyWith({
-    TimestampedPose? currentPose,
-    Size? imageSize,
-    PoseSession? session,
+    DetectedPose? currentPose,
+    DetectionMetrics? metrics,
+    bool? canSwitchCamera,
+    bool? isFrontCamera,
+    PersonDetectionResult? personDetection,
   }) {
     return Detecting(
       cameraController: cameraController,
       currentPose: currentPose ?? this.currentPose,
-      imageSize: imageSize ?? this.imageSize,
-      session: session ?? this.session,
+      metrics: metrics ?? this.metrics,
+      canSwitchCamera: canSwitchCamera ?? this.canSwitchCamera,
+      isFrontCamera: isFrontCamera ?? this.isFrontCamera,
+      personDetection: personDetection ?? this.personDetection,
     );
   }
 
   @override
-  List<Object?> get props => [cameraController, currentPose, imageSize, session];
+  List<Object?> get props => [cameraController, currentPose, metrics, canSwitchCamera, isFrontCamera, personDetection];
 }
 
-/// Session completed with summary
-class SessionSummary extends PoseDetectionState {
+/// Actively recording a session (video + pose tracking)
+class Recording extends PoseDetectionState {
   final CameraController cameraController;
-  final PoseSession session;
+  final DetectedPose? currentPose;
+  final DetectionMetrics metrics;
+  final bool isFrontCamera;
+  final PersonDetectionResult personDetection;
+  final Duration recordingDuration;
+  final int frameCount;
 
-  SessionSummary({
+  Recording({
     required this.cameraController,
-    required this.session,
-  });
+    this.currentPose,
+    this.metrics = const DetectionMetrics(),
+    this.isFrontCamera = false,
+    PersonDetectionResult? personDetection,
+    this.recordingDuration = Duration.zero,
+    this.frameCount = 0,
+  }) : personDetection = personDetection ?? PersonDetectionResult.noPose();
+
+  Recording copyWith({
+    DetectedPose? currentPose,
+    bool clearPose = false,
+    DetectionMetrics? metrics,
+    PersonDetectionResult? personDetection,
+    Duration? recordingDuration,
+    int? frameCount,
+  }) {
+    return Recording(
+      cameraController: cameraController,
+      currentPose: clearPose ? null : (currentPose ?? this.currentPose),
+      metrics: metrics ?? this.metrics,
+      isFrontCamera: isFrontCamera,
+      personDetection: personDetection ?? this.personDetection,
+      recordingDuration: recordingDuration ?? this.recordingDuration,
+      frameCount: frameCount ?? this.frameCount,
+    );
+  }
 
   @override
-  List<Object?> get props => [cameraController, session];
+  List<Object?> get props => [
+    cameraController, currentPose, metrics, isFrontCamera,
+    personDetection, recordingDuration, frameCount,
+  ];
 }
+
+/// Recording stopped, waiting for user to provide title
+class RecordingStopped extends PoseDetectionState {}
+
+/// Session saved successfully after recording
+class SessionSaved extends PoseDetectionState {
+  final String sessionId;
+
+  SessionSaved(this.sessionId);
+
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+/// Saving session in progress
+class SavingSession extends PoseDetectionState {}
 
 /// Error state
 class PoseDetectionError extends PoseDetectionState {

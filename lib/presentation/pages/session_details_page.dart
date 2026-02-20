@@ -1,10 +1,25 @@
-import 'package:flutter/material.dart';
-import 'package:pose_detection/domain/models/pose_session.dart';
-import 'package:pose_detection/presentation/widgets/raw_data_view.dart';
+import 'dart:ui' as ui;
 
-/// Details page showing captured poses from a completed session
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:video_player/video_player.dart';
+
+import 'package:pose_detection/core/di/service_locator.dart';
+import 'package:pose_detection/core/services/playback_sync_engine.dart';
+import 'package:pose_detection/core/utils/transform_calculator.dart';
+import 'package:pose_detection/data/models/landmark_data.dart';
+import 'package:pose_detection/data/models/session.dart';
+import 'package:pose_detection/data/models/tracked_frame.dart';
+import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
+import 'package:pose_detection/presentation/bloc/session_details_state.dart';
+import 'package:pose_detection/presentation/widgets/landmark_detail_card.dart';
+import 'package:pose_detection/presentation/widgets/playback_overlay_painter.dart';
+
+/// Page for viewing a recorded session with video playback
+/// and synchronized landmark overlay.
 class SessionDetailsPage extends StatefulWidget {
-  final PoseSession session;
+  final Session session;
 
   const SessionDetailsPage({super.key, required this.session});
 
@@ -12,545 +27,555 @@ class SessionDetailsPage extends StatefulWidget {
   State<SessionDetailsPage> createState() => _SessionDetailsPageState();
 }
 
-class _SessionDetailsPageState extends State<SessionDetailsPage> {
-  int _currentPoseIndex = 0;
-  int _selectedTabIndex = 0; // 0 = Overview, 1 = Raw Data
+class _SessionDetailsPageState extends State<SessionDetailsPage>
+    with TickerProviderStateMixin {
+  late final SessionDetailsCubit _cubit;
+  late final Ticker _overlayTicker;
+  final _tickerNotifier = _TickerNotifier();
+
+  @override
+  void initState() {
+    super.initState();
+    _cubit = sl<SessionDetailsCubit>(param1: widget.session);
+    _cubit.initialize();
+
+    _overlayTicker = createTicker(_onTick);
+  }
+
+  void _onTick(Duration elapsed) {
+    _tickerNotifier.notify();
+  }
+
+  void _startTickerIfNeeded(bool isPlaying) {
+    if (isPlaying && !_overlayTicker.isActive) {
+      _overlayTicker.start();
+    } else if (!isPlaying && _overlayTicker.isActive) {
+      _overlayTicker.stop();
+      // One final repaint to show the paused state
+      _tickerNotifier.notify();
+    }
+  }
+
+  @override
+  void dispose() {
+    _overlayTicker.dispose();
+    _tickerNotifier.dispose();
+    _cubit.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final session = widget.session;
-    final hasPoses = session.capturedPoses.isNotEmpty;
-    final currentPose = hasPoses
-        ? session.capturedPoses[_currentPoseIndex]
-        : null;
-
-    final duration = session.duration;
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.cyan),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Session Details',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Tab selector
-            _buildTabSelector(),
-
-            const SizedBox(height: 16),
-
-            // Content based on selected tab
-            Expanded(
-              child: _selectedTabIndex == 0
-                  ? _buildOverviewTab(minutes, seconds, session)
-                  : _buildRawDataTab(hasPoses, currentPose, session),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabSelector() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildTab(
-              index: 0,
-              icon: Icons.dashboard,
-              label: 'Overview',
-            ),
+    return BlocProvider.value(
+      value: _cubit,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.session.title,
+            style: const TextStyle(fontWeight: FontWeight.w500),
           ),
-          Expanded(
-            child: _buildTab(
-              index: 1,
-              icon: Icons.data_array,
-              label: 'Raw Data',
-            ),
+        ),
+        body: SafeArea(
+          child: BlocConsumer<SessionDetailsCubit, SessionDetailsState>(
+            listener: (context, state) {
+              if (state is SessionDetailsLoaded) {
+                _startTickerIfNeeded(state.isPlaying);
+              }
+            },
+            builder: (context, state) {
+              return switch (state) {
+                SessionDetailsLoading() => _buildLoading(),
+                SessionDetailsLoaded() => _buildLoaded(state),
+                SessionDetailsError() => _buildError(state),
+              };
+            },
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTab({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final isSelected = _selectedTabIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTabIndex = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.cyan.withValues(alpha: 0.3)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.cyan : Colors.white60,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.cyan : Colors.white60,
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildOverviewTab(int minutes, int seconds, PoseSession session) {
-    return SingleChildScrollView(
+  Widget _buildLoading() {
+    return const Center(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Session stats header
-          _buildSessionHeader(minutes, seconds, session),
-
-          const SizedBox(height: 16),
-
-          // Info cards
-          _buildInfoCards(session),
-
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRawDataTab(
-    bool hasPoses,
-    dynamic currentPose,
-    PoseSession session,
-  ) {
-    if (!hasPoses) {
-      return _buildNoPosesMessage();
-    }
-
-    return Column(
-      children: [
-        // Pose navigator
-        _buildPoseNavigator(session.capturedPoses.length),
-
-        const SizedBox(height: 16),
-
-        // Full-height raw data view
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.cyan.withValues(alpha: 0.3),
-                width: 2,
-              ),
-            ),
-            child: RawDataView(pose: currentPose),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildInfoCards(PoseSession session) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          _buildInfoCard(
-            icon: Icons.analytics,
-            title: 'Motion Data Quality',
-            children: [
-              _buildInfoRow(
-                'Total Poses Captured',
-                '${session.capturedPoses.length}',
-                Colors.cyan,
-              ),
-              _buildInfoRow(
-                'Landmarks per Pose',
-                '33 points (3D)',
-                Colors.white70,
-              ),
-              _buildInfoRow(
-                'Coordinate Systems',
-                'Raw + Normalized',
-                Colors.white70,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            icon: Icons.timeline,
-            title: 'Temporal Resolution',
-            children: [
-              _buildInfoRow(
-                'Frame Indexing',
-                'Sequential',
-                Colors.cyan,
-              ),
-              _buildInfoRow(
-                'Timestamp Precision',
-                'Microseconds',
-                Colors.white70,
-              ),
-              _buildInfoRow(
-                'Effective FPS',
-                session.effectiveFps.toStringAsFixed(2),
-                Colors.white70,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.cyan.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: Colors.cyan, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, Color valueColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
+          CircularProgressIndicator(color: Colors.white),
+          SizedBox(height: 16),
           Text(
-            label,
-            style: const TextStyle(color: Colors.white60, fontSize: 13),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'monospace',
-            ),
+            'Laden...',
+            style: TextStyle(color: Color(0xFF888888), fontSize: 16),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSessionHeader(int minutes, int seconds, PoseSession session) {
-    final metrics = session.metrics;
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.cyan.withValues(alpha: 0.2),
-            Colors.cyan.withValues(alpha: 0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.cyan.withValues(alpha: 0.4), width: 2),
-      ),
-      child: Column(
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle, color: Colors.greenAccent, size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Session Completed',
-                style: TextStyle(
-                  color: Colors.greenAccent,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatColumn(
-                icon: Icons.timer,
-                label: 'Duration',
-                value: '${minutes}m ${seconds}s',
-              ),
-              _buildStatColumn(
-                icon: Icons.accessibility_new,
-                label: 'Poses',
-                value: '${session.capturedPoses.length}',
-              ),
-              _buildStatColumn(
-                icon: Icons.speed,
-                label: 'FPS',
-                value: session.effectiveFps.toStringAsFixed(1),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Pipeline metrics
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Pipeline Metrics',
-                  style: TextStyle(
-                    color: Colors.cyan,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildMetricItem(
-                      'Received',
-                      '${metrics.totalFramesReceived}',
-                    ),
-                    _buildMetricItem(
-                      'Processed',
-                      '${metrics.totalFramesProcessed}',
-                    ),
-                    _buildMetricItem(
-                      'Dropped',
-                      '${metrics.totalFramesDropped}',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildMetricItem(
-                      'Drop Rate',
-                      '${metrics.dropRate.toStringAsFixed(1)}%',
-                    ),
-                    _buildMetricItem(
-                      'Avg Latency',
-                      '${metrics.averageLatencyMs.toStringAsFixed(1)} ms',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricItem(String label, String value) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white60, fontSize: 10),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatColumn({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.cyan, size: 20),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white60,
-            fontSize: 12,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPoseNavigator(int totalPoses) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.cyan.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Previous button
-          IconButton(
-            icon: const Icon(Icons.chevron_left, color: Colors.cyan),
-            onPressed: _currentPoseIndex > 0
-                ? () => setState(() => _currentPoseIndex--)
-                : null,
-          ),
-
-          // Pose indicator
-          Expanded(
-            child: Column(
-              children: [
-                const Text(
-                  'Viewing Pose',
-                  style: TextStyle(color: Colors.white60, fontSize: 12),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${_currentPoseIndex + 1} of $totalPoses',
-                  style: const TextStyle(
-                    color: Colors.cyan,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Progress indicator
-                LinearProgressIndicator(
-                  value: (_currentPoseIndex + 1) / totalPoses,
-                  backgroundColor: Colors.white.withValues(alpha: 0.1),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.cyan),
-                ),
-              ],
-            ),
-          ),
-
-          // Next button
-          IconButton(
-            icon: const Icon(Icons.chevron_right, color: Colors.cyan),
-            onPressed: _currentPoseIndex < totalPoses - 1
-                ? () => setState(() => _currentPoseIndex++)
-                : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoPosesMessage() {
+  Widget _buildError(SessionDetailsError state) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.info_outline,
-            color: Colors.white.withValues(alpha: 0.3),
-            size: 64,
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 48,
+            color: Color(0xFFFF5252),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'No poses captured in this session',
-            style: TextStyle(
-              color: Colors.white60,
-              fontSize: 16,
-            ),
+          Text(
+            state.message,
+            style: const TextStyle(color: Color(0xFF888888), fontSize: 16),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildLoaded(SessionDetailsLoaded state) {
+    return Column(
+      children: [
+        const SizedBox(height: 24),
+        Expanded(
+          child: _VideoWithOverlay(
+            cubit: _cubit,
+            state: state,
+            tickerNotifier: _tickerNotifier,
+          ),
+        ),
+        const SizedBox(height: 24),
+        _PlaybackControls(cubit: _cubit, state: state),
+      ],
+    );
+  }
+}
+
+/// Custom [ChangeNotifier] driven by the ticker to trigger repaints.
+class _TickerNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
+}
+
+/// Video player with ticker-driven landmark overlay stack.
+class _VideoWithOverlay extends StatelessWidget {
+  final SessionDetailsCubit cubit;
+  final SessionDetailsLoaded state;
+  final _TickerNotifier tickerNotifier;
+
+  const _VideoWithOverlay({
+    required this.cubit,
+    required this.state,
+    required this.tickerNotifier,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = cubit.videoController;
+    final syncEngine = cubit.syncEngine;
+    if (controller == null || !controller.value.isInitialized || syncEngine == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+
+    final videoSize = controller.value.size;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final widgetSize = Size(
+              constraints.maxWidth,
+              constraints.maxHeight,
+            );
+
+            // Determine forced frame index for frame-stepping mode
+            final forcedIndex = state.playbackMode == PlaybackMode.frameStepping
+                ? state.currentFrameIndex
+                : null;
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // Video layer
+                FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: SizedBox(
+                    width: videoSize.width,
+                    height: videoSize.height,
+                    child: VideoPlayer(controller),
+                  ),
+                ),
+                // Landmark overlay — ticker-driven CustomPainter
+                RepaintBoundary(
+                  child: _buildOverlay(
+                    controller,
+                    syncEngine,
+                    videoSize,
+                    widgetSize,
+                    forcedIndex,
+                  ),
+                ),
+                // Landmark tap detection
+                _LandmarkTapDetector(
+                  cubit: cubit,
+                  syncEngine: syncEngine,
+                  videoSize: videoSize,
+                  widgetSize: widgetSize,
+                  session: state.session,
+                ),
+                // Landmark detail card overlay
+                if (state.selectedLandmarkId != null)
+                  _LandmarkDetailOverlay(
+                    cubit: cubit,
+                    state: state,
+                    syncEngine: syncEngine,
+                    videoSize: videoSize,
+                    widgetSize: widgetSize,
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverlay(
+    VideoPlayerController controller,
+    PlaybackSyncEngine syncEngine,
+    ui.Size videoSize,
+    Size widgetSize,
+    int? forcedIndex,
+  ) {
+    Widget overlay = CustomPaint(
+      size: widgetSize,
+      painter: PlaybackOverlayPainter(
+        controller: controller,
+        syncEngine: syncEngine,
+        videoSize: videoSize,
+        session: state.session,
+        repaint: tickerNotifier,
+        forcedFrameIndex: forcedIndex,
+      ),
+    );
+
+    if (state.session.isFrontCamera) {
+      overlay = Transform.flip(flipX: true, child: overlay);
+    }
+
+    return overlay;
+  }
+}
+
+/// Transparent gesture detector for landmark tap hit-testing.
+class _LandmarkTapDetector extends StatelessWidget {
+  final SessionDetailsCubit cubit;
+  final PlaybackSyncEngine syncEngine;
+  final ui.Size videoSize;
+  final Size widgetSize;
+  final Session session;
+
+  const _LandmarkTapDetector({
+    required this.cubit,
+    required this.syncEngine,
+    required this.videoSize,
+    required this.widgetSize,
+    required this.session,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTapDown: (details) => _onTap(details.localPosition),
+      child: const SizedBox.expand(),
+    );
+  }
+
+  void _onTap(Offset tapPosition) {
+    final currentState = cubit.state;
+    if (currentState is! SessionDetailsLoaded) return;
+
+    // Get the currently displayed frame
+    TrackedFrame? frame;
+    if (currentState.playbackMode == PlaybackMode.frameStepping) {
+      frame = syncEngine.getFrameByIndex(currentState.currentFrameIndex);
+    } else {
+      final controller = cubit.videoController;
+      if (controller == null) return;
+      final result = syncEngine.findFramePair(controller.value.position);
+      if (result == null) return;
+      frame = result.frameA;
+    }
+
+    if (frame == null || !frame.isPersonDetected) return;
+
+    // Transform landmarks to widget space and find nearest
+    final rawW = session.imageWidth;
+    final rawH = session.imageHeight;
+    if (rawW <= 0 || rawH <= 0) return;
+
+    final transform = TransformCalculator.calculateCoverTransform(
+      imageSize: videoSize,
+      screenSize: widgetSize,
+    );
+
+    // Account for front camera mirror flip
+    final effectiveTapX = session.isFrontCamera
+        ? widgetSize.width - tapPosition.dx
+        : tapPosition.dx;
+    final effectiveTap = Offset(effectiveTapX, tapPosition.dy);
+
+    const hitRadius = 30.0;
+    double closestDistance = hitRadius;
+    int? closestId;
+
+    for (final l in frame.landmarks) {
+      final vx = (l.x / rawW) * videoSize.width;
+      final vy = (l.y / rawH) * videoSize.height;
+      final wx = vx * transform.scale + transform.offset.dx;
+      final wy = vy * transform.scale + transform.offset.dy;
+
+      final dist = (effectiveTap - Offset(wx, wy)).distance;
+      if (dist < closestDistance) {
+        closestDistance = dist;
+        closestId = l.id;
+      }
+    }
+
+    cubit.selectLandmark(closestId);
+  }
+}
+
+/// Positioned overlay for the landmark detail card.
+class _LandmarkDetailOverlay extends StatelessWidget {
+  final SessionDetailsCubit cubit;
+  final SessionDetailsLoaded state;
+  final PlaybackSyncEngine syncEngine;
+  final ui.Size videoSize;
+  final Size widgetSize;
+
+  const _LandmarkDetailOverlay({
+    required this.cubit,
+    required this.state,
+    required this.syncEngine,
+    required this.videoSize,
+    required this.widgetSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final landmarkId = state.selectedLandmarkId;
+    if (landmarkId == null) return const SizedBox.shrink();
+
+    // Get current frame
+    TrackedFrame? frame;
+    if (state.playbackMode == PlaybackMode.frameStepping) {
+      frame = syncEngine.getFrameByIndex(state.currentFrameIndex);
+    } else {
+      final controller = cubit.videoController;
+      if (controller == null) return const SizedBox.shrink();
+      final result = syncEngine.findFramePair(controller.value.position);
+      frame = result?.frameA;
+    }
+
+    if (frame == null || !frame.isPersonDetected) return const SizedBox.shrink();
+
+    // Find the selected landmark
+    LandmarkData? landmark;
+    for (final l in frame.landmarks) {
+      if (l.id == landmarkId) {
+        landmark = l;
+        break;
+      }
+    }
+    if (landmark == null) return const SizedBox.shrink();
+
+    // Position the card near the landmark
+    final rawW = state.session.imageWidth;
+    final rawH = state.session.imageHeight;
+    if (rawW <= 0 || rawH <= 0) return const SizedBox.shrink();
+
+    final transform = TransformCalculator.calculateCoverTransform(
+      imageSize: videoSize,
+      screenSize: widgetSize,
+    );
+
+    var wx = (landmark.x / rawW) * videoSize.width * transform.scale + transform.offset.dx;
+    final wy = (landmark.y / rawH) * videoSize.height * transform.scale + transform.offset.dy;
+
+    // Mirror for front camera
+    if (state.session.isFrontCamera) {
+      wx = widgetSize.width - wx;
+    }
+
+    // Offset card to the right of the landmark, clamped to widget bounds
+    final cardX = (wx + 20).clamp(8.0, widgetSize.width - 228.0);
+    final cardY = (wy - 40).clamp(8.0, widgetSize.height - 200.0);
+
+    return Positioned(
+      left: cardX,
+      top: cardY,
+      child: LandmarkDetailCard(
+        landmark: landmark,
+        session: state.session,
+        frameIndex: state.currentFrameIndex,
+        timestampMicros: frame.timestampMicros,
+        onDismiss: () => cubit.selectLandmark(null),
+      ),
+    );
+  }
+}
+
+/// Playback controls: slider, timestamps, play/pause, frame step.
+class _PlaybackControls extends StatelessWidget {
+  final SessionDetailsCubit cubit;
+  final SessionDetailsLoaded state;
+
+  const _PlaybackControls({required this.cubit, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final positionMs = state.position.inMilliseconds.toDouble();
+    final durationMs = state.duration.inMilliseconds.toDouble();
+    final sliderValue = durationMs > 0
+        ? positionMs.clamp(0.0, durationMs)
+        : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Interactive progress bar
+          SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: const Color(0xFF4CAF50),
+              inactiveTrackColor: const Color(0xFF333333),
+              thumbColor: const Color(0xFF4CAF50),
+              overlayShape: SliderComponentShape.noOverlay,
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+            ),
+            child: Slider(
+              value: sliderValue,
+              max: durationMs > 0 ? durationMs : 1.0,
+              onChanged: (value) {
+                cubit.seekToPosition(
+                  Duration(milliseconds: value.round()),
+                );
+              },
+            ),
+          ),
+          // Timestamps + frame counter
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatDuration(state.position),
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                    fontFeatures: [ui.FontFeature.tabularFigures()],
+                  ),
+                ),
+                if (state.totalFrames > 0)
+                  Text(
+                    'Frame ${state.currentFrameIndex + 1} / ${state.totalFrames}',
+                    style: const TextStyle(
+                      color: Color(0xFF666666),
+                      fontSize: 11,
+                      fontFeatures: [ui.FontFeature.tabularFigures()],
+                    ),
+                  ),
+                Text(
+                  _formatDuration(state.duration),
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                    fontFeatures: [ui.FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Transport controls: step back, play/pause, step forward
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            spacing: 16,
+            children: [
+              // Step backward
+              GestureDetector(
+                onTap: cubit.stepBackward,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2A2A2A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.skip_previous_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+              // Play / Pause
+              GestureDetector(
+                onTap: cubit.togglePlayback,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF4CAF50),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    state.isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              // Step forward
+              GestureDetector(
+                onTap: cubit.stepForward,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2A2A2A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.skip_next_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final millis = (d.inMilliseconds.remainder(1000) ~/ 10).toString().padLeft(2, '0');
+    return '$minutes:$seconds.$millis';
   }
 }

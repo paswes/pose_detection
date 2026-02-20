@@ -1,149 +1,113 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
-import 'package:pose_detection/domain/models/motion_data.dart';
+import 'package:pose_detection/core/di/service_locator.dart';
+import 'package:pose_detection/domain/models/detected_pose.dart';
 
-/// High-performance painter for drawing all 33 pose landmarks with depth visualization.
-///
-/// Optimizations:
-/// - Pre-computes all coordinate translations once per frame
-/// - Uses cached Paint objects
-/// - Includes widgetSize in shouldRepaint for rotation handling
+/// High-performance painter for pose landmarks with likelihood heatmap.
 ///
 /// Visual features:
-/// - Cyan skeleton with depth-based sizing (closer = larger)
-/// - Confidence indicator via yellow glow intensity
-/// - Z-depth visualization via landmark radius and connection thickness
+/// - Likelihood heatmap: Green (>0.8), Yellow (0.5-0.8), Red (<0.5)
+/// - Depth-based sizing (closer = larger)
+/// - Minimal, academic aesthetic
 class PosePainter extends CustomPainter {
-  final TimestampedPose pose;
+  final DetectedPose pose;
   final Size imageSize;
   final Size widgetSize;
+  final LandmarkSchema _schema;
 
-  /// Complete pose skeleton connections using landmark IDs (0-32)
-  static const List<List<int>> _connections = [
-    // Face (11 connections)
-    [1, 2], [2, 3], [3, 7], // Left eye to ear
-    [4, 5], [5, 6], [6, 8], // Right eye to ear
-    [9, 10], // Mouth
-    [0, 1], [0, 4], // Nose to eyes
-    [9, 7], [10, 8], // Mouth to ears
-
-    // Torso (4 connections)
-    [11, 12], // Shoulders
-    [11, 23], [12, 24], // Shoulders to hips
-    [23, 24], // Hips
-
-    // Left arm (6 connections)
-    [11, 13], [13, 15], // Shoulder to wrist
-    [15, 17], [15, 19], [17, 19], [15, 21], // Hand
-
-    // Right arm (6 connections)
-    [12, 14], [14, 16], // Shoulder to wrist
-    [16, 18], [16, 20], [18, 20], [16, 22], // Hand
-
-    // Left leg (5 connections)
-    [23, 25], [25, 27], // Hip to ankle
-    [27, 29], [27, 31], [29, 31], // Foot
-
-    // Right leg (5 connections)
-    [24, 26], [26, 28], // Hip to ankle
-    [28, 30], [28, 32], [30, 32], // Foot
-  ];
+  /// Get skeleton connections from injected schema
+  List<List<int>> get _connections => _schema.skeletonConnections;
 
   PosePainter({
     required this.pose,
     required this.imageSize,
     required this.widgetSize,
-  });
+    LandmarkSchema? schema,
+  }) : _schema = schema ?? sl<LandmarkSchema>();
+
+  /// Get likelihood-based color (heatmap)
+  Color _getLikelihoodColor(double likelihood) {
+    if (likelihood > 0.8) {
+      return const Color(0xFF4CAF50); // Green
+    } else if (likelihood > 0.5) {
+      return const Color(0xFFFFEB3B); // Yellow
+    } else {
+      return const Color(0xFFF44336); // Red
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     if (pose.landmarks.isEmpty) return;
 
     // Pre-compute ALL translations with depth info ONCE
-    final translatedPoints = CoordinateTranslator.translateAllLandmarksWithDepth(
-      pose.landmarks,
-      imageSize,
-      widgetSize,
-    );
+    final translatedPoints =
+        CoordinateTranslator.translateAllLandmarksWithDepth(
+          pose.landmarks,
+          imageSize,
+          widgetSize,
+        );
 
-    // Build a quick lookup for confidence values
-    final confidenceMap = <int, double>{};
+    // Build a quick lookup for likelihood values
+    final likelihoodMap = <int, double>{};
     for (final landmark in pose.landmarks) {
-      confidenceMap[landmark.id] = landmark.likelihood;
+      likelihoodMap[landmark.id] = landmark.likelihood;
     }
 
     // Draw all skeletal connections first (below landmarks)
-    _drawAllConnections(canvas, translatedPoints, confidenceMap);
+    _drawAllConnections(canvas, translatedPoints, likelihoodMap);
 
     // Draw all landmark points on top
-    _drawAllLandmarks(canvas, translatedPoints, confidenceMap);
+    _drawAllLandmarks(canvas, translatedPoints, likelihoodMap);
   }
 
-  /// Draw all landmark points with depth-based sizing
+  /// Draw all landmark points with likelihood heatmap coloring
   void _drawAllLandmarks(
     Canvas canvas,
     Map<int, ({Offset position, double normalizedDepth})> points,
-    Map<int, double> confidenceMap,
+    Map<int, double> likelihoodMap,
   ) {
     for (final entry in points.entries) {
       final id = entry.key;
       final position = entry.value.position;
       final depth = entry.value.normalizedDepth;
-      final confidence = confidenceMap[id] ?? 0.5;
+      final likelihood = likelihoodMap[id] ?? 0.5;
 
-      // Depth-based radius: closer landmarks (higher depth) are larger
-      // Range: 4px (far) to 10px (close)
-      final baseRadius = 4.0 + (depth * 6.0);
+      // Depth-based radius: closer = larger
+      final baseRadius = 4.0 + (depth * 4.0);
 
-      // Confidence-based glow radius
-      final glowRadius = baseRadius + 4 + (confidence * 4);
+      // Get likelihood-based color
+      final likelihoodColor = _getLikelihoodColor(likelihood);
 
-      // Draw confidence glow (yellow, fades with lower confidence)
+      // Draw subtle glow based on likelihood
       final glowPaint = Paint()
-        ..color = Colors.yellow.withValues(alpha: confidence * 0.4)
+        ..color = likelihoodColor.withValues(alpha: 0.3)
         ..style = PaintingStyle.fill
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 3);
-      canvas.drawCircle(position, glowRadius, glowPaint);
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4);
+      canvas.drawCircle(position, baseRadius + 3, glowPaint);
 
-      // Draw depth indicator ring (subtle white ring for depth perception)
-      if (depth > 0.6) {
-        // Only for close landmarks
-        final depthRingPaint = Paint()
-          ..color = Colors.white.withValues(alpha: (depth - 0.6) * 0.5)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5;
-        canvas.drawCircle(position, baseRadius + 2, depthRingPaint);
-      }
-
-      // Draw main landmark point with depth-adjusted color
-      // Closer = more saturated cyan, further = more muted
+      // Draw main landmark point with likelihood color
       final landmarkPaint = Paint()
-        ..color = Color.lerp(
-          Colors.cyan.withValues(alpha: 0.6),
-          Colors.cyan,
-          depth,
-        )!
+        ..color = likelihoodColor
         ..style = PaintingStyle.fill;
       canvas.drawCircle(position, baseRadius, landmarkPaint);
 
-      // Draw center highlight for 3D effect
-      final highlightPaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.3 + (depth * 0.3))
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(
-        position + Offset(-baseRadius * 0.2, -baseRadius * 0.2),
-        baseRadius * 0.3,
-        highlightPaint,
-      );
+      // Draw thin white outline for visibility
+      final outlinePaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+      canvas.drawCircle(position, baseRadius, outlinePaint);
     }
   }
 
-  /// Draw all skeletal connections with depth-based thickness
+  /// Draw all skeletal connections with likelihood-based coloring
   void _drawAllConnections(
     Canvas canvas,
     Map<int, ({Offset position, double normalizedDepth})> points,
-    Map<int, double> confidenceMap,
+    Map<int, double> likelihoodMap,
   ) {
     for (final connection in _connections) {
       final id1 = connection[0];
@@ -153,20 +117,22 @@ class PosePainter extends CustomPainter {
       final point2Data = points[id2];
 
       if (point1Data != null && point2Data != null) {
-        // Average depth of the two endpoints
-        final avgDepth = (point1Data.normalizedDepth + point2Data.normalizedDepth) / 2;
+        // Average depth for line thickness
+        final avgDepth =
+            (point1Data.normalizedDepth + point2Data.normalizedDepth) / 2;
 
-        // Average confidence for line visibility
-        final avgConfidence = ((confidenceMap[id1] ?? 0.5) + (confidenceMap[id2] ?? 0.5)) / 2;
+        // Average likelihood for color
+        final avgLikelihood =
+            ((likelihoodMap[id1] ?? 0.5) + (likelihoodMap[id2] ?? 0.5)) / 2;
 
-        // Depth-based line thickness: 1.5px (far) to 4px (close)
-        final lineWidth = 1.5 + (avgDepth * 2.5);
+        // Depth-based line thickness
+        final lineWidth = 1.5 + (avgDepth * 2.0);
 
-        // Confidence-based alpha: low confidence = more transparent
-        final alpha = 0.4 + (avgConfidence * 0.6);
+        // Likelihood-based alpha (minimal, academic look)
+        final alpha = 0.3 + (avgLikelihood * 0.5);
 
         final linePaint = Paint()
-          ..color = Colors.cyan.withValues(alpha: alpha)
+          ..color = Colors.white.withValues(alpha: alpha)
           ..style = PaintingStyle.stroke
           ..strokeWidth = lineWidth
           ..strokeCap = StrokeCap.round;
@@ -178,7 +144,6 @@ class PosePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PosePainter oldDelegate) {
-    // Check all three dimensions that affect rendering
     return oldDelegate.pose != pose ||
         oldDelegate.imageSize != imageSize ||
         oldDelegate.widgetSize != widgetSize;

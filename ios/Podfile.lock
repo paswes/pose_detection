@@ -69,13 +69,25 @@ PODS:
     - nanopb/encode (= 3.30910.0)
   - nanopb/decode (3.30910.0)
   - nanopb/encode (3.30910.0)
+  - path_provider_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - PromisesObjC (2.4.0)
+  - sqflite_darwin (0.0.4):
+    - Flutter
+    - FlutterMacOS
+  - video_player_avfoundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
 
 DEPENDENCIES:
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - Flutter (from `Flutter`)
   - google_mlkit_commons (from `.symlinks/plugins/google_mlkit_commons/ios`)
   - google_mlkit_pose_detection (from `.symlinks/plugins/google_mlkit_pose_detection/ios`)
+  - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
+  - video_player_avfoundation (from `.symlinks/plugins/video_player_avfoundation/darwin`)
 
 SPEC REPOS:
   trunk:
@@ -103,6 +115,12 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/google_mlkit_commons/ios"
   google_mlkit_pose_detection:
     :path: ".symlinks/plugins/google_mlkit_pose_detection/ios"
+  path_provider_foundation:
+    :path: ".symlinks/plugins/path_provider_foundation/darwin"
+  sqflite_darwin:
+    :path: ".symlinks/plugins/sqflite_darwin/darwin"
+  video_player_avfoundation:
+    :path: ".symlinks/plugins/video_player_avfoundation/darwin"
 
 SPEC CHECKSUMS:
   camera_avfoundation: 5675ca25298b6f81fa0a325188e7df62cc217741
@@ -122,7 +140,10 @@ SPEC CHECKSUMS:
   MLKitVision: 45e79d68845a2de77e2dd4d7f07947f0ed157b0e
   MLKitXenoCommon: ce5047943af6b4be7ae035dd81b3a56fdb29aab3
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
+  path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
+  sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
+  video_player_avfoundation: dd410b52df6d2466a42d28550e33e4146928280a
 
 PODFILE CHECKSUM: 9580a49fa2c095d51100c20f258df867100b916b
 

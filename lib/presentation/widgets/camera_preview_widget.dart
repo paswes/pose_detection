@@ -1,47 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:pose_detection/core/utils/transform_calculator.dart';
 
-/// Widget for displaying fullscreen camera preview
-///
+/// Widget for displaying fullscreen camera preview.
 /// Uses BoxFit.cover to fill the screen while maintaining aspect ratio.
-/// The actual image dimensions and screen size are exposed via [getImageToScreenTransform]
-/// for synchronized coordinate mapping in overlay painters.
+/// Supports mirroring for front camera (selfie mode).
 class CameraPreviewWidget extends StatelessWidget {
   final CameraController cameraController;
+  final bool isFrontCamera;
+  final bool isLandscape;
 
   const CameraPreviewWidget({
     super.key,
     required this.cameraController,
+    this.isFrontCamera = false,
+    this.isLandscape = false,
   });
 
   /// Calculates the BoxFit.cover transformation parameters.
-  /// Returns a record with scale factor and offset for coordinate translation.
-  ///
-  /// This MUST match the exact behavior of FittedBox with BoxFit.cover.
-  static ({double scale, Offset offset, Size fittedSize}) getImageToScreenTransform({
+  /// @deprecated Use TransformCalculator.calculateCoverTransform instead.
+  @Deprecated('Use TransformCalculator.calculateCoverTransform instead')
+  static ({double scale, Offset offset, Size fittedSize})
+  getImageToScreenTransform({
     required Size imageSize,
     required Size screenSize,
   }) {
-    // BoxFit.cover: Scale uniformly to cover the entire target,
-    // potentially clipping parts of the source.
-    final scaleX = screenSize.width / imageSize.width;
-    final scaleY = screenSize.height / imageSize.height;
-
-    // Use the LARGER scale to ensure full coverage (BoxFit.cover behavior)
-    final scale = scaleX > scaleY ? scaleX : scaleY;
-
-    // Calculate the fitted image size after scaling
-    final fittedWidth = imageSize.width * scale;
-    final fittedHeight = imageSize.height * scale;
-
-    // Center offset (parts extending beyond screen are clipped)
-    final offsetX = (screenSize.width - fittedWidth) / 2;
-    final offsetY = (screenSize.height - fittedHeight) / 2;
-
+    final transform = TransformCalculator.calculateCoverTransform(
+      imageSize: imageSize,
+      screenSize: screenSize,
+    );
     return (
-      scale: scale,
-      offset: Offset(offsetX, offsetY),
-      fittedSize: Size(fittedWidth, fittedHeight),
+      scale: transform.scale,
+      offset: transform.offset,
+      fittedSize: transform.fittedSize,
     );
   }
 
@@ -75,12 +66,21 @@ class CameraPreviewWidget extends StatelessWidget {
       );
     }
 
-    // For portrait mode on iOS, the image comes rotated:
-    // previewSize.width is the shorter dimension (portrait width)
-    // previewSize.height is the longer dimension (portrait height)
-    // We need to use the image as-is since ML Kit coordinates match this orientation
-    final imageWidth = previewSize.height; // Swap for portrait
-    final imageHeight = previewSize.width;
+    // Determine image dimensions based on camera orientation
+    final double imageWidth;
+    final double imageHeight;
+
+    if (isLandscape) {
+      // Landscape mode: use previewSize as-is
+      imageWidth = previewSize.width;
+      imageHeight = previewSize.height;
+    } else {
+      // Portrait mode on iOS: the image comes rotated, so swap dimensions
+      // previewSize.width is the shorter dimension (portrait width)
+      // previewSize.height is the longer dimension (portrait height)
+      imageWidth = previewSize.height;
+      imageHeight = previewSize.width;
+    }
 
     return SizedBox.expand(
       child: FittedBox(
@@ -93,5 +93,17 @@ class CameraPreviewWidget extends StatelessWidget {
         ),
       ),
     );
+
+    // Mirror the preview for front camera (like a mirror)
+    // This makes it more intuitive for the user - left is left
+    // if (isFrontCamera) {
+    //   preview = Transform.flip(
+    //     //flipX: true,
+    //     flipX: false,
+    //     child: preview,
+    //   );
+    // }
+
+    // return preview;
   }
 }

@@ -4,7 +4,7 @@ import 'package:path/path.dart';
 /// SQLite database for storing recorded sessions and tracking data.
 class AppDatabase {
   static const _databaseName = 'pose_detection.db';
-  static const _databaseVersion = 4;
+  static const _databaseVersion = 5;
 
   Database? _database;
 
@@ -38,7 +38,8 @@ class AppDatabase {
         is_landscape INTEGER NOT NULL DEFAULT 0,
         image_width REAL NOT NULL DEFAULT 0,
         image_height REAL NOT NULL DEFAULT 0,
-        sensor_orientation INTEGER NOT NULL DEFAULT 90
+        sensor_orientation INTEGER NOT NULL DEFAULT 90,
+        recording_fps REAL NOT NULL DEFAULT 0
       )
     ''');
 
@@ -47,6 +48,7 @@ class AppDatabase {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL,
         timestamp_micros INTEGER NOT NULL,
+        frame_index INTEGER NOT NULL DEFAULT 0,
         landmarks_json TEXT NOT NULL,
         is_person_detected INTEGER NOT NULL,
         person_confidence REAL NOT NULL,
@@ -70,6 +72,10 @@ class AppDatabase {
     }
     if (oldVersion < 4) {
       await db.execute('ALTER TABLE sessions ADD COLUMN sensor_orientation INTEGER NOT NULL DEFAULT 90');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE sessions ADD COLUMN recording_fps REAL NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE tracked_frames ADD COLUMN frame_index INTEGER NOT NULL DEFAULT 0');
     }
   }
 

@@ -15,6 +15,7 @@ class RecordingService {
   final List<TrackedFrame> _frames = [];
   String? _sessionId;
   Size? _imageSize;
+  int _nextFrameIndex = 0;
 
   bool get isRecording => _recordingStartTime != null;
 
@@ -28,6 +29,7 @@ class RecordingService {
     _sessionId = sessionId;
     _recordingStartTime = DateTime.now();
     _frames.clear();
+    _nextFrameIndex = 0;
 
     // Record timestamp BEFORE the await — the platform begins recording
     // as soon as it receives the command, so this is the closest
@@ -55,6 +57,7 @@ class RecordingService {
 
     final frame = TrackedFrame(
       sessionId: _sessionId!,
+      frameIndex: _nextFrameIndex++,
       // Use original capture timestamp (not post-detection) relative to video start
       timestampMicros: captureTimestampMicros - videoStart,
       // Store empty landmarks array when no person detected (pose == null)
@@ -92,12 +95,18 @@ class RecordingService {
     final imageSize = _imageSize ?? Size.zero;
     final sessionId = _sessionId!;
 
+    final durationSeconds = duration.inMilliseconds / 1000.0;
+    final recordingFps = durationSeconds > 0
+        ? frames.length / durationSeconds
+        : 0.0;
+
     // Reset state
     _recordingStartTime = null;
     _videoStartTimestampMicros = null;
     _frames.clear();
     _sessionId = null;
     _imageSize = null;
+    _nextFrameIndex = 0;
 
     return RecordingResult(
       sessionId: sessionId,
@@ -105,6 +114,7 @@ class RecordingService {
       duration: duration,
       frames: frames,
       imageSize: imageSize,
+      recordingFps: recordingFps,
     );
   }
 
@@ -114,6 +124,7 @@ class RecordingService {
     _frames.clear();
     _sessionId = null;
     _imageSize = null;
+    _nextFrameIndex = 0;
   }
 }
 
@@ -124,6 +135,7 @@ class RecordingResult {
   final Duration duration;
   final List<TrackedFrame> frames;
   final Size imageSize;
+  final double recordingFps;
 
   const RecordingResult({
     required this.sessionId,
@@ -131,5 +143,6 @@ class RecordingResult {
     required this.duration,
     required this.frames,
     required this.imageSize,
+    required this.recordingFps,
   });
 }

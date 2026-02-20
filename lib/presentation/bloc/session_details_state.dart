@@ -2,6 +2,15 @@ import 'package:equatable/equatable.dart';
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 
+/// Playback mode for the session details screen.
+enum PlaybackMode {
+  /// Video is playing continuously with ticker-driven overlay.
+  continuous,
+
+  /// Video is paused; user navigates frame-by-frame.
+  frameStepping,
+}
+
 /// States for the session details playback screen.
 sealed class SessionDetailsState extends Equatable {
   const SessionDetailsState();
@@ -22,7 +31,10 @@ class SessionDetailsLoaded extends SessionDetailsState {
   final bool isPlaying;
   final Duration position;
   final Duration duration;
-  final TrackedFrame? currentFrame;
+  final int currentFrameIndex;
+  final int totalFrames;
+  final PlaybackMode playbackMode;
+  final int? selectedLandmarkId;
 
   const SessionDetailsLoaded({
     required this.session,
@@ -30,14 +42,20 @@ class SessionDetailsLoaded extends SessionDetailsState {
     required this.isPlaying,
     required this.position,
     required this.duration,
-    this.currentFrame,
+    required this.currentFrameIndex,
+    required this.totalFrames,
+    this.playbackMode = PlaybackMode.continuous,
+    this.selectedLandmarkId,
   });
 
   SessionDetailsLoaded copyWith({
     bool? isPlaying,
     Duration? position,
     Duration? duration,
-    TrackedFrame? currentFrame,
+    int? currentFrameIndex,
+    PlaybackMode? playbackMode,
+    int? selectedLandmarkId,
+    bool clearSelectedLandmark = false,
   }) {
     return SessionDetailsLoaded(
       session: session,
@@ -45,7 +63,12 @@ class SessionDetailsLoaded extends SessionDetailsState {
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
       duration: duration ?? this.duration,
-      currentFrame: currentFrame ?? this.currentFrame,
+      currentFrameIndex: currentFrameIndex ?? this.currentFrameIndex,
+      totalFrames: totalFrames,
+      playbackMode: playbackMode ?? this.playbackMode,
+      selectedLandmarkId: clearSelectedLandmark
+          ? null
+          : (selectedLandmarkId ?? this.selectedLandmarkId),
     );
   }
 
@@ -55,7 +78,10 @@ class SessionDetailsLoaded extends SessionDetailsState {
     isPlaying,
     position,
     duration,
-    currentFrame?.timestampMicros,
+    currentFrameIndex,
+    totalFrames,
+    playbackMode,
+    selectedLandmarkId,
   ];
 }
 

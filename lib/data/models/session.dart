@@ -11,6 +11,7 @@ class Session {
   final double imageWidth;
   final double imageHeight;
   final int sensorOrientation;
+  final double recordingFps;
 
   const Session({
     required this.id,
@@ -24,6 +25,7 @@ class Session {
     this.imageWidth = 0,
     this.imageHeight = 0,
     this.sensorOrientation = 90,
+    this.recordingFps = 0,
   });
 
   Duration get duration => Duration(milliseconds: durationMs);
@@ -40,6 +42,7 @@ class Session {
     'image_width': imageWidth,
     'image_height': imageHeight,
     'sensor_orientation': sensorOrientation,
+    'recording_fps': recordingFps,
   };
 
   factory Session.fromMap(Map<String, dynamic> map) {
@@ -55,6 +58,7 @@ class Session {
       imageWidth: (map['image_width'] as num?)?.toDouble() ?? 0,
       imageHeight: (map['image_height'] as num?)?.toDouble() ?? 0,
       sensorOrientation: (map['sensor_orientation'] as int?) ?? 90,
+      recordingFps: (map['recording_fps'] as num?)?.toDouble() ?? 0,
     );
   }
 }

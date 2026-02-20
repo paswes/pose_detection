@@ -273,6 +273,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         imageWidth: result.imageSize.width,
         imageHeight: result.imageSize.height,
         sensorOrientation: sensorOrientation,
+        recordingFps: result.recordingFps,
       );
 
       await _sessionRepository.saveSession(session, result.frames);

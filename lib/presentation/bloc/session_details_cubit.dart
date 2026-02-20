@@ -3,27 +3,28 @@ import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
+import 'package:pose_detection/core/services/playback_sync_engine.dart';
 import 'package:pose_detection/data/models/session.dart';
-import 'package:pose_detection/data/models/tracked_frame.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
 import 'package:pose_detection/presentation/bloc/session_details_state.dart';
 
 /// Manages video playback and landmark frame synchronization
 /// for a recorded session.
+///
+/// Exposes [syncEngine] for direct use by the overlay painter,
+/// bypassing BLoC rebuild latency for frame-accurate rendering.
 class SessionDetailsCubit extends Cubit<SessionDetailsState> {
-  /// Forward offset to compensate for VideoPlayer position reporting lag on iOS.
-  /// The video_player package reports position ~30-80ms behind the rendered frame.
-  static const _positionLookaheadMicros = 50000; // 50ms
-
   final Session session;
   final SessionRepository _repository;
 
   VideoPlayerController? _videoController;
-  List<TrackedFrame> _frames = [];
-  List<int> _relativeOffsetsMicros = [];
+  PlaybackSyncEngine? _syncEngine;
 
   /// Access the video controller for the UI layer.
   VideoPlayerController? get videoController => _videoController;
+
+  /// Access the sync engine for direct use by the overlay painter.
+  PlaybackSyncEngine? get syncEngine => _syncEngine;
 
   SessionDetailsCubit({
     required this.session,
@@ -42,16 +43,9 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         return;
       }
 
-      _frames = await _repository.getFramesForSession(session.id);
+      final frames = await _repository.getFramesForSession(session.id);
 
-      // Frame timestamps are already relative to video start
-      // (computed as captureTimestamp - videoStartTimestamp in RecordingService).
-      // Use them directly — video player position 0 = video start, not first frame.
-      if (_frames.isNotEmpty) {
-        _relativeOffsetsMicros = _frames
-            .map((f) => f.timestampMicros)
-            .toList();
-      }
+      _syncEngine = PlaybackSyncEngine(frames: frames);
 
       _videoController = VideoPlayerController.file(videoFile);
       await _videoController!.initialize();
@@ -62,19 +56,20 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
 
       emit(SessionDetailsLoaded(
         session: session,
-        frames: _frames,
+        frames: frames,
         isPlaying: false,
         position: Duration.zero,
         duration: duration,
-        // Don't show frame until playback starts - prevents landmarks
-        // from appearing before video plays
-        currentFrame: null,
+        currentFrameIndex: 0,
+        totalFrames: frames.length,
       ));
     } catch (e) {
       emit(SessionDetailsError(message: 'Fehler beim Laden: $e'));
     }
   }
 
+  /// Listener for VideoPlayerController — updates play/pause state
+  /// and slider position only. The overlay painter reads position directly.
   void _onVideoPositionChanged() {
     final controller = _videoController;
     if (controller == null) return;
@@ -90,46 +85,26 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
 
     if (!playStateChanged && !positionChanged) return;
 
+    // When playback starts, switch to continuous mode
+    PlaybackMode? mode;
+    if (isPlaying && currentState.playbackMode == PlaybackMode.frameStepping) {
+      mode = PlaybackMode.continuous;
+    }
+
+    // Update frame index from current position for the controls
+    final engine = _syncEngine;
+    int? frameIndex;
+    if (engine != null && engine.hasFrames) {
+      frameIndex = engine.findNearestFrameIndex(position);
+    }
+
     emit(currentState.copyWith(
       position: position,
       isPlaying: isPlaying,
+      playbackMode: mode,
+      currentFrameIndex: frameIndex,
+      clearSelectedLandmark: isPlaying,
     ));
-  }
-
-  /// Find the nearest tracked frame for a given video position.
-  /// Exposed for direct use by the overlay widget to bypass BLoC rebuild latency.
-  TrackedFrame? findFrameForPosition(Duration position) {
-    return _findNearestFrame(position);
-  }
-
-  TrackedFrame? _findNearestFrame(Duration position) {
-    if (_frames.isEmpty || _relativeOffsetsMicros.isEmpty) return null;
-
-    final targetMicros = position.inMicroseconds + _positionLookaheadMicros;
-
-    // Binary search for the closest frame
-    int low = 0;
-    int high = _relativeOffsetsMicros.length - 1;
-
-    while (low < high) {
-      final mid = (low + high) ~/ 2;
-      if (_relativeOffsetsMicros[mid] < targetMicros) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-
-    // Check neighbors to find the true closest
-    if (low > 0) {
-      final diffLow = (targetMicros - _relativeOffsetsMicros[low - 1]).abs();
-      final diffHigh = (targetMicros - _relativeOffsetsMicros[low]).abs();
-      if (diffLow < diffHigh) {
-        return _frames[low - 1];
-      }
-    }
-
-    return _frames[low];
   }
 
   /// Toggle between play and pause.
@@ -140,7 +115,89 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     if (controller.value.isPlaying) {
       await controller.pause();
     } else {
+      // Clear landmark selection when starting playback
+      final currentState = state;
+      if (currentState is SessionDetailsLoaded &&
+          currentState.selectedLandmarkId != null) {
+        emit(currentState.copyWith(clearSelectedLandmark: true));
+      }
       await controller.play();
+    }
+  }
+
+  /// Step to the next frame (enters frame-stepping mode).
+  Future<void> stepForward() async {
+    await _stepToFrame(1);
+  }
+
+  /// Step to the previous frame (enters frame-stepping mode).
+  Future<void> stepBackward() async {
+    await _stepToFrame(-1);
+  }
+
+  Future<void> _stepToFrame(int delta) async {
+    final controller = _videoController;
+    final engine = _syncEngine;
+    if (controller == null || engine == null || !engine.hasFrames) return;
+
+    // Pause if playing
+    if (controller.value.isPlaying) {
+      await controller.pause();
+    }
+
+    final currentState = state;
+    if (currentState is! SessionDetailsLoaded) return;
+
+    final newIndex = (currentState.currentFrameIndex + delta)
+        .clamp(0, engine.frameCount - 1);
+
+    final frame = engine.getFrameByIndex(newIndex);
+    if (frame == null) return;
+
+    // Seek video to the frame's timestamp
+    await controller.seekTo(Duration(microseconds: frame.timestampMicros));
+
+    emit(currentState.copyWith(
+      currentFrameIndex: newIndex,
+      position: Duration(microseconds: frame.timestampMicros),
+      isPlaying: false,
+      playbackMode: PlaybackMode.frameStepping,
+      clearSelectedLandmark: true,
+    ));
+  }
+
+  /// Seek to a specific position (from slider drag).
+  Future<void> seekToPosition(Duration position) async {
+    final controller = _videoController;
+    final engine = _syncEngine;
+    if (controller == null) return;
+
+    await controller.seekTo(position);
+
+    final currentState = state;
+    if (currentState is! SessionDetailsLoaded) return;
+
+    int? frameIndex;
+    if (engine != null && engine.hasFrames) {
+      frameIndex = engine.findNearestFrameIndex(position);
+    }
+
+    emit(currentState.copyWith(
+      position: position,
+      currentFrameIndex: frameIndex,
+      clearSelectedLandmark: true,
+    ));
+  }
+
+  /// Select a landmark to show its detail card.
+  void selectLandmark(int? landmarkId) {
+    final currentState = state;
+    if (currentState is! SessionDetailsLoaded) return;
+
+    if (landmarkId == null) {
+      emit(currentState.copyWith(clearSelectedLandmark: true));
+    } else {
+      emit(currentState.copyWith(selectedLandmarkId: landmarkId));
     }
   }
 

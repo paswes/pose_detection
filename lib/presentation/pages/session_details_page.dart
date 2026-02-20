@@ -106,10 +106,11 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   Widget _buildLoaded(SessionDetailsLoaded state) {
     return Column(
       children: [
-        _SessionMetadata(
-          session: state.session,
-          frameCount: state.frames.length,
-        ),
+        // _SessionMetadata(
+        //   session: state.session,
+        //   frameCount: state.frames.length,
+        // ),
+        SizedBox(height: 24),
         Expanded(
           child: _VideoWithOverlay(
             cubit: _cubit,

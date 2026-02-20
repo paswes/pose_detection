@@ -42,5 +42,21 @@ class ChangeOrientationEvent extends PoseDetectionEvent {
   List<Object?> get props => [orientation];
 }
 
+/// Tick to update recording duration (internal, fired by timer)
+class RecordingTickEvent extends PoseDetectionEvent {}
+
+/// Start recording a session (video + pose tracking)
+class StartRecordingEvent extends PoseDetectionEvent {}
+
+/// Stop recording and save session
+class StopRecordingEvent extends PoseDetectionEvent {
+  final String title;
+
+  StopRecordingEvent({required this.title});
+
+  @override
+  List<Object?> get props => [title];
+}
+
 /// Dispose resources
 class DisposeEvent extends PoseDetectionEvent {}

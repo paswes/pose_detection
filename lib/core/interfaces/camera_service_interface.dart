@@ -39,6 +39,15 @@ abstract class ICameraService {
   /// Handles stopping stream, disposing, reinitializing with new orientation, and restarting stream
   Future<void> setOrientation(DeviceOrientation orientation);
 
+  /// Whether the camera is currently recording video
+  bool get isRecordingVideo;
+
+  /// Start video recording
+  Future<void> startVideoRecording();
+
+  /// Stop video recording and return the file
+  Future<XFile> stopVideoRecording();
+
   /// Get the camera description
   CameraDescription? getCameraDescription();
 

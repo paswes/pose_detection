@@ -138,6 +138,22 @@ class CameraService implements ICameraService {
   }
 
   @override
+  bool get isRecordingVideo =>
+      isInitialized && _controller!.value.isRecordingVideo;
+
+  @override
+  Future<void> startVideoRecording() async {
+    if (!isInitialized) throw Exception('Camera not initialized');
+    await _controller!.startVideoRecording();
+  }
+
+  @override
+  Future<XFile> stopVideoRecording() async {
+    if (!isInitialized) throw Exception('Camera not initialized');
+    return await _controller!.stopVideoRecording();
+  }
+
+  @override
   void startImageStream(Function(CameraImage) onImage) {
     if (!isInitialized) {
       throw Exception('Camera not initialized');

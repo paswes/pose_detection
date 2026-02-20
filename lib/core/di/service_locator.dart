@@ -7,7 +7,11 @@ import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
 import 'package:pose_detection/core/services/person_validator.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/core/services/recording_service.dart';
+import 'package:pose_detection/data/database/app_database.dart';
+import 'package:pose_detection/data/repositories/session_repository.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
+import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -26,6 +30,16 @@ Future<void> initializeDependencies({
     schema ?? LandmarkSchema.mlKit33,
   );
 
+  // Database
+  final database = AppDatabase();
+  await database.initialize();
+  sl.registerSingleton<AppDatabase>(database);
+
+  // Repositories
+  sl.registerLazySingleton<SessionRepository>(
+    () => SessionRepository(database: sl<AppDatabase>()),
+  );
+
   // Core Services (lazy singletons - created on first access)
   sl.registerLazySingleton<ICameraService>(
     () => CameraService(),
@@ -39,14 +53,24 @@ Future<void> initializeDependencies({
     () => PersonValidator(),
   );
 
-  // BLoC
-  sl.registerLazySingleton<PoseDetectionBloc>(
+  sl.registerLazySingleton<RecordingService>(
+    () => RecordingService(),
+  );
+
+  // BLoC / Cubit
+  sl.registerFactory<PoseDetectionBloc>(
     () => PoseDetectionBloc(
       cameraService: sl<ICameraService>(),
       poseDetector: sl<IPoseDetector>(),
       config: sl<PoseDetectionConfig>(),
       personValidator: sl<IPersonValidator>(),
+      recordingService: sl<RecordingService>(),
+      sessionRepository: sl<SessionRepository>(),
     ),
+  );
+
+  sl.registerFactory<SessionListCubit>(
+    () => SessionListCubit(repository: sl<SessionRepository>()),
   );
 }
 

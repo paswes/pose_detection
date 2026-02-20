@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/config/pose_detection_config.dart';
 import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
@@ -7,21 +10,26 @@ import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/error_tracker.dart';
 import 'package:pose_detection/core/services/frame_processor.dart';
+import 'package:pose_detection/core/services/recording_service.dart';
 import 'package:pose_detection/core/utils/logger.dart';
+import 'package:pose_detection/data/models/session.dart';
+import 'package:pose_detection/data/repositories/session_repository.dart';
 import 'package:pose_detection/domain/models/detection_metrics.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 
-/// Simplified BLoC for pose detection - orchestration only.
-/// No session management, just real-time pose detection with metrics.
+/// BLoC for pose detection with session recording support.
 class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   final ICameraService _cameraService;
   final FrameProcessor _frameProcessor;
   final ErrorTracker _errorTracker;
   final IPersonValidator _personValidator;
+  final RecordingService _recordingService;
+  final SessionRepository _sessionRepository;
 
   bool _isProcessingFrame = false;
   bool _isStreamingActive = false;
+  Timer? _recordingTimer;
 
   // FPS calculation using rolling window
   final List<int> _frameTimestamps = [];
@@ -35,10 +43,14 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     required IPoseDetector poseDetector,
     required PoseDetectionConfig config,
     required IPersonValidator personValidator,
+    required RecordingService recordingService,
+    required SessionRepository sessionRepository,
   }) : _cameraService = cameraService,
        _frameProcessor = FrameProcessor(poseDetector: poseDetector),
        _errorTracker = ErrorTracker(config: config),
        _personValidator = personValidator,
+       _recordingService = recordingService,
+       _sessionRepository = sessionRepository,
        super(PoseDetectionInitial()) {
     on<InitializeEvent>(_onInitialize);
     on<StartCaptureEvent>(_onStartCapture);
@@ -46,6 +58,9 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     on<SwitchCameraEvent>(_onSwitchCamera);
     on<ChangeOrientationEvent>(_onChangeOrientation);
     on<ProcessFrameEvent>(_onProcessFrame, transformer: droppable());
+    on<StartRecordingEvent>(_onStartRecording);
+    on<StopRecordingEvent>(_onStopRecording);
+    on<RecordingTickEvent>(_onRecordingTick);
     on<DisposeEvent>(_onDispose);
   }
 
@@ -55,13 +70,35 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     return _frameTimestamps.length.toDouble();
   }
 
-  void _recordFrame() {
+  void _recordFpsFrame() {
     _frameTimestamps.add(DateTime.now().millisecondsSinceEpoch);
   }
 
   void _resetMetrics() {
     _frameTimestamps.clear();
     _lastLatencyMs = 0.0;
+  }
+
+  void _startImageStream() {
+    final cameraDescription = _cameraService.getCameraDescription();
+    if (cameraDescription != null) {
+      _isStreamingActive = true;
+      _cameraService.startImageStream((image) {
+        if (_isStreamingActive) {
+          final timestampMicros = DateTime.now().microsecondsSinceEpoch;
+
+          if (!_isProcessingFrame) {
+            add(
+              ProcessFrameEvent(
+                image,
+                cameraDescription.sensorOrientation,
+                timestampMicros,
+              ),
+            );
+          }
+        }
+      });
+    }
   }
 
   Future<void> _onInitialize(
@@ -112,26 +149,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       ),
     );
 
-    final cameraDescription = _cameraService.getCameraDescription();
-    if (cameraDescription != null) {
-      _isStreamingActive = true;
-      _cameraService.startImageStream((image) {
-        if (_isStreamingActive) {
-          final timestampMicros = DateTime.now().microsecondsSinceEpoch;
-
-          if (!_isProcessingFrame) {
-            add(
-              ProcessFrameEvent(
-                image,
-                cameraDescription.sensorOrientation,
-                timestampMicros,
-              ),
-            );
-          }
-          // Dropped frames are simply not processed - no tracking needed
-        }
-      });
-    }
+    _startImageStream();
 
     Logger.info('Bloc', 'Detection started');
   }
@@ -148,11 +166,119 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Logger.info('Bloc', 'Detection stopped');
   }
 
+  Future<void> _onStartRecording(
+    StartRecordingEvent event,
+    Emitter<PoseDetectionState> emit,
+  ) async {
+    if (_isStreamingActive) {
+      _cameraService.stopImageStream();
+      _isStreamingActive = false;
+    }
+
+    _errorTracker.reset();
+    _resetMetrics();
+
+    final controller = _cameraService.controller;
+    if (controller == null || !controller.value.isInitialized) {
+      emit(PoseDetectionError('Camera not initialized'));
+      return;
+    }
+
+    final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    try {
+      // Start video recording first, then image stream
+      await _recordingService.startRecording(controller, sessionId);
+
+      emit(
+        Recording(
+          cameraController: controller,
+          isFrontCamera:
+              _cameraService.currentLensDirection == CameraLensDirection.front,
+        ),
+      );
+
+      // Start image streaming for pose tracking alongside video recording
+      _startImageStream();
+
+      // Timer to update recording duration via event
+      _recordingTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        if (state is Recording) {
+          add(RecordingTickEvent());
+        }
+      });
+
+      Logger.info('Bloc', 'Recording started (session: $sessionId)');
+    } catch (e) {
+      Logger.error('Bloc', 'ERROR starting recording: $e');
+      _recordingService.reset();
+      emit(PoseDetectionError('Failed to start recording: $e'));
+    }
+  }
+
+  Future<void> _onStopRecording(
+    StopRecordingEvent event,
+    Emitter<PoseDetectionState> emit,
+  ) async {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+
+    _cameraService.stopImageStream();
+    _isStreamingActive = false;
+
+    emit(SavingSession());
+
+    try {
+      final controller = _cameraService.controller;
+      if (controller == null) {
+        throw Exception('Camera controller not available');
+      }
+
+      final result = await _recordingService.stopRecording(controller);
+
+      final now = DateTime.now();
+      final session = Session(
+        id: now.millisecondsSinceEpoch.toString(),
+        title: event.title,
+        createdAt: now,
+        durationMs: result.duration.inMilliseconds,
+        videoPath: result.videoPath,
+        frameCount: result.frames.length,
+        isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
+        isLandscape: _cameraService.currentOrientation != DeviceOrientation.portraitUp,
+      );
+
+      await _sessionRepository.saveSession(session, result.frames);
+
+      Logger.info('Bloc', 'Session saved: ${session.id} (${result.frames.length} frames)');
+      emit(SessionSaved(session.id));
+    } catch (e) {
+      Logger.error('Bloc', 'ERROR saving session: $e');
+      emit(PoseDetectionError('Failed to save session: $e'));
+    }
+  }
+
+  void _onRecordingTick(
+    RecordingTickEvent event,
+    Emitter<PoseDetectionState> emit,
+  ) {
+    if (state is Recording) {
+      emit(
+        (state as Recording).copyWith(
+          recordingDuration: _recordingService.recordingDuration,
+          frameCount: _recordingService.frameCount,
+        ),
+      );
+    }
+  }
+
   Future<void> _onSwitchCamera(
     SwitchCameraEvent event,
     Emitter<PoseDetectionState> emit,
   ) async {
     if (!_cameraService.canSwitchCamera) return;
+    // Don't allow camera switch during recording
+    if (state is Recording) return;
 
     final wasDetecting = state is Detecting;
     final previousPose = wasDetecting ? (state as Detecting).currentPose : null;
@@ -172,26 +298,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       }
 
       if (wasDetecting) {
-        // Restart image stream for detection
-        final cameraDescription = _cameraService.getCameraDescription();
-        if (cameraDescription != null && !_isStreamingActive) {
-          _isStreamingActive = true;
-          _cameraService.startImageStream((image) {
-            if (_isStreamingActive) {
-              final timestampMicros = DateTime.now().microsecondsSinceEpoch;
-
-              if (!_isProcessingFrame) {
-                add(
-                  ProcessFrameEvent(
-                    image,
-                    cameraDescription.sensorOrientation,
-                    timestampMicros,
-                  ),
-                );
-              }
-            }
-          });
-        }
+        _startImageStream();
 
         emit(
           Detecting(
@@ -239,26 +346,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       }
 
       if (wasDetecting) {
-        // Restart image stream for detection
-        final cameraDescription = _cameraService.getCameraDescription();
-        if (cameraDescription != null && !_isStreamingActive) {
-          _isStreamingActive = true;
-          _cameraService.startImageStream((image) {
-            if (_isStreamingActive) {
-              final timestampMicros = DateTime.now().microsecondsSinceEpoch;
-
-              if (!_isProcessingFrame) {
-                add(
-                  ProcessFrameEvent(
-                    image,
-                    cameraDescription.sensorOrientation,
-                    timestampMicros,
-                  ),
-                );
-              }
-            }
-          });
-        }
+        _startImageStream();
 
         emit(
           Detecting(
@@ -298,12 +386,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       if (result.success) {
         _errorTracker.recordSuccess();
-        _recordFrame();
+        _recordFpsFrame();
         _lastLatencyMs = result.latencyMs;
 
-        if (state is Detecting) {
-          final personDetection = _personValidator.validate(result.pose);
+        final personDetection = _personValidator.validate(result.pose);
 
+        if (state is Detecting) {
           emit(
             (state as Detecting).copyWith(
               currentPose: result.pose,
@@ -316,6 +404,21 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
                   _cameraService.currentLensDirection ==
                   CameraLensDirection.front,
               personDetection: personDetection,
+            ),
+          );
+        } else if (state is Recording) {
+          // Record frame data for the session
+          _recordingService.recordFrame(result.pose, personDetection);
+
+          emit(
+            (state as Recording).copyWith(
+              currentPose: result.pose,
+              metrics: DetectionMetrics(
+                fps: _calculateFps(),
+                latencyMs: _lastLatencyMs,
+              ),
+              personDetection: personDetection,
+              frameCount: _recordingService.frameCount,
             ),
           );
         }
@@ -347,6 +450,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     DisposeEvent event,
     Emitter<PoseDetectionState> emit,
   ) async {
+    _recordingTimer?.cancel();
     _cameraService.dispose();
     _frameProcessor.dispose();
   }

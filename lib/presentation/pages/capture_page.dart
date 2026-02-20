@@ -1,19 +1,17 @@
-import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
+import 'package:pose_detection/domain/models/detected_pose.dart';
+import 'package:pose_detection/domain/models/person_detection_result.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_state.dart';
 import 'package:pose_detection/presentation/widgets/camera_preview_widget.dart';
 import 'package:pose_detection/presentation/widgets/pose_painter.dart';
 
-/// Fullscreen camera capture page with pose overlay
-/// Single-screen app with start/stop detection controls
+/// Fullscreen camera capture page with pose overlay and recording.
 class CapturePage extends StatefulWidget {
   const CapturePage({super.key});
 
@@ -29,14 +27,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
 
-    // Lock to portrait mode
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
-
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     WidgetsBinding.instance.addObserver(this);
 
-    // Initialize BLoC from service locator
     _bloc = sl<PoseDetectionBloc>();
     _bloc.add(InitializeEvent());
   }
@@ -53,7 +46,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _bloc.add(DisposeEvent());
     _bloc.close();
-    // Reset to allow all orientations on dispose
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -72,11 +64,8 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         ? DeviceOrientation.portraitUp
         : DeviceOrientation.landscapeLeft;
 
-    // Update system orientation
     if (_isPortrait) {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-      ]);
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     } else {
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
@@ -84,64 +73,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       ]);
     }
 
-    // Trigger camera reinitialization via BLoC
     _bloc.add(ChangeOrientationEvent(newOrientation));
-  }
-
-  // DEBUG: Capture frame and save to gallery
-  Future<void> _captureFrame(CameraController controller) async {
-    try {
-      final XFile file = await controller.takePicture();
-      final bytes = await File(file.path).readAsBytes();
-
-      // Decode image to get actual dimensions
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      final int width = frame.image.width;
-      final int height = frame.image.height;
-      final bool isActuallyPortrait = height > width;
-
-      final result = await ImageGallerySaver.saveImage(
-        bytes,
-        name:
-            'pose_debug_${_isPortrait ? "portrait" : "landscape"}_${width}x$height',
-      );
-
-      // Log for debugging
-      debugPrint('========================================');
-      debugPrint('DEBUG CAPTURE:');
-      debugPrint('  UI Mode: ${_isPortrait ? "PORTRAIT" : "LANDSCAPE"}');
-      debugPrint('  Image Size: ${width}x$height');
-      debugPrint(
-        '  Actual Orientation: ${isActuallyPortrait ? "PORTRAIT" : "LANDSCAPE"}',
-      );
-      debugPrint(
-        '  Match: ${_isPortrait == isActuallyPortrait ? "YES" : "NO !!!"}',
-      );
-      debugPrint('  Saved: $result');
-      debugPrint('========================================');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${width}x$height (${isActuallyPortrait ? "Portrait" : "Landscape"}) ${_isPortrait == isActuallyPortrait ? "" : "MISMATCH!"}',
-            ),
-            backgroundColor: _isPortrait == isActuallyPortrait
-                ? Colors.green
-                : Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('DEBUG: Failed to capture: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e')),
-        );
-      }
-    }
   }
 
   @override
@@ -150,34 +82,38 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       value: _bloc,
       child: Scaffold(
         backgroundColor: const Color(0xFF121212),
-        body: BlocBuilder<PoseDetectionBloc, PoseDetectionState>(
+        body: BlocConsumer<PoseDetectionBloc, PoseDetectionState>(
+          listener: (context, state) {
+            if (state is SessionSaved) {
+              Navigator.pop(context, true);
+            }
+          },
           builder: (context, state) {
-            // Handle initialization states
             if (state is PoseDetectionInitial || state is CameraInitializing) {
               return _buildLoadingView();
             }
-
-            // Handle error state
             if (state is PoseDetectionError) {
               return _buildErrorView(state.message);
             }
-
-            // Handle CameraReady state (idle, not detecting)
             if (state is CameraReady) {
               return _buildIdleView(state);
             }
-
-            // Handle Detecting state (active detection)
-            if (state is Detecting) {
-              return _buildDetectingView(state);
+            if (state is Recording) {
+              return _buildRecordingView(state);
             }
-
+            if (state is SavingSession) {
+              return _buildSavingView();
+            }
             return const SizedBox.shrink();
           },
         ),
       ),
     );
   }
+
+  // ============================================================
+  // VIEWS
+  // ============================================================
 
   Widget _buildLoadingView() {
     return const Center(
@@ -236,11 +172,26 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildSavingView() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Color(0xFF4CAF50)),
+          SizedBox(height: 24),
+          Text(
+            'Saving session...',
+            style: TextStyle(color: Color(0xFF888888), fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildIdleView(CameraReady state) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Camera preview (clean, no overlays)
         CameraPreviewWidget(
           cameraController: state.cameraController,
           isFrontCamera:
@@ -248,43 +199,41 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
               CameraLensDirection.front,
           isLandscape: !_isPortrait,
         ),
-
-        // Back button (top-left)
         _buildBackButton(),
-
-        // Bottom controls with Start button
         _buildIdleControls(state),
       ],
     );
   }
 
-  Widget _buildDetectingView(Detecting state) {
+  Widget _buildRecordingView(Recording state) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Camera preview
         CameraPreviewWidget(
           cameraController: state.cameraController,
           isFrontCamera: state.isFrontCamera,
           isLandscape: !_isPortrait,
         ),
 
-        // Pose overlay (skeleton) - only show when person is detected
-        if (state.currentPose != null &&
-            state.personDetection.isPersonDetected)
-          _buildPoseOverlay(state),
+        // Pose overlay
+        if (state.currentPose != null && state.personDetection.isPersonDetected)
+          _buildPoseOverlayFromRecording(state),
 
         // Back button (top-left)
         _buildBackButton(),
 
-        // Person-in-view indicator (small icon, top-left but offset)
-        _buildPersonIndicator(state),
+        // Person indicator (top-right)
+        _buildPersonIndicatorFromResult(state.personDetection),
 
-        // Bottom controls with Stop button
-        _buildDetectingControls(state),
+        // Bottom: recording time (left) + stop button (right)
+        _buildRecordingControls(state),
       ],
     );
   }
+
+  // ============================================================
+  // OVERLAYS & INDICATORS
+  // ============================================================
 
   Widget _buildBackButton() {
     return SafeArea(
@@ -301,7 +250,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
-                Icons.arrow_back,
+                Icons.arrow_back_rounded,
                 color: Color(0xFF888888),
                 size: 24,
               ),
@@ -312,9 +261,15 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildPoseOverlay(Detecting state) {
+  Widget _buildPoseOverlayFromRecording(Recording state) {
+    return _buildPoseOverlay(
+      state.currentPose!,
+      state.isFrontCamera,
+    );
+  }
+
+  Widget _buildPoseOverlay(DetectedPose pose, bool isFrontCamera) {
     final screenSize = MediaQuery.of(context).size;
-    final pose = state.currentPose!;
 
     Widget overlay = SizedBox.expand(
       child: CustomPaint(
@@ -326,20 +281,17 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       ),
     );
 
-    // Mirror the pose overlay for front camera (to match mirrored preview)
-    if (state.isFrontCamera) {
-      overlay = Transform.flip(
-        flipX: true,
-        child: overlay,
-      );
+    if (isFrontCamera) {
+      overlay = Transform.flip(flipX: true, child: overlay);
     }
 
     return overlay;
   }
 
-  /// Small icon indicator for person-in-view status (top-right)
-  Widget _buildPersonIndicator(Detecting state) {
-    final isPersonDetected = state.personDetection.isPersonDetected;
+  Widget _buildPersonIndicatorFromResult(
+    PersonDetectionResult personDetection,
+  ) {
+    final isPersonDetected = personDetection.isPersonDetected;
 
     return SafeArea(
       child: Align(
@@ -353,7 +305,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              isPersonDetected ? Icons.person : Icons.person_off,
+              isPersonDetected
+                  ? Icons.person_rounded
+                  : Icons.person_off_rounded,
               color: isPersonDetected
                   ? const Color(0xFF4CAF50)
                   : const Color(0xFFFF5252),
@@ -363,6 +317,68 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  // ============================================================
+  // DIALOGS
+  // ============================================================
+
+  void _showSaveSessionDialog() {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          'Session speichern',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Session Name',
+            hintStyle: TextStyle(color: Color(0xFF666666)),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF444444)),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF4CAF50)),
+            ),
+          ),
+          onSubmitted: (value) {
+            Navigator.pop(context);
+            final title = value.trim().isEmpty
+                ? _defaultSessionTitle()
+                : value.trim();
+            _bloc.add(StopRecordingEvent(title: title));
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              final title = controller.text.trim().isEmpty
+                  ? _defaultSessionTitle()
+                  : controller.text.trim();
+              _bloc.add(StopRecordingEvent(title: title));
+            },
+            child: const Text(
+              'Speichern',
+              style: TextStyle(color: Color(0xFF4CAF50)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _defaultSessionTitle() {
+    final now = DateTime.now();
+    return 'Session ${now.day}.${now.month}.${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
   // ============================================================
@@ -378,25 +394,29 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Left side controls
               Row(
                 children: [
-                  // Camera switch button
-                  _buildCameraSwitchButton(
-                    state.cameraController.description.lensDirection ==
-                        CameraLensDirection.front,
-                  ),
+                  _buildCameraSwitchButton(),
                   const SizedBox(width: 16),
-                  // Orientation switch button
                   _buildOrientationSwitchButton(),
-                  // const SizedBox(width: 16),
-                  // DEBUG: Capture button
-                  // _buildCaptureButton(state.cameraController),
                 ],
               ),
-
-              // Start button
-              _buildStartButton(),
+              // Green play button — starts recording
+              GestureDetector(
+                onTap: () => _bloc.add(StartRecordingEvent()),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -404,7 +424,11 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildDetectingControls(Detecting state) {
+  Widget _buildRecordingControls(Recording state) {
+    final duration = state.recordingDuration;
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
@@ -413,23 +437,57 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Left side controls
-              Row(
-                children: [
-                  // Camera switch button
-                  if (state.canSwitchCamera)
-                    _buildCameraSwitchButton(state.isFrontCamera),
-                  if (state.canSwitchCamera) const SizedBox(width: 16),
-                  // Orientation switch button
-                  _buildOrientationSwitchButton(),
-                  // const SizedBox(width: 16),
-                  // DEBUG: Capture button
-                  // _buildCaptureButton(state.cameraController),
-                ],
+              // Recording time indicator (replaces camera/orientation buttons)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF5252),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
-              // Stop button
-              _buildStopButton(),
+              // Red stop button
+              GestureDetector(
+                onTap: _showSaveSessionDialog,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF5252),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const Icon(
+                    Icons.stop_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -437,51 +495,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildStartButton() {
+  Widget _buildCameraSwitchButton() {
     return GestureDetector(
-      onTap: () {
-        _bloc.add(StartCaptureEvent());
-      },
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF4CAF50),
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: const Icon(
-          Icons.play_arrow,
-          color: Colors.white,
-          size: 24,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStopButton() {
-    return GestureDetector(
-      onTap: () {
-        _bloc.add(StopCaptureEvent());
-      },
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFF5252),
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: const Icon(
-          Icons.stop,
-          color: Colors.white,
-          size: 24,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCameraSwitchButton(bool isFrontCamera) {
-    return GestureDetector(
-      onTap: () {
-        _bloc.add(SwitchCameraEvent());
-      },
+      onTap: () => _bloc.add(SwitchCameraEvent()),
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
@@ -489,7 +505,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           borderRadius: BorderRadius.circular(99),
         ),
         child: const Icon(
-          Icons.flip_camera_ios,
+          Icons.flip_camera_ios_rounded,
           color: Color(0xFF888888),
           size: 24,
         ),
@@ -508,28 +524,9 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         ),
         child: Icon(
           _isPortrait
-              ? Icons.stay_current_landscape
-              : Icons.stay_current_portrait,
+              ? Icons.stay_current_landscape_rounded
+              : Icons.stay_current_portrait_rounded,
           color: const Color(0xFF888888),
-          size: 24,
-        ),
-      ),
-    );
-  }
-
-  // DEBUG: Capture button
-  Widget _buildCaptureButton(CameraController controller) {
-    return GestureDetector(
-      onTap: () => _captureFrame(controller),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFF9800).withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: const Icon(
-          Icons.camera_alt,
-          color: Colors.white,
           size: 24,
         ),
       ),

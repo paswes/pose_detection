@@ -65,6 +65,64 @@ class Detecting extends PoseDetectionState {
   List<Object?> get props => [cameraController, currentPose, metrics, canSwitchCamera, isFrontCamera, personDetection];
 }
 
+/// Actively recording a session (video + pose tracking)
+class Recording extends PoseDetectionState {
+  final CameraController cameraController;
+  final DetectedPose? currentPose;
+  final DetectionMetrics metrics;
+  final bool isFrontCamera;
+  final PersonDetectionResult personDetection;
+  final Duration recordingDuration;
+  final int frameCount;
+
+  Recording({
+    required this.cameraController,
+    this.currentPose,
+    this.metrics = const DetectionMetrics(),
+    this.isFrontCamera = false,
+    PersonDetectionResult? personDetection,
+    this.recordingDuration = Duration.zero,
+    this.frameCount = 0,
+  }) : personDetection = personDetection ?? PersonDetectionResult.noPose();
+
+  Recording copyWith({
+    DetectedPose? currentPose,
+    DetectionMetrics? metrics,
+    PersonDetectionResult? personDetection,
+    Duration? recordingDuration,
+    int? frameCount,
+  }) {
+    return Recording(
+      cameraController: cameraController,
+      currentPose: currentPose ?? this.currentPose,
+      metrics: metrics ?? this.metrics,
+      isFrontCamera: isFrontCamera,
+      personDetection: personDetection ?? this.personDetection,
+      recordingDuration: recordingDuration ?? this.recordingDuration,
+      frameCount: frameCount ?? this.frameCount,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    cameraController, currentPose, metrics, isFrontCamera,
+    personDetection, recordingDuration, frameCount,
+  ];
+}
+
+/// Session saved successfully after recording
+class SessionSaved extends PoseDetectionState {
+  final String sessionId;
+
+  SessionSaved(this.sessionId);
+
+  @override
+  List<Object?> get props => [sessionId];
+}
+
+/// Saving session in progress
+class SavingSession extends PoseDetectionState {}
+
 /// Error state
 class PoseDetectionError extends PoseDetectionState {
   final String message;

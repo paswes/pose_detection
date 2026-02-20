@@ -54,7 +54,7 @@ class PoseDetectionService implements IPoseDetector {
             x: entry.value.x,
             y: entry.value.y,
             z: entry.value.z,
-            confidence: entry.value.likelihood,
+            likelihood: entry.value.likelihood,
           );
         })
         .toList(growable: false);
@@ -73,13 +73,17 @@ class PoseDetectionService implements IPoseDetector {
     );
     if (imageRotation == null) return null;
 
-    // For iOS with BGRA8888 format
+    // iOS: BGRA8888 format, single plane
     if (Platform.isIOS) {
       final plane = image.planes.first;
       return InputImage.fromBytes(
         bytes: plane.bytes,
         metadata: InputImageMetadata(
           size: Size(image.width.toDouble(), image.height.toDouble()),
+          // Required by InputImageMetadata constructor but explicitly
+          // ignored on iOS per google_mlkit_commons documentation.
+          // ML Kit iOS returns landmarks in raw camera buffer pixel space
+          // regardless of this value.
           rotation: imageRotation,
           format: InputImageFormat.bgra8888,
           bytesPerRow: plane.bytesPerRow,

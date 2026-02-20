@@ -1,14 +1,16 @@
+import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
 import 'package:pose_detection/domain/models/detected_pose.dart';
 import 'package:pose_detection/domain/models/landmark.dart';
 import 'package:pose_detection/domain/models/person_detection_result.dart';
 
-/// Validates if a detected pose represents a real person
+/// Validates if a detected pose represents a real person.
 ///
-/// ML Kit returns poses even for objects (cables, desks, etc.) with high confidence.
-/// This validator applies multiple geometric and proportion checks:
+/// ML Kit returns poses even for objects (cables, desks, etc.) with high
+/// likelihood. This validator applies multiple geometric and proportion
+/// checks using landmark IDs from [LandmarkSchema]:
 ///
-/// 1. Core landmark confidence (nose, shoulders, hips)
+/// 1. Core landmark likelihood (nose, shoulders, hips)
 /// 2. Geometric plausibility (head > shoulders > hips)
 /// 3. Minimum size requirements
 /// 4. Shoulder symmetry
@@ -16,7 +18,8 @@ import 'package:pose_detection/domain/models/person_detection_result.dart';
 /// 6. Neck proportion
 /// 7. Face parts detection (eyes, ears)
 class PersonValidator implements IPersonValidator {
-  static const double _minConfidence = 0.5;
+  // Validation thresholds
+  static const double _minLikelihood = 0.5;
   static const double _minShoulderWidth = 40.0;
   static const double _minTorsoLength = 60.0;
   static const double _maxSymmetryRatio = 0.3;
@@ -32,27 +35,27 @@ class PersonValidator implements IPersonValidator {
       return PersonDetectionResult.noPose();
     }
 
-    // Get core landmarks
-    final nose = _getLandmark(pose, 0);
-    final leftShoulder = _getLandmark(pose, 11);
-    final rightShoulder = _getLandmark(pose, 12);
-    final leftHip = _getLandmark(pose, 23);
-    final rightHip = _getLandmark(pose, 24);
+    // Core landmarks
+    final nose = _getLandmark(pose, LandmarkSchema.nose);
+    final leftShoulder = _getLandmark(pose, LandmarkSchema.leftShoulder);
+    final rightShoulder = _getLandmark(pose, LandmarkSchema.rightShoulder);
+    final leftHip = _getLandmark(pose, LandmarkSchema.leftHip);
+    final rightHip = _getLandmark(pose, LandmarkSchema.rightHip);
 
-    // Get face landmarks
-    final leftEye = _getLandmark(pose, 2);
-    final rightEye = _getLandmark(pose, 5);
-    final leftEar = _getLandmark(pose, 7);
-    final rightEar = _getLandmark(pose, 8);
+    // Face landmarks
+    final leftEye = _getLandmark(pose, LandmarkSchema.leftEye);
+    final rightEye = _getLandmark(pose, LandmarkSchema.rightEye);
+    final leftEar = _getLandmark(pose, LandmarkSchema.leftEar);
+    final rightEar = _getLandmark(pose, LandmarkSchema.rightEar);
 
-    // Check core landmark confidence
-    final hasAllConfidence = _hasMinConfidence(nose) &&
-        _hasMinConfidence(leftShoulder) &&
-        _hasMinConfidence(rightShoulder) &&
-        _hasMinConfidence(leftHip) &&
-        _hasMinConfidence(rightHip);
+    // Check core landmark likelihood
+    final hasAllLikelihood = _hasMinLikelihood(nose) &&
+        _hasMinLikelihood(leftShoulder) &&
+        _hasMinLikelihood(rightShoulder) &&
+        _hasMinLikelihood(leftHip) &&
+        _hasMinLikelihood(rightHip);
 
-    if (!hasAllConfidence) {
+    if (!hasAllLikelihood) {
       return PersonDetectionResult.noPose();
     }
 
@@ -88,10 +91,10 @@ class PersonValidator implements IPersonValidator {
 
     // Face parts detection
     int facePartsDetected = 0;
-    if (_hasMinConfidence(leftEye)) facePartsDetected++;
-    if (_hasMinConfidence(rightEye)) facePartsDetected++;
-    if (_hasMinConfidence(leftEar)) facePartsDetected++;
-    if (_hasMinConfidence(rightEar)) facePartsDetected++;
+    if (_hasMinLikelihood(leftEye)) facePartsDetected++;
+    if (_hasMinLikelihood(rightEye)) facePartsDetected++;
+    if (_hasMinLikelihood(leftEar)) facePartsDetected++;
+    if (_hasMinLikelihood(rightEar)) facePartsDetected++;
     final faceOk = facePartsDetected >= _minFaceParts;
 
     // Final decision: all checks must pass
@@ -129,7 +132,7 @@ class PersonValidator implements IPersonValidator {
     return pose.landmarks.where((l) => l.id == id).firstOrNull;
   }
 
-  bool _hasMinConfidence(Landmark? landmark) {
-    return landmark != null && landmark.confidence >= _minConfidence;
+  bool _hasMinLikelihood(Landmark? landmark) {
+    return landmark != null && landmark.likelihood >= _minLikelihood;
   }
 }

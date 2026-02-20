@@ -226,6 +226,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
     _cameraService.stopImageStream();
     _isStreamingActive = false;
+    _isProcessingFrame = false;
 
     try {
       final controller = _cameraService.controller;
@@ -416,43 +417,34 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         _recordFpsFrame();
         _lastLatencyMs = result.latencyMs;
 
+        // Only process frames during active recording.
+        // Detection is not needed in idle/preview states.
+        if (state is! Recording) return;
+
         final personDetection = _personValidator.validate(result.pose);
 
-        if (state is Detecting) {
-          emit(
-            (state as Detecting).copyWith(
-              currentPose: result.pose,
-              metrics: DetectionMetrics(
-                fps: _calculateFps(),
-                latencyMs: _lastLatencyMs,
-              ),
-              canSwitchCamera: _cameraService.canSwitchCamera,
-              isFrontCamera:
-                  _cameraService.currentLensDirection ==
-                  CameraLensDirection.front,
-              personDetection: personDetection,
-            ),
-          );
-        } else if (state is Recording) {
-          // Record frame data using original capture timestamp (not post-detection)
+        // Only record frames with a validated person detection.
+        // This ensures stored data matches what is painted on screen.
+        if (personDetection.isPersonDetected) {
           _recordingService.recordFrame(
             result.pose,
             personDetection,
             event.timestampMicros,
           );
-
-          emit(
-            (state as Recording).copyWith(
-              currentPose: result.pose,
-              metrics: DetectionMetrics(
-                fps: _calculateFps(),
-                latencyMs: _lastLatencyMs,
-              ),
-              personDetection: personDetection,
-              frameCount: _recordingService.frameCount,
-            ),
-          );
         }
+
+        emit(
+          (state as Recording).copyWith(
+            currentPose: personDetection.isPersonDetected ? result.pose : null,
+            clearPose: !personDetection.isPersonDetected,
+            metrics: DetectionMetrics(
+              fps: _calculateFps(),
+              latencyMs: _lastLatencyMs,
+            ),
+            personDetection: personDetection,
+            frameCount: _recordingService.frameCount,
+          ),
+        );
       } else {
         _handleError(emit, result.error ?? 'Unknown error');
       }

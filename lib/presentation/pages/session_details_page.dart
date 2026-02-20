@@ -283,7 +283,7 @@ class _VideoWithOverlay extends StatelessWidget {
         x: (l.x / rawW) * videoSize.width,
         y: (l.y / rawH) * videoSize.height,
         z: l.z,
-        confidence: l.confidence,
+        likelihood: l.likelihood,
       );
     }).toList();
 

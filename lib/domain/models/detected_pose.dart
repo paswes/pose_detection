@@ -20,21 +20,21 @@ class DetectedPose {
     required this.timestampMicros,
   });
 
-  /// Average confidence across all landmarks
-  double get avgConfidence {
+  /// Average inFrameLikelihood across all landmarks
+  double get avgLikelihood {
     if (landmarks.isEmpty) return 0.0;
-    return landmarks.fold(0.0, (sum, l) => sum + l.confidence) /
+    return landmarks.fold(0.0, (sum, l) => sum + l.likelihood) /
         landmarks.length;
   }
 
   /// Number of landmarks
   int get landmarkCount => landmarks.length;
 
-  /// Count of landmarks with confidence > 0.8
-  int get highConfidenceLandmarks =>
-      landmarks.where((l) => l.confidence > 0.8).length;
+  /// Count of landmarks with high likelihood (> 0.8)
+  int get highLikelihoodCount =>
+      landmarks.where((l) => l.likelihood > 0.8).length;
 
-  /// Count of landmarks with confidence < 0.5
-  int get lowConfidenceLandmarks =>
-      landmarks.where((l) => l.confidence < 0.5).length;
+  /// Count of landmarks with low likelihood (< 0.5)
+  int get lowLikelihoodCount =>
+      landmarks.where((l) => l.likelihood < 0.5).length;
 }

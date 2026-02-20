@@ -58,7 +58,7 @@ class RecordingService {
       timestampMicros: captureTimestampMicros - videoStart,
       landmarks: pose.landmarks.map((l) => LandmarkData.fromLandmark(l)).toList(),
       isPersonDetected: personDetection.isPersonDetected,
-      personConfidence: pose.avgConfidence,
+      personConfidence: pose.avgLikelihood,
     );
 
     _frames.add(frame);

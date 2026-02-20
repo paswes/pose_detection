@@ -87,6 +87,7 @@ class Recording extends PoseDetectionState {
 
   Recording copyWith({
     DetectedPose? currentPose,
+    bool clearPose = false,
     DetectionMetrics? metrics,
     PersonDetectionResult? personDetection,
     Duration? recordingDuration,
@@ -94,7 +95,7 @@ class Recording extends PoseDetectionState {
   }) {
     return Recording(
       cameraController: cameraController,
-      currentPose: currentPose ?? this.currentPose,
+      currentPose: clearPose ? null : (currentPose ?? this.currentPose),
       metrics: metrics ?? this.metrics,
       isFrontCamera: isFrontCamera,
       personDetection: personDetection ?? this.personDetection,

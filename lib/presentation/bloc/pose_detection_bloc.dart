@@ -257,16 +257,21 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     emit(SavingSession());
 
     try {
-      final now = DateTime.now();
+      final sensorOrientation =
+          _cameraService.getCameraDescription()?.sensorOrientation ?? 90;
+
       final session = Session(
-        id: now.millisecondsSinceEpoch.toString(),
+        id: result.sessionId,
         title: event.title,
-        createdAt: now,
+        createdAt: DateTime.now(),
         durationMs: result.duration.inMilliseconds,
         videoPath: result.videoPath,
         frameCount: result.frames.length,
         isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
         isLandscape: _cameraService.currentOrientation != DeviceOrientation.portraitUp,
+        imageWidth: result.imageSize.width,
+        imageHeight: result.imageSize.height,
+        sensorOrientation: sensorOrientation,
       );
 
       await _sessionRepository.saveSession(session, result.frames);
@@ -429,8 +434,12 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
             ),
           );
         } else if (state is Recording) {
-          // Record frame data for the session
-          _recordingService.recordFrame(result.pose, personDetection);
+          // Record frame data using original capture timestamp (not post-detection)
+          _recordingService.recordFrame(
+            result.pose,
+            personDetection,
+            event.timestampMicros,
+          );
 
           emit(
             (state as Recording).copyWith(

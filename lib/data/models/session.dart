@@ -8,6 +8,9 @@ class Session {
   final int frameCount;
   final bool isFrontCamera;
   final bool isLandscape;
+  final double imageWidth;
+  final double imageHeight;
+  final int sensorOrientation;
 
   const Session({
     required this.id,
@@ -18,6 +21,9 @@ class Session {
     required this.frameCount,
     required this.isFrontCamera,
     required this.isLandscape,
+    this.imageWidth = 0,
+    this.imageHeight = 0,
+    this.sensorOrientation = 90,
   });
 
   Duration get duration => Duration(milliseconds: durationMs);
@@ -31,6 +37,9 @@ class Session {
     'frame_count': frameCount,
     'is_front_camera': isFrontCamera ? 1 : 0,
     'is_landscape': isLandscape ? 1 : 0,
+    'image_width': imageWidth,
+    'image_height': imageHeight,
+    'sensor_orientation': sensorOrientation,
   };
 
   factory Session.fromMap(Map<String, dynamic> map) {
@@ -43,6 +52,9 @@ class Session {
       frameCount: map['frame_count'] as int,
       isFrontCamera: (map['is_front_camera'] as int) == 1,
       isLandscape: (map['is_landscape'] as int) == 1,
+      imageWidth: (map['image_width'] as num?)?.toDouble() ?? 0,
+      imageHeight: (map['image_height'] as num?)?.toDouble() ?? 0,
+      sensorOrientation: (map['sensor_orientation'] as int?) ?? 90,
     );
   }
 }

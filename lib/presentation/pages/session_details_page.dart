@@ -8,6 +8,7 @@ import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 import 'package:pose_detection/domain/models/detected_pose.dart';
+import 'package:pose_detection/domain/models/landmark.dart';
 import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_details_state.dart';
 import 'package:pose_detection/presentation/widgets/pose_painter.dart';
@@ -207,6 +208,30 @@ class _VideoWithOverlay extends StatelessWidget {
               constraints.maxHeight,
             );
 
+            final frame = state.currentFrame;
+
+            Widget? overlay;
+            if (frame != null && frame.isPersonDetected) {
+              final pose = _buildPoseForPlayback(
+                frame,
+                videoSize,
+                state.session,
+              );
+
+              overlay = CustomPaint(
+                size: widgetSize,
+                painter: PosePainter(
+                  pose: pose,
+                  imageSize: videoSize,
+                  widgetSize: widgetSize,
+                ),
+              );
+
+              if (state.session.isFrontCamera) {
+                overlay = Transform.flip(flipX: true, child: overlay);
+              }
+            }
+
             return Stack(
               fit: StackFit.expand,
               children: [
@@ -221,19 +246,7 @@ class _VideoWithOverlay extends StatelessWidget {
                   ),
                 ),
                 // Landmark overlay
-                if (state.currentFrame != null &&
-                    state.currentFrame!.isPersonDetected)
-                  CustomPaint(
-                    size: widgetSize,
-                    painter: PosePainter(
-                      pose: _buildDetectedPose(
-                        state.currentFrame!,
-                        videoSize,
-                      ),
-                      imageSize: videoSize,
-                      widgetSize: widgetSize,
-                    ),
-                  ),
+                if (overlay != null) overlay,
               ],
             );
           },
@@ -242,9 +255,34 @@ class _VideoWithOverlay extends StatelessWidget {
     );
   }
 
-  DetectedPose _buildDetectedPose(TrackedFrame frame, ui.Size videoSize) {
+  /// Builds a [DetectedPose] for playback by normalizing raw ML Kit buffer
+  /// coordinates into video pixel space.
+  ///
+  /// ML Kit on iOS returns landmarks in raw camera buffer space (e.g. 1920x1080
+  /// landscape). The recorded video is in visual orientation (e.g. 1080x1920
+  /// portrait). We normalize coordinates proportionally so they map correctly
+  /// to the video frame, then PosePainter applies BoxFit.cover from videoSize
+  /// to widgetSize — matching the video FittedBox exactly.
+  DetectedPose _buildPoseForPlayback(
+    TrackedFrame frame,
+    ui.Size videoSize,
+    Session session,
+  ) {
+    final rawW = session.imageWidth;
+    final rawH = session.imageHeight;
+
+    final landmarks = frame.landmarks.map((l) {
+      return Landmark(
+        id: l.id,
+        x: (l.x / rawW) * videoSize.width,
+        y: (l.y / rawH) * videoSize.height,
+        z: l.z,
+        confidence: l.confidence,
+      );
+    }).toList();
+
     return DetectedPose(
-      landmarks: frame.landmarks.map((l) => l.toLandmark()).toList(),
+      landmarks: landmarks,
       imageSize: videoSize,
       timestampMicros: frame.timestampMicros,
     );

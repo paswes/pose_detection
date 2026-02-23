@@ -544,7 +544,7 @@ class _RepPillRow extends StatelessWidget {
   /// Must match the Slider's internal track offset:
   /// max(overlayRadius, thumbRadius) = max(0, 8) = 8.
   static const _trackPadding = 8.0;
-  static const _markerDiameter = 22.0;
+  static const _markerDiameter = 28.0;
 
   const _RepPillRow({required this.cubit, required this.state});
 
@@ -557,6 +557,7 @@ class _RepPillRow extends StatelessWidget {
         painter: _RepCirclePainter(
           reps: state.reps,
           totalFrames: state.totalFrames,
+          activeRepNumber: _VideoWithOverlay._currentRepNumber(state),
         ),
         child: const SizedBox(height: _markerDiameter, width: double.infinity),
       ),
@@ -584,11 +585,18 @@ class _RepPillRow extends StatelessWidget {
 class _RepCirclePainter extends CustomPainter {
   final List<RdlRepData> reps;
   final int totalFrames;
+  final int activeRepNumber;
 
   static const _trackPadding = 8.0;
-  static const _diameter = 22.0;
+  static const _diameter = 28.0;
+  static const _activeColor = Color(0xFF4CAF50);
+  static const _inactiveColor = Color(0xFF2A2A2A);
 
-  _RepCirclePainter({required this.reps, required this.totalFrames});
+  _RepCirclePainter({
+    required this.reps,
+    required this.totalFrames,
+    required this.activeRepNumber,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -596,20 +604,22 @@ class _RepCirclePainter extends CustomPainter {
 
     final trackWidth = size.width - _trackPadding * 2;
     final maxFrames = totalFrames - 1;
-    final circlePaint = Paint()..color = const Color(0xFF2A2A2A);
     final cy = size.height / 2;
 
     for (final rep in reps) {
       final cx = _trackPadding + (rep.startFrameIndex / maxFrames) * trackWidth;
+      final isActive = rep.repNumber <= activeRepNumber;
 
+      final circlePaint = Paint()
+        ..color = isActive ? _activeColor : _inactiveColor;
       canvas.drawCircle(Offset(cx, cy), _diameter / 2, circlePaint);
 
       final tp = TextPainter(
         text: TextSpan(
           text: '${rep.repNumber}',
-          style: const TextStyle(
-            color: Color(0xFF888888),
-            fontSize: 10,
+          style: TextStyle(
+            color: isActive ? Colors.white : const Color(0xFF888888),
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             height: 1,
           ),
@@ -623,7 +633,9 @@ class _RepCirclePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RepCirclePainter old) =>
-      old.reps.length != reps.length || old.totalFrames != totalFrames;
+      old.reps.length != reps.length ||
+      old.totalFrames != totalFrames ||
+      old.activeRepNumber != activeRepNumber;
 }
 
 class _ControlButton extends StatelessWidget {

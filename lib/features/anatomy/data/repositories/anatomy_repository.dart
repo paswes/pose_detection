@@ -13,49 +13,19 @@ class AnatomyRepository implements IAnatomyRepository {
     // ── FRONT VIEW ──────────────────────────────────────────────
 
     MuscleGroup(
-      id: 'chest',
-      nameDE: 'Brustmuskel',
-      nameLatin: 'M. pectoralis major',
+      id: 'traps',
+      nameDE: 'Trapezmuskel',
+      nameLatin: 'M. trapezius',
       view: BodyView.front,
-      origin: 'Schluesselbein (Clavicula), Brustbein (Sternum), Rippen 2-6',
-      insertion: 'Crista tuberculi majoris des Oberarmknochens (Humerus)',
+      origin:
+          'Protuberantia occipitalis, Lig. nuchae, Dornfortsaetze C7-Th12',
+      insertion: 'Spina scapulae, Acromion, laterales Drittel der Clavicula',
       function:
-          'Adduktion, Innenrotation und Flexion des Oberarms; Atemstuetze',
+          'Schulterblattfixierung, Elevation (oberer), Retraktion (mittlerer), Depression (unterer Anteil)',
       exercises: [
-        ExerciseInfo(nameDE: 'Bankdruecken', equipment: 'Langhantel'),
-        ExerciseInfo(nameDE: 'Liegestuetze', equipment: 'Koerpergewicht'),
-        ExerciseInfo(nameDE: 'Butterfly', equipment: 'Kabelzug'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'abs',
-      nameDE: 'Gerader Bauchmuskel',
-      nameLatin: 'M. rectus abdominis',
-      view: BodyView.front,
-      origin: 'Schambein (Os pubis)',
-      insertion: 'Schwertfortsatz (Proc. xiphoideus), Rippen 5-7',
-      function:
-          'Rumpfbeugung, Beckenaufrichtung, Bauchpresse, Atemstuetzfunktion',
-      exercises: [
-        ExerciseInfo(nameDE: 'Crunches', equipment: 'Koerpergewicht'),
-        ExerciseInfo(nameDE: 'Beinheben haengend', equipment: 'Klimmzugstange'),
-        ExerciseInfo(nameDE: 'Plank', equipment: 'Koerpergewicht'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'obliques',
-      nameDE: 'Schraege Bauchmuskeln',
-      nameLatin: 'M. obliquus externus / internus',
-      view: BodyView.front,
-      origin: 'Rippen 5-12 (ext.), Fascia thoracolumbalis (int.)',
-      insertion: 'Linea alba, Crista iliaca, Leistenband',
-      function: 'Rumpfrotation, Seitneigung, Bauchpresse',
-      exercises: [
-        ExerciseInfo(nameDE: 'Russian Twist', equipment: 'Medizinball'),
-        ExerciseInfo(nameDE: 'Seitliche Crunches', equipment: 'Koerpergewicht'),
-        ExerciseInfo(nameDE: 'Woodchops', equipment: 'Kabelzug'),
+        ExerciseInfo(nameDE: 'Shrugs', equipment: 'Kurzhanteln'),
+        ExerciseInfo(nameDE: 'Aufrechtes Rudern', equipment: 'Langhantel'),
+        ExerciseInfo(nameDE: 'Face Pulls', equipment: 'Kabelzug'),
       ],
     ),
 
@@ -77,6 +47,22 @@ class AnatomyRepository implements IAnatomyRepository {
     ),
 
     MuscleGroup(
+      id: 'chest',
+      nameDE: 'Brustmuskel',
+      nameLatin: 'M. pectoralis major',
+      view: BodyView.front,
+      origin: 'Schluesselbein (Clavicula), Brustbein (Sternum), Rippen 2-6',
+      insertion: 'Crista tuberculi majoris des Oberarmknochens (Humerus)',
+      function:
+          'Adduktion, Innenrotation und Flexion des Oberarms; Atemstuetze',
+      exercises: [
+        ExerciseInfo(nameDE: 'Bankdruecken', equipment: 'Langhantel'),
+        ExerciseInfo(nameDE: 'Liegestuetze', equipment: 'Koerpergewicht'),
+        ExerciseInfo(nameDE: 'Butterfly', equipment: 'Kabelzug'),
+      ],
+    ),
+
+    MuscleGroup(
       id: 'biceps',
       nameDE: 'Bizeps',
       nameLatin: 'M. biceps brachii',
@@ -93,18 +79,50 @@ class AnatomyRepository implements IAnatomyRepository {
     ),
 
     MuscleGroup(
+      id: 'triceps',
+      nameDE: 'Trizeps',
+      nameLatin: 'M. triceps brachii',
+      view: BodyView.front,
+      origin:
+          'Caput longum: Tuberculum infraglenoidale; Caput laterale/mediale: Humerus-Rueckseite',
+      insertion: 'Olecranon der Ulna',
+      function: 'Ellenbogenstreckung, Schulterextension (Caput longum)',
+      exercises: [
+        ExerciseInfo(nameDE: 'Trizepsdruecken am Kabel', equipment: 'Kabelzug'),
+        ExerciseInfo(nameDE: 'Dips', equipment: 'Barren'),
+        ExerciseInfo(nameDE: 'French Press', equipment: 'SZ-Stange'),
+      ],
+    ),
+
+    MuscleGroup(
       id: 'forearms',
       nameDE: 'Unterarmmuskeln',
       nameLatin: 'Mm. flexores / extensores antebrachii',
       view: BodyView.front,
       origin: 'Epicondylus medialis / lateralis des Humerus',
       insertion: 'Handwurzel-, Mittelhand- und Fingerknochen',
-      function:
-          'Handgelenkbeugung/-streckung, Fingerbeugung, Greifkraft',
+      function: 'Handgelenkbeugung/-streckung, Fingerbeugung, Greifkraft',
       exercises: [
         ExerciseInfo(nameDE: 'Handgelenkscurls', equipment: 'Kurzhantel'),
         ExerciseInfo(nameDE: 'Farmers Walk', equipment: 'Kurzhanteln'),
-        ExerciseInfo(nameDE: 'Unterarmbeugen Reverse', equipment: 'Langhantel'),
+        ExerciseInfo(
+            nameDE: 'Unterarmbeugen Reverse', equipment: 'Langhantel'),
+      ],
+    ),
+
+    MuscleGroup(
+      id: 'abs',
+      nameDE: 'Gerader Bauchmuskel',
+      nameLatin: 'M. rectus abdominis',
+      view: BodyView.front,
+      origin: 'Schambein (Os pubis)',
+      insertion: 'Schwertfortsatz (Proc. xiphoideus), Rippen 5-7',
+      function:
+          'Rumpfbeugung, Beckenaufrichtung, Bauchpresse, Atemstuetzfunktion',
+      exercises: [
+        ExerciseInfo(nameDE: 'Crunches', equipment: 'Koerpergewicht'),
+        ExerciseInfo(nameDE: 'Beinheben haengend', equipment: 'Klimmzugstange'),
+        ExerciseInfo(nameDE: 'Plank', equipment: 'Koerpergewicht'),
       ],
     ),
 
@@ -125,65 +143,24 @@ class AnatomyRepository implements IAnatomyRepository {
     ),
 
     MuscleGroup(
-      id: 'adductors',
-      nameDE: 'Adduktoren',
-      nameLatin: 'M. adductor longus / brevis / magnus',
+      id: 'calves',
+      nameDE: 'Wadenmuskel',
+      nameLatin: 'M. gastrocnemius / M. soleus',
       view: BodyView.front,
-      origin: 'Ramus inferior des Os pubis, Tuber ischiadicum',
-      insertion: 'Linea aspera des Femur',
-      function: 'Hueftadduktion, Hueftbeugung, Stabilisierung',
+      origin:
+          'Condylus medialis/lateralis des Femur (Gastrocnemius), Fibula/Tibia (Soleus)',
+      insertion: 'Tuber calcanei (ueber die Achillessehne)',
+      function:
+          'Plantarflexion (Fussspitze nach unten), Kniebeugung (Gastrocnemius)',
       exercises: [
-        ExerciseInfo(nameDE: 'Adduktorenmaschine', equipment: 'Maschine'),
-        ExerciseInfo(nameDE: 'Sumo-Kniebeugen', equipment: 'Langhantel'),
+        ExerciseInfo(nameDE: 'Wadenheben stehend', equipment: 'Maschine'),
+        ExerciseInfo(nameDE: 'Wadenheben sitzend', equipment: 'Maschine'),
+        ExerciseInfo(
+            nameDE: 'Einbeiniges Wadenheben', equipment: 'Koerpergewicht'),
       ],
     ),
 
     // ── BACK VIEW ───────────────────────────────────────────────
-
-    MuscleGroup(
-      id: 'neck',
-      nameDE: 'Nackenmuskulatur',
-      nameLatin: 'Mm. scaleni / M. sternocleidomastoideus',
-      view: BodyView.back,
-      origin: 'Querfortsaetze der HWS, Manubrium sterni, Clavicula',
-      insertion: 'Processus mastoideus, Linea nuchalis, 1.-2. Rippe',
-      function: 'Kopfneigung, Kopfdrehung, Atemhilfsmuskel',
-      exercises: [
-        ExerciseInfo(nameDE: 'Nackenziehen', equipment: 'Kabelzug'),
-        ExerciseInfo(nameDE: 'Shrugs', equipment: 'Kurzhanteln'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'traps',
-      nameDE: 'Trapezmuskel',
-      nameLatin: 'M. trapezius',
-      view: BodyView.back,
-      origin:
-          'Protuberantia occipitalis, Lig. nuchae, Dornfortsaetze C7-Th12',
-      insertion: 'Spina scapulae, Acromion, laterales Drittel der Clavicula',
-      function:
-          'Schulterblattfixierung, Elevation (oberer), Retraktion (mittlerer), Depression (unterer Anteil)',
-      exercises: [
-        ExerciseInfo(nameDE: 'Shrugs', equipment: 'Kurzhanteln'),
-        ExerciseInfo(nameDE: 'Aufrechtes Rudern', equipment: 'Langhantel'),
-        ExerciseInfo(nameDE: 'Face Pulls', equipment: 'Kabelzug'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'upper_back',
-      nameDE: 'Oberer Ruecken',
-      nameLatin: 'Mm. rhomboidei / M. trapezius (pars media)',
-      view: BodyView.back,
-      origin: 'Dornfortsaetze C6-Th4',
-      insertion: 'Margo medialis der Scapula',
-      function: 'Schulterblattretraktion, Stabilisierung der Scapula',
-      exercises: [
-        ExerciseInfo(nameDE: 'Face Pulls', equipment: 'Kabelzug'),
-        ExerciseInfo(nameDE: 'Vorgebeugtes Rudern', equipment: 'Langhantel'),
-      ],
-    ),
 
     MuscleGroup(
       id: 'lats',
@@ -199,24 +176,6 @@ class AnatomyRepository implements IAnatomyRepository {
         ExerciseInfo(nameDE: 'Klimmzuege', equipment: 'Klimmzugstange'),
         ExerciseInfo(nameDE: 'Latzug', equipment: 'Kabelzug'),
         ExerciseInfo(nameDE: 'Langhantelrudern', equipment: 'Langhantel'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'triceps',
-      nameDE: 'Trizeps',
-      nameLatin: 'M. triceps brachii',
-      view: BodyView.back,
-      origin:
-          'Caput longum: Tuberculum infraglenoidale; Caput laterale/mediale: Humerus-Rueckseite',
-      insertion: 'Olecranon der Ulna',
-      function:
-          'Ellenbogenstreckung, Schulterextension (Caput longum)',
-      exercises: [
-        ExerciseInfo(nameDE: 'Trizepsdruecken am Kabel', equipment: 'Kabelzug'),
-        ExerciseInfo(nameDE: 'Dips', equipment: 'Barren'),
-        ExerciseInfo(
-            nameDE: 'French Press', equipment: 'SZ-Stange'),
       ],
     ),
 
@@ -243,28 +202,14 @@ class AnatomyRepository implements IAnatomyRepository {
       view: BodyView.back,
       origin:
           'Os ilium (Darmbein), Os sacrum (Kreuzbein), Lig. sacrotuberale',
-      insertion:
-          'Tractus iliotibialis, Tuberositas glutea des Femur',
+      insertion: 'Tractus iliotibialis, Tuberositas glutea des Femur',
       function:
           'Hueftstreckung, Aussenrotation, Abduktion (oberer Anteil)',
       exercises: [
         ExerciseInfo(nameDE: 'Hip Thrusts', equipment: 'Langhantel'),
-        ExerciseInfo(nameDE: 'Bulgarische Kniebeugen', equipment: 'Kurzhanteln'),
+        ExerciseInfo(
+            nameDE: 'Bulgarische Kniebeugen', equipment: 'Kurzhanteln'),
         ExerciseInfo(nameDE: 'Glutebruecke', equipment: 'Koerpergewicht'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'abductor',
-      nameDE: 'Abduktoren',
-      nameLatin: 'M. gluteus medius / M. tensor fasciae latae',
-      view: BodyView.back,
-      origin: 'Facies glutea des Os ilium, Crista iliaca',
-      insertion: 'Trochanter major, Tractus iliotibialis',
-      function: 'Hueftabduktion, Stabilisierung des Beckens beim Gehen',
-      exercises: [
-        ExerciseInfo(nameDE: 'Seitliches Beinheben', equipment: 'Koerpergewicht'),
-        ExerciseInfo(nameDE: 'Abduktorenmaschine', equipment: 'Maschine'),
       ],
     ),
 
@@ -283,23 +228,6 @@ class AnatomyRepository implements IAnatomyRepository {
         ExerciseInfo(nameDE: 'Beinbeuger liegend', equipment: 'Maschine'),
         ExerciseInfo(
             nameDE: 'Nordic Hamstring Curls', equipment: 'Koerpergewicht'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'calves',
-      nameDE: 'Wadenmuskel',
-      nameLatin: 'M. gastrocnemius / M. soleus',
-      view: BodyView.back,
-      origin:
-          'Condylus medialis/lateralis des Femur (Gastrocnemius), Fibula/Tibia (Soleus)',
-      insertion: 'Tuber calcanei (ueber die Achillessehne)',
-      function: 'Plantarflexion (Fussspitze nach unten), Kniebeugung (Gastrocnemius)',
-      exercises: [
-        ExerciseInfo(nameDE: 'Wadenheben stehend', equipment: 'Maschine'),
-        ExerciseInfo(nameDE: 'Wadenheben sitzend', equipment: 'Maschine'),
-        ExerciseInfo(
-            nameDE: 'Einbeiniges Wadenheben', equipment: 'Koerpergewicht'),
       ],
     ),
   ];

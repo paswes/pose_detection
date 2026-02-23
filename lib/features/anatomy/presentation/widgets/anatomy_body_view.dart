@@ -1,72 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:muscle_selector/muscle_selector.dart';
+import 'package:flutter_body_part_selector/flutter_body_part_selector.dart';
 
 import 'package:pose_detection/features/anatomy/domain/entities/muscle_group.dart';
+import 'package:pose_detection/features/anatomy/domain/entities/muscle_status.dart';
 
-/// Maps between app muscle IDs and the muscle_selector package group names.
-class _MuscleIdMapper {
-  static const _appToPackage = {
-    'forearms': 'forearm',
-    'traps': 'trapezius',
-    'hamstrings': 'harmstrings',
+/// Maps between app muscle IDs and the [Muscle] enum from
+/// `flutter_body_part_selector`.
+class _BodyPartMapper {
+  /// App muscle ID → package [Muscle] enum values (left/right pairs).
+  static const Map<String, Set<Muscle>> _appIdToMuscles = {
+    // Front view
+    'traps': {Muscle.trapsLeft, Muscle.trapsRight},
+    'shoulders': {Muscle.deltsLeft, Muscle.deltsRight},
+    'chest': {Muscle.chestLeft, Muscle.chestRight},
+    'biceps': {Muscle.bicepsLeft, Muscle.bicepsRight},
+    'triceps': {Muscle.tricepsLeft, Muscle.tricepsRight},
+    'forearms': {Muscle.forearmsLeft, Muscle.forearmsRight},
+    'abs': {Muscle.abs},
+    'quads': {Muscle.quadsLeft, Muscle.quadsRight},
+    'calves': {Muscle.calvesLeft, Muscle.calvesRight},
+    // Back view
+    'lats': {Muscle.latsBackLeft, Muscle.latsBackRight},
+    'lower_back': {Muscle.lowerLatsBackLeft, Muscle.lowerLatsBackRight},
+    'glutes': {Muscle.glutesLeft, Muscle.glutesRight},
+    'hamstrings': {Muscle.hamstringsLeft, Muscle.hamstringsRight},
   };
 
-  static const _packageToApp = {
-    'forearm': 'forearms',
-    'trapezius': 'traps',
-    'harmstrings': 'hamstrings',
-  };
-
-  /// Package muscle sub-IDs grouped by their group name.
-  static const _packageGroups = {
-    'chest': ['chest1', 'chest2'],
-    'shoulders': ['shoulder1', 'shoulder2', 'shoulder3', 'shoulder4'],
-    'obliques': ['obliques1', 'obliques2'],
-    'abs': ['abs1', 'abs2', 'abs3', 'abs4', 'abs5', 'abs6', 'abs7', 'abs8'],
-    'abductor': ['abductor1', 'abductor2'],
-    'biceps': ['biceps1', 'biceps2'],
-    'calves': ['calves1', 'calves2', 'calves3', 'calves4'],
-    'forearm': ['forearm1', 'forearm2', 'forearm3', 'forearm4'],
-    'glutes': ['glutes1', 'glutes2'],
-    'harmstrings': ['harmstrings1', 'harmstrings2'],
-    'lats': ['lats1', 'lats2'],
-    'upper_back': ['upper_back1', 'upper_back2'],
-    'quads': ['quads1', 'quads2', 'quads3', 'quads4'],
-    'trapezius': [
-      'trapezius1',
-      'trapezius2',
-      'trapezius3',
-      'trapezius4',
-      'trapezius5',
-    ],
-    'triceps': ['triceps1', 'triceps2'],
-    'adductors': ['adductors1', 'adductors2'],
-    'lower_back': ['lower_back'],
-    'neck': ['neck'],
-  };
-
-  /// Convert an app muscle ID to the package group name.
-  static String toPackageGroup(String appId) => _appToPackage[appId] ?? appId;
-
-  /// Given a package [Muscle.id] like 'chest1', find the app muscle ID.
-  static String? appIdFromMuscleSubId(String subId) {
-    for (final entry in _packageGroups.entries) {
-      if (entry.value.contains(subId)) {
-        return _packageToApp[entry.key] ?? entry.key;
+  /// Reverse lookup: given a tapped [Muscle], return the app muscle ID.
+  static final Map<Muscle, String> _muscleToAppId = () {
+    final map = <Muscle, String>{};
+    for (final entry in _appIdToMuscles.entries) {
+      for (final muscle in entry.value) {
+        map[muscle] = entry.key;
       }
     }
-    return null;
+    return map;
+  }();
+
+  /// Get all [Muscle] values for a given app muscle ID.
+  static Set<Muscle> musclesForAppId(String appId) {
+    return _appIdToMuscles[appId] ?? {};
+  }
+
+  /// Get the app muscle ID for a tapped [Muscle].
+  static String? appIdFromMuscle(Muscle muscle) {
+    return _muscleToAppId[muscle];
   }
 }
 
-/// Interactive body view using the muscle_selector package SVG body.
+/// Interactive body view using `flutter_body_part_selector`.
 ///
-/// Tap a muscle → it highlights green and the detail sheet opens.
-/// When the sheet is dismissed, [selectedMuscleId] becomes null and the
-/// highlight disappears (the widget rebuilds with no initial selection).
-class AnatomyBodyView extends StatefulWidget {
+/// Uses stacked [InteractiveBodySvg] layers to show multiple status colors
+/// simultaneously (trained=green, complaint=red, weak=yellow).
+/// The top layer handles tap interaction.
+class AnatomyBodyView extends StatelessWidget {
   final List<MuscleGroup> muscles;
   final BodyView currentView;
   final String? selectedMuscleId;
@@ -80,90 +69,117 @@ class AnatomyBodyView extends StatefulWidget {
     required this.onMuscleSelected,
   });
 
-  @override
-  State<AnatomyBodyView> createState() => _AnatomyBodyViewState();
-}
-
-class _AnatomyBodyViewState extends State<AnatomyBodyView> {
-  bool _initialized = false;
-  Set<String> _previousSelectedIds = {};
-
-  /// Set of app muscle IDs that belong to the current view.
-  Set<String> get _currentViewMuscleIds => widget.muscles
-      .where((m) => m.view == widget.currentView)
-      .map((m) => m.id)
-      .toSet();
-
-  void _handleSelectionChanged(Set<Muscle> selected) {
-    final currentIds = selected.map((m) => m.id).toSet();
-
-    // Skip the init callback fired by the package after SVG load.
-    if (!_initialized) {
-      _initialized = true;
-      _previousSelectedIds = currentIds;
-      return;
-    }
-
-    // Detect which muscle was just added by the user's tap.
-    final newlyAdded = currentIds.difference(_previousSelectedIds);
-    _previousSelectedIds = currentIds;
-
-    if (newlyAdded.isEmpty) return;
-
-    final viewIds = _currentViewMuscleIds;
-
-    for (final subId in newlyAdded) {
-      final appId = _MuscleIdMapper.appIdFromMuscleSubId(subId);
-      if (appId != null && viewIds.contains(appId)) {
-        HapticFeedback.lightImpact();
-        widget.onMuscleSelected(appId);
-        return;
+  /// Collect [Muscle] enum values for all muscles matching a given [test].
+  Set<Muscle> _collectMuscles(bool Function(MuscleGroup) test) {
+    final result = <Muscle>{};
+    for (final m in muscles) {
+      if (m.view == currentView && test(m)) {
+        result.addAll(_BodyPartMapper.musclesForAppId(m.id));
       }
     }
+    return result;
   }
 
-  @override
-  void didUpdateWidget(AnatomyBodyView oldWidget) {
-    super.didUpdateWidget(oldWidget);
+  void _handleMuscleTap(Muscle muscle) {
+    final appId = _BodyPartMapper.appIdFromMuscle(muscle);
+    if (appId == null) return;
 
-    // Reset when the ValueKey will change (different view or selection).
-    if (oldWidget.currentView != widget.currentView ||
-        oldWidget.selectedMuscleId != widget.selectedMuscleId) {
-      _initialized = false;
-      _previousSelectedIds = {};
-    }
+    // Verify this muscle belongs to the current view.
+    final inView = muscles.any((m) => m.id == appId && m.view == currentView);
+    if (!inView) return;
+
+    HapticFeedback.lightImpact();
+    onMuscleSelected(appId);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Highlight only the currently selected muscle (if any).
-    final highlighted = <String>[];
-    if (widget.selectedMuscleId != null) {
-      highlighted.add(
-        _MuscleIdMapper.toPackageGroup(widget.selectedMuscleId!),
-      );
-    }
+    final isFront = currentView == BodyView.front;
 
-    // Key changes when view or selection changes → fresh MusclePickerMap.
-    final mapKey = ValueKey(
-      '${widget.currentView.name}_${widget.selectedMuscleId ?? 'none'}',
-    );
+    // Build muscle sets per status.
+    final trainedMuscles = _collectMuscles((m) => m.status is TrainedStatus);
+    final complaintMuscles =
+        _collectMuscles((m) => m.status is ComplaintStatus);
+    final weakMuscles = _collectMuscles((m) => m.status is WeakStatus);
+
+    // Currently selected/tapped muscle highlight.
+    final selectedMuscles = selectedMuscleId != null
+        ? _BodyPartMapper.musclesForAppId(selectedMuscleId!)
+        : <Muscle>{};
 
     return InteractiveViewer(
       minScale: 1.0,
       maxScale: 3.0,
       child: Center(
-        child: MusclePickerMap(
-          key: mapKey,
-          height: 800,
-          width: 200,
-          map: Maps.BODY,
-          onChanged: _handleSelectionChanged,
-          selectedColor: const Color(0xFF4CAF50),
-          strokeColor: Colors.white60,
-          dotColor: Colors.transparent,
-          initialSelectedGroups: highlighted,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Layer 1: Trained muscles (green)
+            if (trainedMuscles.isNotEmpty)
+              _StatusLayer(
+                key: ValueKey('trained_${isFront}_$trainedMuscles'),
+                isFront: isFront,
+                selectedMuscles: trainedMuscles,
+                color: const Color(0xFF4CAF50),
+              ),
+
+            // Layer 2: Complaint muscles (red)
+            if (complaintMuscles.isNotEmpty)
+              _StatusLayer(
+                key: ValueKey('complaint_${isFront}_$complaintMuscles'),
+                isFront: isFront,
+                selectedMuscles: complaintMuscles,
+                color: const Color(0xFFFF5252),
+              ),
+
+            // Layer 3: Weak muscles (yellow)
+            if (weakMuscles.isNotEmpty)
+              _StatusLayer(
+                key: ValueKey('weak_${isFront}_$weakMuscles'),
+                isFront: isFront,
+                selectedMuscles: weakMuscles,
+                color: const Color(0xFFFFEB3B),
+              ),
+
+            // Layer 4: Interactive tap layer
+            InteractiveBodySvg(
+              key: ValueKey('interactive_$isFront'),
+              isFront: isFront,
+              selectedMuscles: selectedMuscles,
+              onMuscleTap: _handleMuscleTap,
+              highlightColor: Colors.white.withValues(alpha: 0.25),
+              fit: BoxFit.contain,
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+/// A non-interactive SVG layer that displays selected muscles with a given
+/// highlight color. Used to show status colors underneath the interactive layer.
+class _StatusLayer extends StatelessWidget {
+  final bool isFront;
+  final Set<Muscle> selectedMuscles;
+  final Color color;
+
+  const _StatusLayer({
+    super.key,
+    required this.isFront,
+    required this.selectedMuscles,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: InteractiveBodySvg(
+        isFront: isFront,
+        selectedMuscles: selectedMuscles,
+        enableSelection: false,
+        highlightColor: color,
+        fit: BoxFit.contain,
       ),
     );
   }

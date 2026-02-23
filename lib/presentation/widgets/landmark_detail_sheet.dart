@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
@@ -7,30 +8,69 @@ import 'package:pose_detection/data/models/landmark_data.dart';
 /// Shows a bottom sheet with details for a single pose landmark.
 ///
 /// Displays the landmark name, raw coordinates (x, y, z),
-/// likelihood score, and connected landmarks.
+/// and connected landmarks as tappable navigation links.
 void showLandmarkDetailSheet({
   required BuildContext context,
   required LandmarkData landmark,
+  required List<LandmarkData> allLandmarks,
+  ValueChanged<int>? onLandmarkSelected,
   VoidCallback? onDismissed,
 }) {
   final schema = LandmarkSchema.rdl;
 
-  WoltModalSheet.show(
-    context: context,
-    pageListBuilder: (bottomSheetContext) => [
-      _buildPage(bottomSheetContext, landmark, schema),
+  late final ValueNotifier<WoltModalSheetPageListBuilder> pageListNotifier;
+  pageListNotifier = ValueNotifier<WoltModalSheetPageListBuilder>(
+    (sheetContext) => [
+      _buildPage(sheetContext, landmark, schema, allLandmarks, (id) {
+        onLandmarkSelected?.call(id);
+        final next = allLandmarks.firstWhere((l) => l.id == id);
+        _updateNotifier(
+          pageListNotifier,
+          next,
+          schema,
+          allLandmarks,
+          onLandmarkSelected,
+        );
+      }),
     ],
+  );
+
+  WoltModalSheet.showWithDynamicPath(
+    context: context,
+    pageListBuilderNotifier: pageListNotifier,
     modalBarrierColor: Colors.black54,
-  ).whenComplete(() => onDismissed?.call());
+  ).whenComplete(() {
+    pageListNotifier.dispose();
+    onDismissed?.call();
+  });
+}
+
+/// Recursive helper to keep navigations working at any depth.
+void _updateNotifier(
+  ValueNotifier<WoltModalSheetPageListBuilder> notifier,
+  LandmarkData landmark,
+  LandmarkSchema schema,
+  List<LandmarkData> allLandmarks,
+  ValueChanged<int>? onLandmarkSelected,
+) {
+  notifier.value = (ctx) => [
+    _buildPage(ctx, landmark, schema, allLandmarks, (id) {
+      onLandmarkSelected?.call(id);
+      final next = allLandmarks.firstWhere((l) => l.id == id);
+      _updateNotifier(notifier, next, schema, allLandmarks, onLandmarkSelected);
+    }),
+  ];
 }
 
 SliverWoltModalSheetPage _buildPage(
   BuildContext context,
   LandmarkData landmark,
   LandmarkSchema schema,
+  List<LandmarkData> allLandmarks,
+  ValueChanged<int> onConnectionTapped,
 ) {
   final name = schema.getLandmarkName(landmark.id);
-  final connections = _getConnectedLandmarks(landmark.id, schema);
+  final connections = _getConnectedLandmarks(landmark.id, schema, allLandmarks);
 
   return SliverWoltModalSheetPage(
     backgroundColor: const Color(0xFF1E1E1E),
@@ -57,17 +97,6 @@ SliverWoltModalSheetPage _buildPage(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
         sliver: SliverList.list(
           children: [
-            // Landmark ID
-            Text(
-              'ID: ${landmark.id}',
-              style: const TextStyle(
-                color: Color(0xFF888888),
-                fontSize: 14,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
             // Coordinates section
             const _SectionHeader(title: 'KOORDINATEN'),
             const SizedBox(height: 12),
@@ -75,44 +104,24 @@ SliverWoltModalSheetPage _buildPage(
             const SizedBox(height: 8),
             _InfoRow(label: 'Y', value: landmark.y.toStringAsFixed(1)),
             const SizedBox(height: 8),
-            _InfoRow(label: 'Z (Tiefe)', value: landmark.z.toStringAsFixed(1)),
-
-            const SizedBox(height: 24),
-
-            // Likelihood section
-            const _SectionHeader(title: 'LIKELIHOOD'),
-            const SizedBox(height: 12),
-            _LikelihoodIndicator(likelihood: landmark.likelihood),
+            _InfoRow(
+              label: 'Z (Tiefe)',
+              value: landmark.z.toStringAsFixed(1),
+            ),
 
             if (connections.isNotEmpty) ...[
               const SizedBox(height: 24),
 
-              // Connections section
+              // Connections section — tappable navigation
               const _SectionHeader(title: 'VERBINDUNGEN'),
               const SizedBox(height: 12),
               ...connections.map(
-                (name) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF666666),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: Color(0xFFCCCCCC),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
+                (conn) => _ConnectionRow(
+                  name: conn.name,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    onConnectionTapped(conn.id);
+                  },
                 ),
               ),
             ],
@@ -123,20 +132,31 @@ SliverWoltModalSheetPage _buildPage(
   );
 }
 
-/// Returns names of landmarks connected to [landmarkId].
-List<String> _getConnectedLandmarks(int landmarkId, LandmarkSchema schema) {
+/// Connected landmark with ID and display name.
+typedef _Connection = ({int id, String name});
+
+/// Returns connected landmarks that are present in the current frame.
+List<_Connection> _getConnectedLandmarks(
+  int landmarkId,
+  LandmarkSchema schema,
+  List<LandmarkData> allLandmarks,
+) {
+  final presentIds = {for (final l in allLandmarks) l.id};
   final connectedIds = <int>{};
   for (final connection in schema.skeletonConnections) {
-    if (connection[0] == landmarkId) {
+    if (connection[0] == landmarkId && presentIds.contains(connection[1])) {
       connectedIds.add(connection[1]);
-    } else if (connection[1] == landmarkId) {
+    } else if (connection[1] == landmarkId &&
+        presentIds.contains(connection[0])) {
       connectedIds.add(connection[0]);
     }
   }
-  return connectedIds.map((id) => schema.getLandmarkName(id)).toList();
+  return connectedIds
+      .map((id) => (id: id, name: schema.getLandmarkName(id)))
+      .toList();
 }
 
-// ── Private widgets ──────────────────────────────────────────────
+// -- Private widgets ---------------------------------------------------------
 
 class _SectionHeader extends StatelessWidget {
   final String title;
@@ -193,54 +213,47 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _LikelihoodIndicator extends StatelessWidget {
-  final double likelihood;
+class _ConnectionRow extends StatelessWidget {
+  final String name;
+  final VoidCallback onTap;
 
-  const _LikelihoodIndicator({required this.likelihood});
+  const _ConnectionRow({required this.name, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final percent = (likelihood * 100).toStringAsFixed(0);
-    final color = _getLikelihoodColor(likelihood);
-
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Color(0xFF666666),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                name,
+                style: const TextStyle(
+                  color: Color(0xFFCCCCCC),
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF666666),
+              size: 20,
+            ),
+          ],
         ),
-        const SizedBox(width: 10),
-        Text(
-          '$percent%',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          likelihood > 0.8
-              ? 'Im Bild'
-              : likelihood > 0.5
-                  ? 'Teilweise'
-                  : 'Unsicher',
-          style: TextStyle(
-            color: color,
-            fontSize: 13,
-          ),
-        ),
-      ],
+      ),
     );
-  }
-
-  Color _getLikelihoodColor(double likelihood) {
-    if (likelihood > 0.8) return const Color(0xFF4CAF50);
-    if (likelihood > 0.5) return const Color(0xFFFFEB3B);
-    return const Color(0xFFF44336);
   }
 }

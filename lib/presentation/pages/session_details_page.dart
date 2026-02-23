@@ -113,6 +113,8 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
               showLandmarkDetailSheet(
                 context: context,
                 landmark: landmark,
+                allLandmarks: state.currentFrame?.landmarks ?? [],
+                onLandmarkSelected: (id) => _cubit.selectLandmark(id),
                 onDismissed: () => _cubit.selectLandmark(null),
               );
             },
@@ -258,6 +260,7 @@ class _VideoWithOverlay extends StatelessWidget {
                         fitMode: FitMode.contain,
                         schema: LandmarkSchema.rdl,
                         visibleLandmarkIds: LandmarkSchema.rdlLandmarkIds,
+                        selectedLandmarkId: state.selectedLandmarkId,
                       ),
                     ),
                   ),

@@ -22,6 +22,7 @@ class LandmarkOverlayPainter extends CustomPainter {
   final FitMode fitMode;
   final LandmarkSchema _schema;
   final Set<int>? _visibleIds;
+  final int? selectedLandmarkId;
 
   LandmarkOverlayPainter({
     required this.frameNotifier,
@@ -30,6 +31,7 @@ class LandmarkOverlayPainter extends CustomPainter {
     required this.rawImageHeight,
     this.isFrontCamera = false,
     this.fitMode = FitMode.cover,
+    this.selectedLandmarkId,
     LandmarkSchema? schema,
     Set<int>? visibleLandmarkIds,
   })  : _schema = schema ?? sl<LandmarkSchema>(),
@@ -97,33 +99,46 @@ class LandmarkOverlayPainter extends CustomPainter {
     Map<int, ({Offset position, double normalizedDepth})> points,
     Map<int, double> likelihoodMap,
   ) {
+    final hasSelection = selectedLandmarkId != null;
+
     for (final entry in points.entries) {
       final id = entry.key;
       final position = entry.value.position;
       final depth = entry.value.normalizedDepth;
       final likelihood = likelihoodMap[id] ?? 0.5;
+      final isSelected = id == selectedLandmarkId;
 
       final baseRadius = 4.0 + (depth * 4.0);
       final color = _getLikelihoodColor(likelihood);
+      final dimFactor = hasSelection && !isSelected ? 0.3 : 1.0;
+
+      if (isSelected) {
+        // Selection glow — white, larger
+        final selectionGlow = Paint()
+          ..color = Colors.white.withValues(alpha: 0.4)
+          ..style = PaintingStyle.fill
+          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 8);
+        canvas.drawCircle(position, baseRadius + 8, selectionGlow);
+      }
 
       // Glow
       final glowPaint = Paint()
-        ..color = color.withValues(alpha: 0.3)
+        ..color = color.withValues(alpha: 0.3 * dimFactor)
         ..style = PaintingStyle.fill
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4);
       canvas.drawCircle(position, baseRadius + 3, glowPaint);
 
       // Fill
       final fillPaint = Paint()
-        ..color = color
+        ..color = color.withValues(alpha: dimFactor)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(position, baseRadius, fillPaint);
 
       // Outline
       final outlinePaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.5)
+        ..color = Colors.white.withValues(alpha: (isSelected ? 0.9 : 0.5) * dimFactor)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0;
+        ..strokeWidth = isSelected ? 2.0 : 1.0;
       canvas.drawCircle(position, baseRadius, outlinePaint);
     }
   }
@@ -133,6 +148,8 @@ class LandmarkOverlayPainter extends CustomPainter {
     Map<int, ({Offset position, double normalizedDepth})> points,
     Map<int, double> likelihoodMap,
   ) {
+    final hasSelection = selectedLandmarkId != null;
+
     for (final connection in _schema.skeletonConnections) {
       final id1 = connection[0];
       final id2 = connection[1];
@@ -145,7 +162,10 @@ class LandmarkOverlayPainter extends CustomPainter {
         final avgLikelihood =
             ((likelihoodMap[id1] ?? 0.5) + (likelihoodMap[id2] ?? 0.5)) / 2;
         final lineWidth = 1.5 + (avgDepth * 2.0);
-        final alpha = 0.3 + (avgLikelihood * 0.5);
+        final touchesSelected = id1 == selectedLandmarkId ||
+            id2 == selectedLandmarkId;
+        final dimFactor = hasSelection && !touchesSelected ? 0.3 : 1.0;
+        final alpha = (0.3 + (avgLikelihood * 0.5)) * dimFactor;
 
         final linePaint = Paint()
           ..color = Colors.white.withValues(alpha: alpha)
@@ -174,6 +194,7 @@ class LandmarkOverlayPainter extends CustomPainter {
         oldDelegate.isFrontCamera != isFrontCamera ||
         oldDelegate.fitMode != fitMode ||
         oldDelegate._schema != _schema ||
-        oldDelegate._visibleIds != _visibleIds;
+        oldDelegate._visibleIds != _visibleIds ||
+        oldDelegate.selectedLandmarkId != selectedLandmarkId;
   }
 }

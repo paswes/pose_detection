@@ -524,7 +524,9 @@ class _RepPillRow extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
 
-  static const _trackPadding = 24.0;
+  /// Must match the Slider's internal track offset:
+  /// max(overlayRadius, thumbRadius) = max(0, 8) = 8.
+  static const _trackPadding = 8.0;
   static const _markerDiameter = 22.0;
 
   const _RepPillRow({required this.cubit, required this.state});
@@ -566,7 +568,7 @@ class _RepCirclePainter extends CustomPainter {
   final List<RdlRepData> reps;
   final int totalFrames;
 
-  static const _trackPadding = 24.0;
+  static const _trackPadding = 8.0;
   static const _diameter = 22.0;
 
   _RepCirclePainter({required this.reps, required this.totalFrames});

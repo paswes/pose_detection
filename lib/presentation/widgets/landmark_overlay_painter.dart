@@ -19,6 +19,7 @@ class LandmarkOverlayPainter extends CustomPainter {
   final double rawImageWidth;
   final double rawImageHeight;
   final bool isFrontCamera;
+  final FitMode fitMode;
   final LandmarkSchema _schema;
   final Set<int>? _visibleIds;
 
@@ -28,6 +29,7 @@ class LandmarkOverlayPainter extends CustomPainter {
     required this.rawImageWidth,
     required this.rawImageHeight,
     this.isFrontCamera = false,
+    this.fitMode = FitMode.cover,
     LandmarkSchema? schema,
     Set<int>? visibleLandmarkIds,
   })  : _schema = schema ?? sl<LandmarkSchema>(),
@@ -69,12 +71,13 @@ class LandmarkOverlayPainter extends CustomPainter {
       ));
     }
 
-    // Translate to widget coordinates using the same BoxFit.cover transform
+    // Translate to widget coordinates using the matching BoxFit transform
     final translatedPoints =
         CoordinateTranslator.translateAllLandmarksWithDepth(
       landmarks,
       videoSize,
       size,
+      fitMode: fitMode,
     );
 
     final likelihoodMap = <int, double>{};
@@ -169,6 +172,7 @@ class LandmarkOverlayPainter extends CustomPainter {
         oldDelegate.rawImageWidth != rawImageWidth ||
         oldDelegate.rawImageHeight != rawImageHeight ||
         oldDelegate.isFrontCamera != isFrontCamera ||
+        oldDelegate.fitMode != fitMode ||
         oldDelegate._schema != _schema ||
         oldDelegate._visibleIds != _visibleIds;
   }

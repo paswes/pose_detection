@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
@@ -45,20 +47,14 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
     return BlocProvider.value(
       value: _cubit,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            widget.session.title,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-        ),
+        backgroundColor: Colors.black,
         body: SafeArea(
+          top: false,
           child: BlocBuilder<SessionDetailsCubit, SessionDetailsState>(
-            builder: (context, state) {
-              return switch (state) {
-                SessionDetailsLoading() => _buildLoading(),
-                SessionDetailsLoaded() => _buildLoaded(state),
-                SessionDetailsError() => _buildError(state),
-              };
+            builder: (context, state) => switch (state) {
+              SessionDetailsLoading() => _buildLoading(),
+              SessionDetailsLoaded() => _buildLoaded(state),
+              SessionDetailsError() => _buildError(state),
             },
           ),
         ),
@@ -106,13 +102,12 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   Widget _buildLoaded(SessionDetailsLoaded state) {
     return Column(
       children: [
-        const SizedBox(height: 16),
-        _RepCounterDisplay(state: state),
-        const SizedBox(height: 16),
         Expanded(
           child: _VideoWithOverlay(
             cubit: _cubit,
             state: state,
+            onBack: () => Navigator.pop(context),
+            onOptionsTapped: () => _showOptionsSheet(state),
             onLandmarkTapped: (landmark) {
               _cubit.selectLandmark(landmark.id);
               showLandmarkDetailSheet(
@@ -123,23 +118,87 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
             },
           ),
         ),
-        const SizedBox(height: 24),
         _FramePlaybackControls(cubit: _cubit, state: state),
       ],
     );
   }
+
+  void _showOptionsSheet(SessionDetailsLoaded state) {
+    HapticFeedback.lightImpact();
+    WoltModalSheet.show(
+      context: context,
+      pageListBuilder: (sheetContext) => [
+        SliverWoltModalSheetPage(
+          backgroundColor: const Color(0xFF1E1E1E),
+          surfaceTintColor: Colors.transparent,
+          hasSabGradient: false,
+          isTopBarLayerAlwaysVisible: true,
+          topBarTitle: const Text(
+            'Optionen',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          trailingNavBarWidget: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Color(0xFF888888)),
+              onPressed: () => Navigator.of(sheetContext).pop(),
+            ),
+          ),
+          mainContentSliversBuilder: (context) => [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              sliver: SliverList.list(
+                children: [
+                  const _SheetSectionHeader(title: 'GESCHWINDIGKEIT'),
+                  const SizedBox(height: 12),
+                  Row(
+                    spacing: 8,
+                    children: [
+                      for (final speed
+                          in SessionDetailsCubit.availableSpeeds)
+                        Expanded(
+                          child: _SheetSpeedPill(
+                            speed: speed,
+                            isActive: state.playbackSpeed == speed,
+                            onTap: () {
+                              _cubit.setPlaybackSpeed(speed);
+                              Navigator.of(sheetContext).pop();
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+      modalBarrierColor: Colors.black54,
+    );
+  }
 }
 
-/// Renders the video player with landmark overlay on top.
-/// Detects taps on landmark points and reports the tapped landmark.
+// =============================================================================
+// Video with overlay + HUD elements
+// =============================================================================
+
 class _VideoWithOverlay extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
+  final VoidCallback onBack;
+  final VoidCallback onOptionsTapped;
   final ValueChanged<LandmarkData> onLandmarkTapped;
 
   const _VideoWithOverlay({
     required this.cubit,
     required this.state,
+    required this.onBack,
+    required this.onOptionsTapped,
     required this.onLandmarkTapped,
   });
 
@@ -154,16 +213,14 @@ class _VideoWithOverlay extends StatelessWidget {
 
     final videoWidth = state.session.imageWidth;
     final videoHeight = state.session.imageHeight;
+    final topPadding = MediaQuery.of(context).padding.top;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: const BorderRadius.vertical(
+        bottom: Radius.circular(16),
+      ),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        clipBehavior: Clip.hardEdge,
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(12),
-        ),
+        color: Colors.black,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final widgetSize = Size(
@@ -177,11 +234,10 @@ class _VideoWithOverlay extends StatelessWidget {
               ),
               child: Stack(
                 children: [
-                  // Layer 1: Video player (BoxFit.cover)
+                  // Layer 1: Video (BoxFit.contain — full frame, no crop)
                   Positioned.fill(
                     child: FittedBox(
-                      fit: BoxFit.cover,
-                      clipBehavior: Clip.hardEdge,
+                      fit: BoxFit.contain,
                       child: SizedBox(
                         width: videoWidth,
                         height: videoHeight,
@@ -189,8 +245,7 @@ class _VideoWithOverlay extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Layer 2: Landmark overlay — driven by ValueNotifier
-                  // for instant repaint (bypasses BLoC rebuild pipeline)
+                  // Layer 2: Landmark overlay (contain to match video)
                   Positioned.fill(
                     child: CustomPaint(
                       size: widgetSize,
@@ -200,9 +255,39 @@ class _VideoWithOverlay extends StatelessWidget {
                         rawImageWidth: state.session.imageWidth,
                         rawImageHeight: state.session.imageHeight,
                         isFrontCamera: state.session.isFrontCamera,
+                        fitMode: FitMode.contain,
                         schema: LandmarkSchema.rdl,
                         visibleLandmarkIds: LandmarkSchema.rdlLandmarkIds,
                       ),
+                    ),
+                  ),
+                  // Layer 3: Back button (top-left)
+                  Positioned(
+                    top: topPadding + 8,
+                    left: 16,
+                    child: _OverlayButton(
+                      onTap: onBack,
+                      icon: Icons.chevron_left_rounded,
+                      size: 28,
+                    ),
+                  ),
+                  // Layer 4: Rep + angle badge (top-right)
+                  Positioned(
+                    top: topPadding + 8,
+                    right: 16,
+                    child: _RepBadge(
+                      repCount: state.repCount,
+                      hipAngle: state.hipAngle,
+                    ),
+                  ),
+                  // Layer 5: Options button (bottom-right)
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: _OverlayButton(
+                      onTap: onOptionsTapped,
+                      icon: Icons.tune_rounded,
+                      size: 22,
                     ),
                   ),
                 ],
@@ -214,10 +299,6 @@ class _VideoWithOverlay extends StatelessWidget {
     );
   }
 
-  /// Hit-tests the tap position against painted landmark positions.
-  ///
-  /// Uses the same coordinate translation as [LandmarkOverlayPainter]
-  /// to ensure tap targets match the visual positions exactly.
   void _handleTap(Offset tapPosition, Size widgetSize) {
     final frame = state.currentFrame;
     if (frame == null || !frame.isPersonDetected || frame.landmarks.isEmpty) {
@@ -229,7 +310,6 @@ class _VideoWithOverlay extends StatelessWidget {
       state.session.imageHeight,
     );
 
-    // Same normalization and filtering as LandmarkOverlayPainter._drawLandmarks()
     final landmarks = <Landmark>[];
     for (final l in frame.landmarks) {
       if (!LandmarkSchema.rdlLandmarkIds.contains(l.id)) continue;
@@ -253,9 +333,9 @@ class _VideoWithOverlay extends StatelessWidget {
       landmarks,
       videoSize,
       widgetSize,
+      fitMode: FitMode.contain,
     );
 
-    // Find closest landmark within hit radius
     const hitRadius = 30.0;
     int? closestId;
     double closestDistance = hitRadius;
@@ -277,77 +357,88 @@ class _VideoWithOverlay extends StatelessWidget {
   }
 }
 
-/// Displays current rep count and hip hinge angle.
-class _RepCounterDisplay extends StatelessWidget {
-  final SessionDetailsLoaded state;
+// =============================================================================
+// Overlay HUD widgets
+// =============================================================================
 
-  const _RepCounterDisplay({required this.state});
+class _OverlayButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final IconData icon;
+  final double size;
+
+  const _OverlayButton({
+    required this.onTap,
+    required this.icon,
+    this.size = 24,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.5),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: size),
+      ),
+    );
+  }
+}
+
+class _RepBadge extends StatelessWidget {
+  final int repCount;
+  final double? hipAngle;
+
+  const _RepBadge({required this.repCount, this.hipAngle});
+
+  static const _valueStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  static const _labelStyle = TextStyle(
+    color: Color(0xFF999999),
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final angleText = hipAngle != null
+        ? '${hipAngle!.toStringAsFixed(0)}°'
+        : '–';
+
+    return Container(
+      width: 140,
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
-        spacing: 12,
+        mainAxisAlignment: MainAxisAlignment.center,
+        spacing: 6,
         children: [
-          _MetricCard(
-            label: 'Reps',
-            value: '${state.repCount}',
-          ),
-          _MetricCard(
-            label: 'Hip Angle',
-            value: state.hipAngle != null
-                ? '${state.hipAngle!.toStringAsFixed(0)}°'
-                : '–',
-          ),
+          Text('$repCount', style: _valueStyle),
+          Text('Reps', style: _labelStyle),
+          Container(width: 1, height: 16, color: const Color(0xFF555555)),
+          Text(angleText, style: _valueStyle),
         ],
       ),
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  final String label;
-  final String value;
+// =============================================================================
+// Frame playback controls
+// =============================================================================
 
-  const _MetricCard({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF888888),
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Frame-by-frame navigation controls: slider, frame counter, prev/next/play.
 class _FramePlaybackControls extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
@@ -360,7 +451,7 @@ class _FramePlaybackControls extends StatelessWidget {
     final totalFrames = state.totalFrames;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -393,9 +484,6 @@ class _FramePlaybackControls extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Speed selector
-          _SpeedSelector(cubit: cubit, state: state),
-          const SizedBox(height: 12),
           // Previous / Play-Pause / Next
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -458,36 +546,35 @@ class _FramePlaybackControls extends StatelessWidget {
   }
 }
 
-/// Row of pill buttons for selecting playback speed.
-class _SpeedSelector extends StatelessWidget {
-  final SessionDetailsCubit cubit;
-  final SessionDetailsLoaded state;
+// =============================================================================
+// Options sheet widgets
+// =============================================================================
 
-  const _SpeedSelector({required this.cubit, required this.state});
+class _SheetSectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SheetSectionHeader({required this.title});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      spacing: 8,
-      children: [
-        for (final speed in SessionDetailsCubit.availableSpeeds)
-          _SpeedPill(
-            speed: speed,
-            isActive: state.playbackSpeed == speed,
-            onTap: () => cubit.setPlaybackSpeed(speed),
-          ),
-      ],
+    return Text(
+      title,
+      style: const TextStyle(
+        color: Color(0xFF666666),
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.2,
+      ),
     );
   }
 }
 
-class _SpeedPill extends StatelessWidget {
+class _SheetSpeedPill extends StatelessWidget {
   final double speed;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _SpeedPill({
+  const _SheetSpeedPill({
     required this.speed,
     required this.isActive,
     required this.onTap,
@@ -496,20 +583,24 @@ class _SpeedPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: isActive
               ? const Color(0xFF4CAF50)
               : const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
         ),
+        alignment: Alignment.center,
         child: Text(
           _formatSpeed(speed),
           style: TextStyle(
             color: isActive ? Colors.white : const Color(0xFF888888),
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
           ),
         ),

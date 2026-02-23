@@ -529,7 +529,8 @@ class _RepMarkerSlider extends StatelessWidget {
       child: Slider(
         value: state.currentFrameIndex.toDouble(),
         max: (state.totalFrames - 1).toDouble().clamp(0, double.infinity),
-        onChanged: (value) => cubit.seekToFrame(value.round()),
+        onChanged: (value) => cubit.scrubToFrame(value.round()),
+        onChangeEnd: (_) => cubit.commitScrub(),
       ),
     );
   }

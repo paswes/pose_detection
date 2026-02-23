@@ -31,6 +31,10 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   /// to eliminate visible lag between video and landmarks.
   final frameNotifier = ValueNotifier<TrackedFrame?>(null);
 
+  /// Throttle state for scrub video seeks.
+  DateTime _lastScrubSeek = DateTime(0);
+  static const _scrubSeekInterval = Duration(milliseconds: 100);
+
   /// Exposes the video controller for the page to build the [VideoPlayer] widget.
   VideoPlayerController? get videoController => _controller;
 
@@ -270,6 +274,51 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       hipAngle: () => _repCounter.currentAngle,
       reps: _allReps,
     ));
+  }
+
+  /// Update overlay and state, with throttled video seeks.
+  ///
+  /// The landmark overlay updates instantly on every call. Video seeks
+  /// are throttled to at most once per [_scrubSeekInterval] so the player
+  /// keeps up without freezing during fast slider drags.
+  void scrubToFrame(int index) {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    final clamped = index.clamp(0, current.totalFrames - 1);
+    final timestampMicros = current.frames[clamped].timestampMicros;
+
+    _repCounter.countRepsUpTo(current.frames, clamped);
+
+    frameNotifier.value = current.frames[clamped];
+
+    // Throttled video seek — fire-and-forget to avoid blocking the UI
+    final now = DateTime.now();
+    if (now.difference(_lastScrubSeek) >= _scrubSeekInterval) {
+      _lastScrubSeek = now;
+      _controller?.seekTo(Duration(microseconds: timestampMicros));
+    }
+
+    emit(current.copyWith(
+      currentFrameIndex: clamped,
+      videoPosition: Duration(microseconds: timestampMicros),
+      repCount: _repCounter.repCount,
+      hipAngle: () => _repCounter.currentAngle,
+      reps: _allReps,
+    ));
+  }
+
+  /// Seek the video controller to the current frame position.
+  ///
+  /// Called once when the slider drag ends to sync the video to
+  /// the frame the user scrubbed to.
+  Future<void> commitScrub() async {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    final timestampMicros =
+        current.frames[current.currentFrameIndex].timestampMicros;
+    await _controller?.seekTo(Duration(microseconds: timestampMicros));
   }
 
   /// Advance to the next frame (pauses if playing).

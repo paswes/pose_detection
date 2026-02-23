@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:pose_detection/core/di/service_locator.dart';
+import 'package:pose_detection/features/anatomy/domain/entities/muscle_group.dart';
 import 'package:pose_detection/features/anatomy/presentation/cubit/anatomy_cubit.dart';
 import 'package:pose_detection/features/anatomy/presentation/cubit/anatomy_state.dart';
 import 'package:pose_detection/features/anatomy/presentation/widgets/anatomy_body_view.dart';
@@ -62,6 +63,18 @@ class _AnatomyPageState extends State<AnatomyPage> {
             'Anatomie',
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
+          actions: [
+            BlocBuilder<AnatomyCubit, AnatomyState>(
+              builder: (context, state) {
+                if (state is! AnatomyLoaded) return const SizedBox.shrink();
+                return _ViewToggle(
+                  currentView: state.currentView,
+                  onChanged: _cubit.setView,
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
         ),
         body: BlocBuilder<AnatomyCubit, AnatomyState>(
           builder: (context, state) {
@@ -93,6 +106,76 @@ class _AnatomyPageState extends State<AnatomyPage> {
 
 // ── Private widgets ──────────────────────────────────────────────
 
+class _ViewToggle extends StatelessWidget {
+  final BodyView currentView;
+  final ValueChanged<BodyView> onChanged;
+
+  const _ViewToggle({
+    required this.currentView,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ToggleButton(
+            label: 'Front',
+            isSelected: currentView == BodyView.front,
+            onTap: () => onChanged(BodyView.front),
+          ),
+          _ToggleButton(
+            label: 'Back',
+            isSelected: currentView == BodyView.back,
+            onTap: () => onChanged(BodyView.back),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToggleButton extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ToggleButton({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF333333) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : const Color(0xFF666666),
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AnatomyLoadedView extends StatelessWidget {
   final AnatomyLoaded state;
   final ValueChanged<String> onMuscleSelected;
@@ -117,6 +200,7 @@ class _AnatomyLoadedView extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: AnatomyBodyView(
                 muscles: state.muscles,
+                currentView: state.currentView,
                 selectedMuscleId: state.selectedMuscleId,
                 onMuscleSelected: onMuscleSelected,
               ),

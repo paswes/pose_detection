@@ -1,6 +1,9 @@
 import 'package:pose_detection/features/anatomy/domain/entities/exercise_info.dart';
 import 'package:pose_detection/features/anatomy/domain/entities/muscle_status.dart';
 
+/// Which side of the body a muscle is primarily visible on.
+enum BodyView { front, back }
+
 /// A muscle group that can be displayed on the anatomy avatar.
 class MuscleGroup {
   /// Unique identifier (e.g., 'chest', 'biceps').
@@ -11,6 +14,9 @@ class MuscleGroup {
 
   /// Latin/anatomical name (e.g., 'M. pectoralis major').
   final String nameLatin;
+
+  /// Which body view this muscle appears on.
+  final BodyView view;
 
   /// Anatomical origin (Ursprung).
   final String origin;
@@ -31,6 +37,7 @@ class MuscleGroup {
     required this.id,
     required this.nameDE,
     required this.nameLatin,
+    required this.view,
     required this.origin,
     required this.insertion,
     required this.function,
@@ -43,6 +50,7 @@ class MuscleGroup {
       id: id,
       nameDE: nameDE,
       nameLatin: nameLatin,
+      view: view,
       origin: origin,
       insertion: insertion,
       function: function,

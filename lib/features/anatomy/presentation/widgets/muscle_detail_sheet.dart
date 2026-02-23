@@ -5,6 +5,9 @@ import 'package:pose_detection/features/anatomy/domain/entities/muscle_group.dar
 import 'package:pose_detection/features/anatomy/domain/entities/muscle_status.dart';
 
 /// Shows the muscle detail bottom sheet using wolt_modal_sheet.
+///
+/// [onDismissed] is called when the sheet is closed by any means
+/// (barrier tap, drag, close button, or back navigation).
 void showMuscleDetailSheet({
   required BuildContext context,
   required MuscleGroup muscle,
@@ -16,10 +19,8 @@ void showMuscleDetailSheet({
     pageListBuilder: (bottomSheetContext) => [
       _buildPage(bottomSheetContext, muscle, onStatusChanged),
     ],
-    onModalDismissedWithBarrierTap: onDismissed,
-    onModalDismissedWithDrag: onDismissed,
     modalBarrierColor: Colors.black54,
-  );
+  ).whenComplete(onDismissed);
 }
 
 SliverWoltModalSheetPage _buildPage(

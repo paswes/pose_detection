@@ -19,14 +19,20 @@ class AnatomyLoading extends AnatomyState {
 /// Muscles loaded and ready for display.
 class AnatomyLoaded extends AnatomyState {
   final List<MuscleGroup> muscles;
+  final BodyView currentView;
   final String? selectedMuscleId;
 
   const AnatomyLoaded({
     required this.muscles,
+    this.currentView = BodyView.front,
     this.selectedMuscleId,
   });
 
-  /// Find a muscle by ID.
+  /// Muscles visible in the current body view.
+  List<MuscleGroup> get visibleMuscles =>
+      muscles.where((m) => m.view == currentView).toList();
+
+  /// Find a muscle by ID across all views.
   MuscleGroup? muscleById(String id) {
     for (final m in muscles) {
       if (m.id == id) return m;
@@ -46,17 +52,19 @@ class AnatomyLoaded extends AnatomyState {
 
   AnatomyLoaded copyWith({
     List<MuscleGroup>? muscles,
+    BodyView? currentView,
     String? Function()? selectedMuscleId,
   }) {
     return AnatomyLoaded(
       muscles: muscles ?? this.muscles,
+      currentView: currentView ?? this.currentView,
       selectedMuscleId:
           selectedMuscleId != null ? selectedMuscleId() : this.selectedMuscleId,
     );
   }
 
   @override
-  List<Object?> get props => [muscles, selectedMuscleId];
+  List<Object?> get props => [muscles, currentView, selectedMuscleId];
 }
 
 /// Error state.

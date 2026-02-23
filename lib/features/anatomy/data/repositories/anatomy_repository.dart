@@ -10,10 +10,13 @@ class AnatomyRepository implements IAnatomyRepository {
   final Map<String, MuscleStatus> _statusOverrides = {};
 
   static const List<MuscleGroup> _muscles = [
+    // ── FRONT VIEW ──────────────────────────────────────────────
+
     MuscleGroup(
       id: 'chest',
       nameDE: 'Brustmuskel',
       nameLatin: 'M. pectoralis major',
+      view: BodyView.front,
       origin: 'Schluesselbein (Clavicula), Brustbein (Sternum), Rippen 2-6',
       insertion: 'Crista tuberculi majoris des Oberarmknochens (Humerus)',
       function:
@@ -29,6 +32,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'abs',
       nameDE: 'Gerader Bauchmuskel',
       nameLatin: 'M. rectus abdominis',
+      view: BodyView.front,
       origin: 'Schambein (Os pubis)',
       insertion: 'Schwertfortsatz (Proc. xiphoideus), Rippen 5-7',
       function:
@@ -44,6 +48,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'obliques',
       nameDE: 'Schraege Bauchmuskeln',
       nameLatin: 'M. obliquus externus / internus',
+      view: BodyView.front,
       origin: 'Rippen 5-12 (ext.), Fascia thoracolumbalis (int.)',
       insertion: 'Linea alba, Crista iliaca, Leistenband',
       function: 'Rumpfrotation, Seitneigung, Bauchpresse',
@@ -58,6 +63,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'shoulders',
       nameDE: 'Schultermuskel',
       nameLatin: 'M. deltoideus',
+      view: BodyView.front,
       origin:
           'Schluesselbein (Pars clavicularis), Acromion (Pars acromialis), Spina scapulae (Pars spinalis)',
       insertion: 'Tuberositas deltoidea des Humerus',
@@ -74,6 +80,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'biceps',
       nameDE: 'Bizeps',
       nameLatin: 'M. biceps brachii',
+      view: BodyView.front,
       origin:
           'Caput longum: Tuberculum supraglenoidale; Caput breve: Proc. coracoideus',
       insertion: 'Tuberositas radii, Aponeurosis bicipitalis',
@@ -89,6 +96,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'forearms',
       nameDE: 'Unterarmmuskeln',
       nameLatin: 'Mm. flexores / extensores antebrachii',
+      view: BodyView.front,
       origin: 'Epicondylus medialis / lateralis des Humerus',
       insertion: 'Handwurzel-, Mittelhand- und Fingerknochen',
       function:
@@ -104,6 +112,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'quads',
       nameDE: 'Quadrizeps',
       nameLatin: 'M. quadriceps femoris',
+      view: BodyView.front,
       origin:
           'Spina iliaca anterior inferior (Rectus), Trochanter major und Linea aspera (Vasti)',
       insertion: 'Tuberositas tibiae (ueber die Patellarsehne)',
@@ -116,9 +125,40 @@ class AnatomyRepository implements IAnatomyRepository {
     ),
 
     MuscleGroup(
+      id: 'adductors',
+      nameDE: 'Adduktoren',
+      nameLatin: 'M. adductor longus / brevis / magnus',
+      view: BodyView.front,
+      origin: 'Ramus inferior des Os pubis, Tuber ischiadicum',
+      insertion: 'Linea aspera des Femur',
+      function: 'Hueftadduktion, Hueftbeugung, Stabilisierung',
+      exercises: [
+        ExerciseInfo(nameDE: 'Adduktorenmaschine', equipment: 'Maschine'),
+        ExerciseInfo(nameDE: 'Sumo-Kniebeugen', equipment: 'Langhantel'),
+      ],
+    ),
+
+    // ── BACK VIEW ───────────────────────────────────────────────
+
+    MuscleGroup(
+      id: 'neck',
+      nameDE: 'Nackenmuskulatur',
+      nameLatin: 'Mm. scaleni / M. sternocleidomastoideus',
+      view: BodyView.back,
+      origin: 'Querfortsaetze der HWS, Manubrium sterni, Clavicula',
+      insertion: 'Processus mastoideus, Linea nuchalis, 1.-2. Rippe',
+      function: 'Kopfneigung, Kopfdrehung, Atemhilfsmuskel',
+      exercises: [
+        ExerciseInfo(nameDE: 'Nackenziehen', equipment: 'Kabelzug'),
+        ExerciseInfo(nameDE: 'Shrugs', equipment: 'Kurzhanteln'),
+      ],
+    ),
+
+    MuscleGroup(
       id: 'traps',
       nameDE: 'Trapezmuskel',
       nameLatin: 'M. trapezius',
+      view: BodyView.back,
       origin:
           'Protuberantia occipitalis, Lig. nuchae, Dornfortsaetze C7-Th12',
       insertion: 'Spina scapulae, Acromion, laterales Drittel der Clavicula',
@@ -132,9 +172,24 @@ class AnatomyRepository implements IAnatomyRepository {
     ),
 
     MuscleGroup(
+      id: 'upper_back',
+      nameDE: 'Oberer Ruecken',
+      nameLatin: 'Mm. rhomboidei / M. trapezius (pars media)',
+      view: BodyView.back,
+      origin: 'Dornfortsaetze C6-Th4',
+      insertion: 'Margo medialis der Scapula',
+      function: 'Schulterblattretraktion, Stabilisierung der Scapula',
+      exercises: [
+        ExerciseInfo(nameDE: 'Face Pulls', equipment: 'Kabelzug'),
+        ExerciseInfo(nameDE: 'Vorgebeugtes Rudern', equipment: 'Langhantel'),
+      ],
+    ),
+
+    MuscleGroup(
       id: 'lats',
       nameDE: 'Breiter Rueckenmuskel',
       nameLatin: 'M. latissimus dorsi',
+      view: BodyView.back,
       origin:
           'Dornfortsaetze Th7-L5, Fascia thoracolumbalis, Crista iliaca, Rippen 9-12',
       insertion: 'Crista tuberculi minoris des Humerus',
@@ -151,6 +206,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'triceps',
       nameDE: 'Trizeps',
       nameLatin: 'M. triceps brachii',
+      view: BodyView.back,
       origin:
           'Caput longum: Tuberculum infraglenoidale; Caput laterale/mediale: Humerus-Rueckseite',
       insertion: 'Olecranon der Ulna',
@@ -168,6 +224,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'lower_back',
       nameDE: 'Unterer Ruecken',
       nameLatin: 'M. erector spinae',
+      view: BodyView.back,
       origin: 'Os sacrum, Crista iliaca, Dornfortsaetze der LWS',
       insertion: 'Querfortsaetze und Dornfortsaetze der Wirbelsaeule, Rippen',
       function:
@@ -183,6 +240,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'glutes',
       nameDE: 'Gesaessmuskel',
       nameLatin: 'M. gluteus maximus',
+      view: BodyView.back,
       origin:
           'Os ilium (Darmbein), Os sacrum (Kreuzbein), Lig. sacrotuberale',
       insertion:
@@ -197,9 +255,24 @@ class AnatomyRepository implements IAnatomyRepository {
     ),
 
     MuscleGroup(
+      id: 'abductor',
+      nameDE: 'Abduktoren',
+      nameLatin: 'M. gluteus medius / M. tensor fasciae latae',
+      view: BodyView.back,
+      origin: 'Facies glutea des Os ilium, Crista iliaca',
+      insertion: 'Trochanter major, Tractus iliotibialis',
+      function: 'Hueftabduktion, Stabilisierung des Beckens beim Gehen',
+      exercises: [
+        ExerciseInfo(nameDE: 'Seitliches Beinheben', equipment: 'Koerpergewicht'),
+        ExerciseInfo(nameDE: 'Abduktorenmaschine', equipment: 'Maschine'),
+      ],
+    ),
+
+    MuscleGroup(
       id: 'hamstrings',
       nameDE: 'Beinbeuger',
       nameLatin: 'M. biceps femoris / M. semitendinosus',
+      view: BodyView.back,
       origin:
           'Tuber ischiadicum (Sitzbeinhöcker), Linea aspera (Caput breve)',
       insertion:
@@ -217,6 +290,7 @@ class AnatomyRepository implements IAnatomyRepository {
       id: 'calves',
       nameDE: 'Wadenmuskel',
       nameLatin: 'M. gastrocnemius / M. soleus',
+      view: BodyView.back,
       origin:
           'Condylus medialis/lateralis des Femur (Gastrocnemius), Fibula/Tibia (Soleus)',
       insertion: 'Tuber calcanei (ueber die Achillessehne)',
@@ -226,58 +300,6 @@ class AnatomyRepository implements IAnatomyRepository {
         ExerciseInfo(nameDE: 'Wadenheben sitzend', equipment: 'Maschine'),
         ExerciseInfo(
             nameDE: 'Einbeiniges Wadenheben', equipment: 'Koerpergewicht'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'neck',
-      nameDE: 'Nackenmuskulatur',
-      nameLatin: 'Mm. scaleni / M. sternocleidomastoideus',
-      origin: 'Querfortsaetze der HWS, Manubrium sterni, Clavicula',
-      insertion: 'Processus mastoideus, Linea nuchalis, 1.-2. Rippe',
-      function: 'Kopfneigung, Kopfdrehung, Atemhilfsmuskel',
-      exercises: [
-        ExerciseInfo(nameDE: 'Nackenziehen', equipment: 'Kabelzug'),
-        ExerciseInfo(nameDE: 'Shrugs', equipment: 'Kurzhanteln'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'upper_back',
-      nameDE: 'Oberer Ruecken',
-      nameLatin: 'Mm. rhomboidei / M. trapezius (pars media)',
-      origin: 'Dornfortsaetze C6-Th4',
-      insertion: 'Margo medialis der Scapula',
-      function: 'Schulterblattretraktion, Stabilisierung der Scapula',
-      exercises: [
-        ExerciseInfo(nameDE: 'Face Pulls', equipment: 'Kabelzug'),
-        ExerciseInfo(nameDE: 'Vorgebeugtes Rudern', equipment: 'Langhantel'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'abductor',
-      nameDE: 'Abduktoren',
-      nameLatin: 'M. gluteus medius / M. tensor fasciae latae',
-      origin: 'Facies glutea des Os ilium, Crista iliaca',
-      insertion: 'Trochanter major, Tractus iliotibialis',
-      function: 'Hueftabduktion, Stabilisierung des Beckens beim Gehen',
-      exercises: [
-        ExerciseInfo(nameDE: 'Seitliches Beinheben', equipment: 'Koerpergewicht'),
-        ExerciseInfo(nameDE: 'Abduktorenmaschine', equipment: 'Maschine'),
-      ],
-    ),
-
-    MuscleGroup(
-      id: 'adductors',
-      nameDE: 'Adduktoren',
-      nameLatin: 'M. adductor longus / brevis / magnus',
-      origin: 'Ramus inferior des Os pubis, Tuber ischiadicum',
-      insertion: 'Linea aspera des Femur',
-      function: 'Hueftadduktion, Hueftbeugung, Stabilisierung',
-      exercises: [
-        ExerciseInfo(nameDE: 'Adduktorenmaschine', equipment: 'Maschine'),
-        ExerciseInfo(nameDE: 'Sumo-Kniebeugen', equipment: 'Langhantel'),
       ],
     ),
   ];

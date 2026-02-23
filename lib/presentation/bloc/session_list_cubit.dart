@@ -1,10 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import 'package:pose_detection/core/services/demo_session_service.dart';
-import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
+import 'package:pose_detection/presentation/bloc/session_list_state.dart';
 
 /// Cubit for managing the session list on the home page.
-class SessionListCubit extends Cubit<List<Session>> {
+class SessionListCubit extends Cubit<SessionListState> {
   final SessionRepository _repository;
   final DemoSessionService _demoService;
 
@@ -13,17 +14,31 @@ class SessionListCubit extends Cubit<List<Session>> {
     required DemoSessionService demoService,
   })  : _repository = repository,
         _demoService = demoService,
-        super(const []);
+        super(const SessionListInitializing());
 
   /// Seed the demo session (if needed) and load all sessions.
   Future<void> loadSessions() async {
-    await _demoService.ensureDemoSession();
+    final needsDemo = await _demoService.needsProcessing();
+
+    if (needsDemo) {
+      emit(const SessionListInitializing());
+      await _demoService.ensureDemoSession(
+        onProgress: (completed, total) {
+          emit(SessionListInitializing(
+            completedFrames: completed,
+            totalFrames: total,
+          ));
+        },
+      );
+    }
+
     final sessions = await _repository.getAllSessions();
-    emit(sessions);
+    emit(SessionListLoaded(sessions: sessions));
   }
 
   Future<void> deleteSession(String sessionId) async {
     await _repository.deleteSession(sessionId);
-    await loadSessions();
+    final sessions = await _repository.getAllSessions();
+    emit(SessionListLoaded(sessions: sessions));
   }
 }

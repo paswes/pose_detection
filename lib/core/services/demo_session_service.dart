@@ -27,6 +27,12 @@ class DemoSessionService {
   })  : _repository = repository,
         _processingService = processingService;
 
+  /// Whether the demo session still needs to be processed.
+  Future<bool> needsProcessing() async {
+    final existing = await _repository.getFramesForSession(_demoSessionId);
+    return existing.isEmpty;
+  }
+
   /// Ensures the demo session exists in the database.
   ///
   /// Returns immediately if already seeded. Otherwise copies the asset
@@ -62,6 +68,7 @@ class DemoSessionService {
       imageWidth: result.imageWidth,
       imageHeight: result.imageHeight,
       sensorOrientation: 0,
+      isDemo: true,
     );
 
     await _repository.saveSession(session, result.frames);

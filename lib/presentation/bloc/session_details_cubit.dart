@@ -121,8 +121,19 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     if (newIndex != current.currentFrameIndex) {
       frameNotifier.value = current.frames[newIndex];
 
-      // Update rep counter — sequential advance during playback
-      _repCounter.processFrame(current.frames[newIndex]);
+      // Process ALL intermediate frames so the rep counter never skips
+      // state transitions when the position listener fires infrequently.
+      final prevIndex = current.currentFrameIndex;
+      if (newIndex > prevIndex) {
+        _repCounter.processFrameRange(
+          current.frames,
+          prevIndex + 1,
+          newIndex,
+        );
+      } else {
+        // Jumped backward (rare during playback) — replay from start
+        _repCounter.countRepsUpTo(current.frames, newIndex);
+      }
     }
 
     // Only emit BLoC state when something actually changed (for UI controls)

@@ -1,11 +1,13 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/data/models/landmark_data.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 
 /// Phase of a single RDL repetition.
-enum RdlPhase { standing, descending, ascending }
+enum RdlPhase { standing, descending }
 
 /// Counts Romanian Deadlift reps by tracking the hip hinge angle
 /// (shoulder-center → hip-center → knee-center) through a state machine.
@@ -13,31 +15,78 @@ enum RdlPhase { standing, descending, ascending }
 /// Pure logic — no Flutter dependencies.
 class RdlRepCounter {
   /// Angle above which the lifter is considered standing (top of rep).
-  static const _standingAngle = 160.0;
+  /// Real data shows standing phases peak at ~155-158° smoothed.
+  /// 150° safely captures return to upright without requiring full extension.
+  static const _standingAngle = 150.0;
 
   /// Angle below which the lifter has reached the bottom of the hinge.
-  static const _hingeAngle = 145.0;
+  /// Real data shows bottom of hinge at ~77-91° raw. 110° captures
+  /// the start of a meaningful descent with margin.
+  static const _hingeAngle = 110.0;
+
+  /// Hysteresis margin added to thresholds to prevent oscillation
+  /// at threshold boundaries from noisy angle readings.
+  /// Effective entry: < 105°, effective exit: > 155°.
+  static const _hysteresisMargin = 5.0;
 
   /// Minimum landmark confidence to trust a coordinate.
   static const _minLikelihood = 0.5;
 
-  /// Number of recent angles to average for smoothing.
+  /// Number of recent angles for the median filter.
+  /// 3-frame median removes single-frame outliers while adding minimal
+  /// lag (~50ms at 30 FPS). The wide hysteresis band handles the rest.
   static const _smoothingWindow = 3;
+
+  /// Minimum frames a descent must last before a rep can be counted.
+  /// With corrected thresholds (55° travel), this primarily guards
+  /// against erratic tracking data. At 30 FPS, 8 frames ≈ 267ms.
+  static const _minDescentFrames = 8;
 
   int _repCount = 0;
   RdlPhase _phase = RdlPhase.standing;
   double? _currentAngle;
   final List<double> _angleBuffer = [];
 
+  // DEBUG: Track angle range across all frames
+  double _minAngleSeen = double.infinity;
+  double _maxAngleSeen = double.negativeInfinity;
+
+  /// Frames spent in the current descending phase.
+  int _descentFrameCount = 0;
+
+  /// Consecutive null-angle frames.
+  int _nullStreak = 0;
+
+  /// Max consecutive null frames before clearing the angle buffer.
+  /// At 30 FPS, 15 frames = 500ms — brief occlusions won't reset state.
+  static const _maxNullStreak = 15;
+
   int get repCount => _repCount;
   RdlPhase get phase => _phase;
   double? get currentAngle => _currentAngle;
+
+  // TODO: Remove debug logging after calibration
+  int _frameIndex = 0;
 
   /// Process a single frame. Returns `true` if the rep count changed.
   bool processFrame(TrackedFrame frame) {
     final angle = calculateHipAngle(frame);
     _currentAngle = angle;
-    if (angle == null) return false;
+    _frameIndex++;
+
+    if (angle == null) {
+      _nullStreak++;
+      if (_nullStreak >= _maxNullStreak) {
+        _angleBuffer.clear();
+      }
+      return false;
+    }
+
+    _nullStreak = 0;
+
+    // DEBUG: Track angle range
+    if (angle < _minAngleSeen) _minAngleSeen = angle;
+    if (angle > _maxAngleSeen) _maxAngleSeen = angle;
 
     _angleBuffer.add(angle);
     if (_angleBuffer.length > _smoothingWindow) {
@@ -47,7 +96,28 @@ class RdlRepCounter {
     final smoothed = _smoothedAngle();
     if (smoothed == null) return false;
 
+    // DEBUG: Log every 10th frame + all state transitions
+    if (_frameIndex % 10 == 0) {
+      debugPrint('[RepCounter] frame=$_frameIndex raw=${angle.toStringAsFixed(1)} '
+          'smoothed=${smoothed.toStringAsFixed(1)} phase=$_phase '
+          'descent=$_descentFrameCount reps=$_repCount');
+    }
+
     return _updatePhase(smoothed);
+  }
+
+  /// Process a range of frames sequentially, from [startIndex] to
+  /// [endIndex] inclusive.
+  void processFrameRange(
+    List<TrackedFrame> frames,
+    int startIndex,
+    int endIndex,
+  ) {
+    final start = startIndex.clamp(0, frames.length - 1);
+    final end = endIndex.clamp(0, frames.length - 1);
+    for (int i = start; i <= end; i++) {
+      processFrame(frames[i]);
+    }
   }
 
   /// Replay frames 0..[targetIndex] to get the correct rep count
@@ -58,6 +128,8 @@ class RdlRepCounter {
     for (int i = 0; i <= end; i++) {
       processFrame(frames[i]);
     }
+    debugPrint('[RepCounter] countRepsUpTo($targetIndex) → reps=$_repCount '
+        'angleRange=${_minAngleSeen.toStringAsFixed(1)}..${_maxAngleSeen.toStringAsFixed(1)}');
   }
 
   /// Reset all state to initial values.
@@ -66,6 +138,11 @@ class RdlRepCounter {
     _phase = RdlPhase.standing;
     _currentAngle = null;
     _angleBuffer.clear();
+    _descentFrameCount = 0;
+    _nullStreak = 0;
+    _frameIndex = 0;
+    _minAngleSeen = double.infinity;
+    _maxAngleSeen = double.negativeInfinity;
   }
 
   /// Calculate the hip hinge angle from a frame's landmarks.
@@ -111,23 +188,23 @@ class RdlRepCounter {
   bool _updatePhase(double smoothedAngle) {
     switch (_phase) {
       case RdlPhase.standing:
-        if (smoothedAngle < _hingeAngle) {
+        if (smoothedAngle < _hingeAngle - _hysteresisMargin) {
+          debugPrint('[RepCounter] STANDING→DESCENDING at frame=$_frameIndex '
+              'smoothed=${smoothedAngle.toStringAsFixed(1)} '
+              '(threshold: <${(_hingeAngle - _hysteresisMargin).toStringAsFixed(0)})');
           _phase = RdlPhase.descending;
+          _descentFrameCount = 0;
         }
         return false;
 
       case RdlPhase.descending:
-        if (smoothedAngle >= _standingAngle) {
+        _descentFrameCount++;
+        if (smoothedAngle > _standingAngle + _hysteresisMargin &&
+            _descentFrameCount >= _minDescentFrames) {
           _repCount++;
-          _phase = RdlPhase.standing;
-          return true;
-        }
-        return false;
-
-      case RdlPhase.ascending:
-        // Not used in simplified 3-state machine, but kept for extensibility.
-        if (smoothedAngle >= _standingAngle) {
-          _repCount++;
+          debugPrint('[RepCounter] DESCENDING→STANDING REP #$_repCount at frame=$_frameIndex '
+              'smoothed=${smoothedAngle.toStringAsFixed(1)} descent=$_descentFrameCount '
+              '(threshold: >${(_standingAngle + _hysteresisMargin).toStringAsFixed(0)})');
           _phase = RdlPhase.standing;
           return true;
         }
@@ -137,7 +214,9 @@ class RdlRepCounter {
 
   double? _smoothedAngle() {
     if (_angleBuffer.isEmpty) return null;
-    return _angleBuffer.reduce((a, b) => a + b) / _angleBuffer.length;
+    final sorted = List<double>.from(_angleBuffer)..sort();
+    // Median filter — more robust to outliers than arithmetic mean.
+    return sorted[sorted.length ~/ 2];
   }
 
   /// Find a landmark by ID with minimum confidence, or return `null`.

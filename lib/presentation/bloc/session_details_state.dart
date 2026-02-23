@@ -40,14 +40,14 @@ class SessionDetailsLoaded extends SessionDetailsState {
   final List<TrackedFrame> frames;
   final List<ui.Image> frameImages;
   final int currentFrameIndex;
-  final bool isAutoPlaying;
+  final int? selectedLandmarkId;
 
   const SessionDetailsLoaded({
     required this.session,
     required this.frames,
     required this.frameImages,
     this.currentFrameIndex = 0,
-    this.isAutoPlaying = false,
+    this.selectedLandmarkId,
   });
 
   int get totalFrames => frames.length;
@@ -62,14 +62,16 @@ class SessionDetailsLoaded extends SessionDetailsState {
 
   SessionDetailsLoaded copyWith({
     int? currentFrameIndex,
-    bool? isAutoPlaying,
+    int? Function()? selectedLandmarkId,
   }) {
     return SessionDetailsLoaded(
       session: session,
       frames: frames,
       frameImages: frameImages,
       currentFrameIndex: currentFrameIndex ?? this.currentFrameIndex,
-      isAutoPlaying: isAutoPlaying ?? this.isAutoPlaying,
+      selectedLandmarkId: selectedLandmarkId != null
+          ? selectedLandmarkId()
+          : this.selectedLandmarkId,
     );
   }
 
@@ -77,7 +79,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
   List<Object?> get props => [
     session.id,
     currentFrameIndex,
-    isAutoPlaying,
+    selectedLandmarkId,
     totalFrames,
   ];
 }

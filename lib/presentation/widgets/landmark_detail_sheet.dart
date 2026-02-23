@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
-import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/data/models/landmark_data.dart';
 
 /// Shows a bottom sheet with details for a single pose landmark.
@@ -14,7 +13,7 @@ void showLandmarkDetailSheet({
   required LandmarkData landmark,
   VoidCallback? onDismissed,
 }) {
-  final schema = sl<LandmarkSchema>();
+  final schema = LandmarkSchema.rdl;
 
   WoltModalSheet.show(
     context: context,

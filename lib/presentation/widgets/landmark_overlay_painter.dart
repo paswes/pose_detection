@@ -20,6 +20,7 @@ class LandmarkOverlayPainter extends CustomPainter {
   final double rawImageHeight;
   final bool isFrontCamera;
   final LandmarkSchema _schema;
+  final Set<int>? _visibleIds;
 
   LandmarkOverlayPainter({
     required this.frameNotifier,
@@ -28,7 +29,9 @@ class LandmarkOverlayPainter extends CustomPainter {
     required this.rawImageHeight,
     this.isFrontCamera = false,
     LandmarkSchema? schema,
+    Set<int>? visibleLandmarkIds,
   })  : _schema = schema ?? sl<LandmarkSchema>(),
+        _visibleIds = visibleLandmarkIds,
         super(repaint: frameNotifier);
 
   @override
@@ -44,7 +47,11 @@ class LandmarkOverlayPainter extends CustomPainter {
   void _drawLandmarks(Canvas canvas, Size size, TrackedFrame frame) {
     // Convert stored landmarks to domain Landmark objects,
     // normalizing from raw ML Kit buffer space to video pixel space.
-    final landmarks = frame.landmarks.map((l) {
+    // When a visible set is provided, skip landmarks outside it.
+    final landmarks = <Landmark>[];
+    for (final l in frame.landmarks) {
+      if (_visibleIds != null && !_visibleIds.contains(l.id)) continue;
+
       var x = (l.x / rawImageWidth) * videoSize.width;
       final y = (l.y / rawImageHeight) * videoSize.height;
 
@@ -53,14 +60,14 @@ class LandmarkOverlayPainter extends CustomPainter {
         x = videoSize.width - x;
       }
 
-      return Landmark(
+      landmarks.add(Landmark(
         id: l.id,
         x: x,
         y: y,
         z: l.z,
         likelihood: l.likelihood,
-      );
-    }).toList();
+      ));
+    }
 
     // Translate to widget coordinates using the same BoxFit.cover transform
     final translatedPoints =
@@ -161,6 +168,8 @@ class LandmarkOverlayPainter extends CustomPainter {
     return oldDelegate.videoSize != videoSize ||
         oldDelegate.rawImageWidth != rawImageWidth ||
         oldDelegate.rawImageHeight != rawImageHeight ||
-        oldDelegate.isFrontCamera != isFrontCamera;
+        oldDelegate.isFrontCamera != isFrontCamera ||
+        oldDelegate._schema != _schema ||
+        oldDelegate._visibleIds != _visibleIds;
   }
 }

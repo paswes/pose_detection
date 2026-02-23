@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
+import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
 import 'package:pose_detection/data/models/landmark_data.dart';
@@ -197,6 +198,8 @@ class _VideoWithOverlay extends StatelessWidget {
                         rawImageWidth: state.session.imageWidth,
                         rawImageHeight: state.session.imageHeight,
                         isFrontCamera: state.session.isFrontCamera,
+                        schema: LandmarkSchema.rdl,
+                        visibleLandmarkIds: LandmarkSchema.rdlLandmarkIds,
                       ),
                     ),
                   ),
@@ -224,21 +227,24 @@ class _VideoWithOverlay extends StatelessWidget {
       state.session.imageHeight,
     );
 
-    // Same normalization as LandmarkOverlayPainter._drawLandmarks()
-    final landmarks = frame.landmarks.map((l) {
+    // Same normalization and filtering as LandmarkOverlayPainter._drawLandmarks()
+    final landmarks = <Landmark>[];
+    for (final l in frame.landmarks) {
+      if (!LandmarkSchema.rdlLandmarkIds.contains(l.id)) continue;
+
       var x = (l.x / state.session.imageWidth) * videoSize.width;
       final y = (l.y / state.session.imageHeight) * videoSize.height;
       if (state.session.isFrontCamera) {
         x = videoSize.width - x;
       }
-      return Landmark(
+      landmarks.add(Landmark(
         id: l.id,
         x: x,
         y: y,
         z: l.z,
         likelihood: l.likelihood,
-      );
-    }).toList();
+      ));
+    }
 
     final translatedPoints =
         CoordinateTranslator.translateAllLandmarksWithDepth(

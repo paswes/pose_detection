@@ -273,6 +273,40 @@ class RdlRepCounter {
     );
   }
 
+  /// Calculate torso lean angle relative to vertical.
+  ///
+  /// Returns degrees from vertical (0° = perfectly upright,
+  /// larger values = more forward lean).
+  /// Uses shoulder-center → hip-center line vs vertical.
+  /// Returns `null` if required landmarks are missing or low-confidence.
+  static double? calculateTorsoLean(TrackedFrame frame) {
+    if (!frame.isPersonDetected) return null;
+
+    final lShoulder = _findLandmark(frame, LandmarkSchema.leftShoulder);
+    final rShoulder = _findLandmark(frame, LandmarkSchema.rightShoulder);
+    final lHip = _findLandmark(frame, LandmarkSchema.leftHip);
+    final rHip = _findLandmark(frame, LandmarkSchema.rightHip);
+
+    if (lShoulder == null ||
+        rShoulder == null ||
+        lHip == null ||
+        rHip == null) {
+      return null;
+    }
+
+    final sx = (lShoulder.x + rShoulder.x) / 2;
+    final sy = (lShoulder.y + rShoulder.y) / 2;
+    final hx = (lHip.x + rHip.x) / 2;
+    final hy = (lHip.y + rHip.y) / 2;
+
+    // Angle between shoulder→hip line and vertical.
+    // In image coords, Y increases downward, so hip is below shoulder.
+    // atan2(dx, dy) gives angle from vertical (0° = straight down = upright).
+    final dx = hx - sx;
+    final dy = hy - sy;
+    return atan2(dx.abs(), dy.abs()) * (180.0 / pi);
+  }
+
   /// Calculate knee angle using one side's landmarks.
   /// hip → knee → ankle for the specified side.
   static double? calculateKneeAngle(

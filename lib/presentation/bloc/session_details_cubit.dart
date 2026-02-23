@@ -21,6 +21,9 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   final RdlRepCounter _repCounter = RdlRepCounter();
   VideoPlayerController? _controller;
 
+  /// Pre-computed reps for the entire session (for always-visible markers).
+  List<RdlRepData> _allReps = const [];
+
   /// Direct repaint signal for the landmark overlay painter.
   ///
   /// Updated synchronously in the video position listener so the overlay
@@ -63,7 +66,12 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       // Set initial frame for the painter
       frameNotifier.value = frames.first;
 
-      // Process first frame for initial angle
+      // Pre-compute all reps so markers are visible from the start.
+      // Run through every frame, then reset the counter back to frame 0
+      // but keep the discovered reps list.
+      _repCounter.countRepsUpTo(frames, frames.length - 1);
+      _allReps = _repCounter.reps;
+      _repCounter.reset();
       _repCounter.processFrame(frames.first, globalFrameIndex: 0);
 
       emit(SessionDetailsLoaded(
@@ -72,7 +80,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         isVideoReady: true,
         videoDuration: _controller!.value.duration,
         hipAngle: _repCounter.currentAngle,
-        reps: _repCounter.reps,
+        reps: _allReps,
       ));
 
       // Add listener AFTER initial state is emitted, so any early
@@ -150,7 +158,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       isPlaying: isPlaying,
       repCount: _repCounter.repCount,
       hipAngle: () => _repCounter.currentAngle,
-      reps: _repCounter.reps,
+      reps: _allReps,
     ));
   }
 
@@ -211,7 +219,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
           videoPosition: Duration.zero,
           repCount: _repCounter.repCount,
           hipAngle: () => _repCounter.currentAngle,
-          reps: _repCounter.reps,
+          reps: _allReps,
         ));
         await controller.play();
         return;
@@ -260,7 +268,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       videoPosition: Duration(microseconds: timestampMicros),
       repCount: _repCounter.repCount,
       hipAngle: () => _repCounter.currentAngle,
-      reps: _repCounter.reps,
+      reps: _allReps,
     ));
   }
 
@@ -292,7 +300,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       isPlaying: false,
       repCount: _repCounter.repCount,
       hipAngle: () => _repCounter.currentAngle,
-      reps: _repCounter.reps,
+      reps: _allReps,
     ));
   }
 
@@ -324,7 +332,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       isPlaying: false,
       repCount: _repCounter.repCount,
       hipAngle: () => _repCounter.currentAngle,
-      reps: _repCounter.reps,
+      reps: _allReps,
     ));
   }
 

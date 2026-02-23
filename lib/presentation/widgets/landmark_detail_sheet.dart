@@ -3,16 +3,20 @@ import 'package:flutter/services.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
+import 'package:pose_detection/core/utils/rdl_rep_counter.dart';
 import 'package:pose_detection/data/models/landmark_data.dart';
+import 'package:pose_detection/data/models/tracked_frame.dart';
 
 /// Shows a bottom sheet with details for a single pose landmark.
 ///
-/// Displays the landmark name, raw coordinates (x, y, z),
-/// and connected landmarks as tappable navigation links.
+/// Displays the landmark name, RDL biomechanical metrics
+/// (hip angle, knee angle, torso lean), and connected landmarks
+/// as tappable navigation links.
 void showLandmarkDetailSheet({
   required BuildContext context,
   required LandmarkData landmark,
   required List<LandmarkData> allLandmarks,
+  TrackedFrame? frame,
   ValueChanged<int>? onLandmarkSelected,
   VoidCallback? onDismissed,
 }) {
@@ -21,7 +25,7 @@ void showLandmarkDetailSheet({
   late final ValueNotifier<WoltModalSheetPageListBuilder> pageListNotifier;
   pageListNotifier = ValueNotifier<WoltModalSheetPageListBuilder>(
     (sheetContext) => [
-      _buildPage(sheetContext, landmark, schema, allLandmarks, (id) {
+      _buildPage(sheetContext, landmark, schema, allLandmarks, frame, (id) {
         onLandmarkSelected?.call(id);
         final next = allLandmarks.firstWhere((l) => l.id == id);
         _updateNotifier(
@@ -29,6 +33,7 @@ void showLandmarkDetailSheet({
           next,
           schema,
           allLandmarks,
+          frame,
           onLandmarkSelected,
         );
       }),
@@ -51,13 +56,14 @@ void _updateNotifier(
   LandmarkData landmark,
   LandmarkSchema schema,
   List<LandmarkData> allLandmarks,
+  TrackedFrame? frame,
   ValueChanged<int>? onLandmarkSelected,
 ) {
   notifier.value = (ctx) => [
-    _buildPage(ctx, landmark, schema, allLandmarks, (id) {
+    _buildPage(ctx, landmark, schema, allLandmarks, frame, (id) {
       onLandmarkSelected?.call(id);
       final next = allLandmarks.firstWhere((l) => l.id == id);
-      _updateNotifier(notifier, next, schema, allLandmarks, onLandmarkSelected);
+      _updateNotifier(notifier, next, schema, allLandmarks, frame, onLandmarkSelected);
     }),
   ];
 }
@@ -67,10 +73,12 @@ SliverWoltModalSheetPage _buildPage(
   LandmarkData landmark,
   LandmarkSchema schema,
   List<LandmarkData> allLandmarks,
+  TrackedFrame? frame,
   ValueChanged<int> onConnectionTapped,
 ) {
   final name = schema.getLandmarkName(landmark.id);
   final connections = _getConnectedLandmarks(landmark.id, schema, allLandmarks);
+  final metrics = frame != null ? _computeMetrics(frame) : <_MetricInfo>[];
 
   return SliverWoltModalSheetPage(
     backgroundColor: const Color(0xFF1E1E1E),
@@ -90,23 +98,18 @@ SliverWoltModalSheetPage _buildPage(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         sliver: SliverList.list(
           children: [
-            // Coordinates section
+            // Metrics section
             const SizedBox(height: 16),
             Row(
               spacing: 8,
               children: [
-                _CoordinateBox(
-                  label: 'X',
-                  value: landmark.x.toStringAsFixed(1),
-                ),
-                _CoordinateBox(
-                  label: 'Y',
-                  value: landmark.y.toStringAsFixed(1),
-                ),
-                _CoordinateBox(
-                  label: 'Z',
-                  value: landmark.z.toStringAsFixed(1),
-                ),
+                for (final m in metrics)
+                  _CoordinateBox(
+                    label: m.label,
+                    value: m.value != null
+                        ? '${m.value!.toStringAsFixed(1)}°'
+                        : '–',
+                  ),
               ],
             ),
 
@@ -131,6 +134,34 @@ SliverWoltModalSheetPage _buildPage(
       ),
     ],
   );
+}
+
+/// A single metric to display in the detail sheet.
+typedef _MetricInfo = ({String label, double? value});
+
+/// Compute the 3 RDL biomechanical metrics for the current frame.
+List<_MetricInfo> _computeMetrics(TrackedFrame frame) {
+  // Hip angle (bilateral center)
+  final hipAngle = RdlRepCounter.calculateHipAngle(frame);
+
+  // Knee angle (average of both sides, or whichever is available)
+  final leftKnee = RdlRepCounter.calculateKneeAngle(frame, left: true);
+  final rightKnee = RdlRepCounter.calculateKneeAngle(frame, left: false);
+  final double? kneeAngle;
+  if (leftKnee != null && rightKnee != null) {
+    kneeAngle = (leftKnee + rightKnee) / 2;
+  } else {
+    kneeAngle = leftKnee ?? rightKnee;
+  }
+
+  // Torso lean angle
+  final torsoLean = RdlRepCounter.calculateTorsoLean(frame);
+
+  return [
+    (label: 'Hüftwinkel', value: hipAngle),
+    (label: 'Kniewinkel', value: kneeAngle),
+    (label: 'Oberkörper', value: torsoLean),
+  ];
 }
 
 /// Connected landmark with ID and display name.

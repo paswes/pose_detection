@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
+import 'package:pose_detection/core/utils/rdl_rep_counter.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
 import 'package:pose_detection/data/models/landmark_data.dart';
@@ -104,15 +105,14 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
             cubit: _cubit,
             state: state,
             onBack: () => Navigator.pop(context),
-            onAnalyticsTapped: state.reps.isNotEmpty
-                ? () => _openAnalytics(state)
-                : null,
+            onAnalyticsTapped: () => _openAnalytics(state),
             onLandmarkTapped: (landmark) {
               _cubit.selectLandmark(landmark.id);
               showLandmarkDetailSheet(
                 context: context,
                 landmark: landmark,
                 allLandmarks: state.currentFrame?.landmarks ?? [],
+                frame: state.currentFrame,
                 onLandmarkSelected: (id) => _cubit.selectLandmark(id),
                 onDismissed: () => _cubit.selectLandmark(null),
               );
@@ -231,24 +231,16 @@ class _VideoWithOverlay extends StatelessWidget {
                       ),
                       const Spacer(),
                       _OverlayBadge(
-                        value: '${state.repCount}',
+                        value: '${state.repCount} of ${state.reps.length}',
                         label: 'Reps',
                       ),
-                      const SizedBox(width: 8),
-                      _OverlayBadge(
-                        value: state.hipAngle != null
-                            ? '${state.hipAngle!.toStringAsFixed(0)}°'
-                            : '–',
-                        label: 'Hips',
-                      ),
-                      if (onAnalyticsTapped != null) ...[
-                        const SizedBox(width: 8),
+                      const Spacer(),
+                      if (onAnalyticsTapped != null)
                         _OverlayButton(
                           onTap: onAnalyticsTapped!,
                           icon: Icons.bar_chart_rounded,
                           size: 22,
                         ),
-                      ],
                     ],
                   ),
                 ),
@@ -361,36 +353,35 @@ class _OverlayBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          spacing: 8,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 8,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              fontFeatures: [FontFeature.tabularFigures()],
             ),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF999999),
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-              ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF999999),
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -436,47 +427,14 @@ class _ControlsSheet extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Drag handle
-                      /* const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10),
-                        child: _DragHandle(),
-                      ), */
-                      // Frame counter
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Padding(
-                          padding: EdgeInsets.only(right: 16),
-                          child: Text(
-                            '${state.currentFrameIndex + 1} / ${state.totalFrames}',
-                            style: const TextStyle(
-                              color: Color(0xFF888888),
-                              fontSize: 10,
-                              fontFeatures: [FontFeature.tabularFigures()],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
+                      // Rep pills (tap to seek to rep start)
+                      if (state.reps.isNotEmpty)
+                        _RepPillRow(cubit: cubit, state: state),
+                      if (state.reps.isNotEmpty) const SizedBox(height: 16),
                       // Frame scrubber
-                      SliderTheme(
-                        data: SliderThemeData(
-                          activeTrackColor: const Color(0xFF4CAF50),
-                          inactiveTrackColor: const Color(0xFF333333),
-                          thumbColor: const Color(0xFF4CAF50),
-                          overlayShape: SliderComponentShape.noOverlay,
-                          trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 8,
-                          ),
-                        ),
-                        child: Slider(
-                          value: state.currentFrameIndex.toDouble(),
-                          max: state.totalFrames > 1
-                              ? (state.totalFrames - 1).toDouble()
-                              : 0,
-                          onChanged: (value) =>
-                              cubit.seekToFrame(value.round()),
-                        ),
+                      _RepMarkerSlider(
+                        cubit: cubit,
+                        state: state,
                       ),
                       const SizedBox(height: 24),
                       // Previous / Play-Pause / Next
@@ -527,6 +485,123 @@ class _ControlsSheet extends StatelessWidget {
       },
     );
   }
+}
+
+class _RepMarkerSlider extends StatelessWidget {
+  final SessionDetailsCubit cubit;
+  final SessionDetailsLoaded state;
+
+  const _RepMarkerSlider({required this.cubit, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliderTheme(
+      data: SliderThemeData(
+        activeTrackColor: const Color(0xFF4CAF50),
+        inactiveTrackColor: const Color(0xFF333333),
+        thumbColor: const Color(0xFF4CAF50),
+        overlayShape: SliderComponentShape.noOverlay,
+        trackHeight: 3,
+        thumbShape: const RoundSliderThumbShape(
+          enabledThumbRadius: 8,
+        ),
+      ),
+      child: Slider(
+        value: state.currentFrameIndex.toDouble(),
+        max: (state.totalFrames - 1).toDouble().clamp(0, double.infinity),
+        onChanged: (value) => cubit.seekToFrame(value.round()),
+      ),
+    );
+  }
+}
+
+/// Circular rep markers positioned at each rep's timestamp on the slider track.
+/// Tap to seek to that rep's start frame.
+class _RepPillRow extends StatelessWidget {
+  final SessionDetailsCubit cubit;
+  final SessionDetailsLoaded state;
+
+  static const _trackPadding = 24.0;
+  static const _markerDiameter = 22.0;
+
+  const _RepPillRow({required this.cubit, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTapUp: (details) => _handleTap(details.localPosition, context),
+      child: CustomPaint(
+        painter: _RepCirclePainter(
+          reps: state.reps,
+          totalFrames: state.totalFrames,
+        ),
+        child: const SizedBox(height: _markerDiameter, width: double.infinity),
+      ),
+    );
+  }
+
+  void _handleTap(Offset tap, BuildContext context) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+
+    final trackWidth = box.size.width - _trackPadding * 2;
+    final maxFrames = (state.totalFrames - 1).clamp(1, state.totalFrames);
+
+    for (final rep in state.reps) {
+      final x = _trackPadding + (rep.startFrameIndex / maxFrames) * trackWidth;
+      if ((tap.dx - x).abs() < _markerDiameter / 2 + 6) {
+        HapticFeedback.selectionClick();
+        cubit.seekToFrame(rep.startFrameIndex);
+        return;
+      }
+    }
+  }
+}
+
+class _RepCirclePainter extends CustomPainter {
+  final List<RdlRepData> reps;
+  final int totalFrames;
+
+  static const _trackPadding = 24.0;
+  static const _diameter = 22.0;
+
+  _RepCirclePainter({required this.reps, required this.totalFrames});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (reps.isEmpty || totalFrames <= 1) return;
+
+    final trackWidth = size.width - _trackPadding * 2;
+    final maxFrames = totalFrames - 1;
+    final circlePaint = Paint()..color = const Color(0xFF2A2A2A);
+    final cy = size.height / 2;
+
+    for (final rep in reps) {
+      final cx = _trackPadding + (rep.startFrameIndex / maxFrames) * trackWidth;
+
+      canvas.drawCircle(Offset(cx, cy), _diameter / 2, circlePaint);
+
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '${rep.repNumber}',
+          style: const TextStyle(
+            color: Color(0xFF888888),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            height: 1,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RepCirclePainter old) =>
+      old.reps.length != reps.length || old.totalFrames != totalFrames;
 }
 
 class _ControlButton extends StatelessWidget {

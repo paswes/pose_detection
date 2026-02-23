@@ -33,3 +33,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/mel.mp4
+    - assets/logo.png
+    - assets/powered_by.png

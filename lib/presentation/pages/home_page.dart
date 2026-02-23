@@ -195,23 +195,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: GestureDetector(
-        onTap: _cubit.loadDemoSession,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          decoration: BoxDecoration(
-            color: Color(0xFF2196F3),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Text(
-            'Demo laden',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+    return const Center(
+      child: Text(
+        'Noch keine Sessions',
+        style: TextStyle(
+          fontSize: 16,
+          color: Color(0xFF666666),
         ),
       ),
     );
@@ -291,58 +280,48 @@ class _InitializingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.fitness_center_rounded,
-                size: 56,
-                color: Color(0xFF4CAF50),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Nutrilize AI Meetup',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Spacer(),
+                Image.asset(
+                  'assets/logo.png',
+                  width: 240,
+                  height: 240,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                state.totalFrames > 0
-                    ? 'Demo wird vorbereitet...'
-                    : 'Wird geladen...',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF888888),
-                ),
-              ),
-              const SizedBox(height: 32),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: state.totalFrames > 0 ? state.progress : null,
-                  backgroundColor: const Color(0xFF2A2A2A),
-                  color: const Color(0xFF4CAF50),
-                  minHeight: 4,
-                ),
-              ),
-              if (state.totalFrames > 0) ...[
-                const SizedBox(height: 12),
-                Text(
-                  '${state.completedFrames} / ${state.totalFrames} Frames',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF666666),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: state.totalFrames > 0 ? state.progress : null,
+                    backgroundColor: const Color(0xFF2A2A2A),
+                    color: Color.fromARGB(255, 74, 230, 215),
+                    minHeight: 4,
                   ),
                 ),
+                if (state.totalFrames > 0) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    state.totalFrames > 0
+                        ? 'Demo wird vorbereitet...'
+                        : 'Wird geladen...',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF888888),
+                    ),
+                  ),
+                ],
+                Spacer(),
+                Image.asset(
+                  'assets/powered_by.png',
+                  width: 300,
+                  height: 64,
+                ),
               ],
-            ],
+            ),
           ),
         ),
       ),

@@ -10,7 +10,6 @@ import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_list_state.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
 import 'package:pose_detection/presentation/pages/session_details_page.dart';
-import 'package:pose_detection/presentation/pages/video_upload_page.dart';
 
 /// Home page showing recorded sessions with navigation to capture.
 class HomePage extends StatefulWidget {
@@ -63,15 +62,7 @@ class _HomePageState extends State<HomePage> {
 
       if (video == null) return;
 
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => VideoUploadPage(videoPath: video.path),
-        ),
-      );
-
-      if (!mounted) return;
-      _cubit.loadSessions();
+      _cubit.processVideoFromPath(video.path);
     } catch (_) {
       if (!mounted) return;
       setState(() => _isPicking = false);
@@ -145,39 +136,43 @@ class _HomePageState extends State<HomePage> {
       child: BlocBuilder<SessionListCubit, SessionListState>(
         builder: (context, state) => switch (state) {
           SessionListInitializing() => _InitializingScreen(state: state),
-          SessionListLoaded() => _buildLoadedScaffold(state.sessions),
+          SessionListLoaded() => _buildLoadedScaffold(state),
         },
       ),
     );
   }
 
-  Widget _buildLoadedScaffold(List<Session> sessions) {
+  Widget _buildLoadedScaffold(SessionListLoaded state) {
+    final sessions = state.sessions;
     return Scaffold(
       appBar: AppBar(
         actions: [
-          GestureDetector(
-            onTap: _showMoreSheet,
-            child: Container(
-              margin: const EdgeInsets.only(right: 16),
-              padding: const EdgeInsets.all(8),
-              child: const Icon(
-                Icons.more_horiz_rounded,
-                color: Color(0xFF888888),
-                size: 24,
+          if (sessions.isNotEmpty && !state.processingVideo)
+            GestureDetector(
+              onTap: _showMoreSheet,
+              child: Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.all(8),
+                child: const Icon(
+                  Icons.more_horiz_rounded,
+                  color: Color(0xFF888888),
+                  size: 24,
+                ),
               ),
             ),
-          ),
         ],
       ),
-      body: sessions.isEmpty ? _buildEmptyState() : _buildSessionList(sessions),
-      floatingActionButton: sessions.isEmpty
+      body: sessions.isEmpty && !state.processingVideo
+          ? _buildEmptyState()
+          : _buildSessionList(state),
+      floatingActionButton: sessions.isEmpty && !state.processingVideo
           ? null
           : GestureDetector(
               onTap: _pickAndUploadVideo,
               child: Container(
                 padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2196F3),
+                  color: const Color(0xFF4CAF50),
                   borderRadius: BorderRadius.circular(99),
                 ),
                 child: _isPicking
@@ -201,90 +196,52 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.videocam_off_rounded,
-            size: 48,
-            color: Color(0xFF444444),
+      child: GestureDetector(
+        onTap: _cubit.loadDemoSession,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          decoration: BoxDecoration(
+            color: Color(0xFF2196F3),
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Noch keine Sessions',
+          child: const Text(
+            'Demo laden',
             style: TextStyle(
-              fontSize: 18,
+              color: Colors.white,
+              fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF888888),
             ),
           ),
-          const SizedBox(height: 32),
-          GestureDetector(
-            onTap: _cubit.loadDemoSession,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Demo RDL laden',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: _pickAndUploadVideo,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2196F3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _isPicking
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Text(
-                      'Video hochladen',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildSessionList(List<Session> sessions) {
+  Widget _buildSessionList(SessionListLoaded state) {
+    final sessions = state.sessions;
+    final extra = state.processingVideo ? 1 : 0;
     return ListView.builder(
-      itemCount: sessions.length,
+      itemCount: sessions.length + extra,
       padding: const EdgeInsets.all(16),
       itemBuilder: (context, index) {
+        if (state.processingVideo && index == 0) {
+          return _ProcessingCard(
+            completed: state.processingCompleted,
+            total: state.processingTotal,
+            progress: state.processingProgress,
+          );
+        }
+        final session = sessions[index - extra];
         return _SessionCard(
-          session: sessions[index],
+          session: session,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => SessionDetailsPage(session: sessions[index]),
+              builder: (_) => SessionDetailsPage(session: session),
             ),
           ),
-          onDismissed: () => _cubit.deleteSession(sessions[index].id),
-          onConfirmDelete: () => _confirmDelete(sessions[index]),
+          onDismissed: () => _cubit.deleteSession(session.id),
+          onConfirmDelete: () => _confirmDelete(session),
         );
       },
     );
@@ -423,6 +380,73 @@ class _MoreSheetItem extends StatelessWidget {
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// -- Processing Card --
+
+class _ProcessingCard extends StatelessWidget {
+  final int completed;
+  final int total;
+  final double progress;
+
+  const _ProcessingCard({
+    required this.completed,
+    required this.total,
+    required this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(
+                  value: total > 0 ? progress : null,
+                  color: const Color(0xFF4CAF50),
+                  strokeWidth: 3,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Video wird verarbeitet...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    total > 0
+                        ? 'Frame $completed / $total'
+                        : 'Pose-Erkennung läuft...',
+                    style: const TextStyle(
+                      color: Color(0xFF666666),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

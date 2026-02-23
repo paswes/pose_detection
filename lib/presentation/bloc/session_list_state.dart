@@ -22,6 +22,31 @@ class SessionListInitializing extends SessionListState {
 /// Sessions loaded successfully.
 class SessionListLoaded extends SessionListState {
   final List<Session> sessions;
+  final bool processingVideo;
+  final int processingCompleted;
+  final int processingTotal;
 
-  const SessionListLoaded({required this.sessions});
+  const SessionListLoaded({
+    required this.sessions,
+    this.processingVideo = false,
+    this.processingCompleted = 0,
+    this.processingTotal = 0,
+  });
+
+  double get processingProgress =>
+      processingTotal > 0 ? processingCompleted / processingTotal : 0.0;
+
+  SessionListLoaded copyWith({
+    List<Session>? sessions,
+    bool? processingVideo,
+    int? processingCompleted,
+    int? processingTotal,
+  }) {
+    return SessionListLoaded(
+      sessions: sessions ?? this.sessions,
+      processingVideo: processingVideo ?? this.processingVideo,
+      processingCompleted: processingCompleted ?? this.processingCompleted,
+      processingTotal: processingTotal ?? this.processingTotal,
+    );
+  }
 }

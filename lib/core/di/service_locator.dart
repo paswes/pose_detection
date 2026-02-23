@@ -109,6 +109,7 @@ Future<void> initializeDependencies({
     () => SessionListCubit(
       repository: sl<SessionRepository>(),
       demoService: sl<DemoSessionService>(),
+      processingService: sl<VideoProcessingService>(),
     ),
   );
 

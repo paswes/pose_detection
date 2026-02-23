@@ -343,6 +343,20 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     emit(current.copyWith(selectedLandmarkId: () => id));
   }
 
+  /// Toggle injury marking for a landmark.
+  void toggleLandmarkInjury(int id) {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    final updated = Set<int>.from(current.injuredLandmarkIds);
+    if (updated.contains(id)) {
+      updated.remove(id);
+    } else {
+      updated.add(id);
+    }
+    emit(current.copyWith(injuredLandmarkIds: updated));
+  }
+
   @override
   Future<void> close() {
     _controller?.removeListener(_onVideoPositionChanged);

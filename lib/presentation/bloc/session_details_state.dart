@@ -31,6 +31,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
   final int repCount;
   final double? hipAngle;
   final List<RdlRepData> reps;
+  final Set<int> injuredLandmarkIds;
 
   const SessionDetailsLoaded({
     required this.session,
@@ -45,6 +46,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     this.repCount = 0,
     this.hipAngle,
     this.reps = const [],
+    this.injuredLandmarkIds = const {},
   });
 
   int get totalFrames => frames.length;
@@ -63,6 +65,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     int? repCount,
     double? Function()? hipAngle,
     List<RdlRepData>? reps,
+    Set<int>? injuredLandmarkIds,
   }) {
     return SessionDetailsLoaded(
       session: session,
@@ -79,6 +82,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
       repCount: repCount ?? this.repCount,
       hipAngle: hipAngle != null ? hipAngle() : this.hipAngle,
       reps: reps ?? this.reps,
+      injuredLandmarkIds: injuredLandmarkIds ?? this.injuredLandmarkIds,
     );
   }
 
@@ -96,6 +100,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     repCount,
     hipAngle,
     reps,
+    injuredLandmarkIds,
   ];
 }
 

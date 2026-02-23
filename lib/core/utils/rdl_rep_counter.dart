@@ -77,10 +77,20 @@ class RdlRepCounter {
   /// against erratic tracking data. At 30 FPS, 8 frames ≈ 267ms.
   static const _minDescentFrames = 8;
 
+  /// Angle drop from peak required to mark descent onset.
+  /// Small enough to catch early movement, large enough to ignore sensor noise.
+  static const _onsetThreshold = 3.0;
+
+  /// Max recent angle entries to keep for backtracking (~2s at 30 FPS).
+  static const _recentAnglesCapacity = 60;
+
   int _repCount = 0;
   RdlPhase _phase = RdlPhase.standing;
   double? _currentAngle;
   final List<double> _angleBuffer = [];
+
+  /// Recent (frameIndex, rawAngle) pairs for backtracking descent onset.
+  final List<(int, double)> _recentAngles = [];
 
   // DEBUG: Track angle range across all frames
   double _minAngleSeen = double.infinity;
@@ -135,6 +145,12 @@ class RdlRepCounter {
     // DEBUG: Track angle range
     if (angle < _minAngleSeen) _minAngleSeen = angle;
     if (angle > _maxAngleSeen) _maxAngleSeen = angle;
+
+    // Store for descent onset backtracking
+    _recentAngles.add((frameIdx, angle));
+    if (_recentAngles.length > _recentAnglesCapacity) {
+      _recentAngles.removeAt(0);
+    }
 
     _angleBuffer.add(angle);
     if (_angleBuffer.length > _smoothingWindow) {
@@ -194,6 +210,7 @@ class RdlRepCounter {
     _phase = RdlPhase.standing;
     _currentAngle = null;
     _angleBuffer.clear();
+    _recentAngles.clear();
     _descentFrameCount = 0;
     _nullStreak = 0;
     _frameIndex = 0;
@@ -350,12 +367,14 @@ class RdlRepCounter {
     switch (_phase) {
       case RdlPhase.standing:
         if (smoothedAngle < _hingeAngle - _hysteresisMargin) {
+          final onsetFrameIdx = _findDescentOnset(frameIdx);
           debugPrint('[RepCounter] STANDING→DESCENDING at frame=$_frameIndex '
               'smoothed=${smoothedAngle.toStringAsFixed(1)} '
+              'onset=$onsetFrameIdx (was $frameIdx) '
               '(threshold: <${(_hingeAngle - _hysteresisMargin).toStringAsFixed(0)})');
           _phase = RdlPhase.descending;
           _descentFrameCount = 0;
-          _descentStartFrameIndex = frameIdx;
+          _descentStartFrameIndex = onsetFrameIdx;
           _descentStartTimestampMicros = frame.timestampMicros;
           _minAngleDuringDescent = smoothedAngle;
           _bottomFrameIndex = frameIdx;
@@ -408,6 +427,37 @@ class RdlRepCounter {
         }
         return false;
     }
+  }
+
+  /// Walk backward through recent angles to find where descent truly began.
+  ///
+  /// Finds the local peak angle before the transition, then scans forward
+  /// to the first frame where the angle drops by [_onsetThreshold] from
+  /// that peak. Falls back to [transitionFrameIdx] if the buffer is empty.
+  int _findDescentOnset(int transitionFrameIdx) {
+    if (_recentAngles.isEmpty) return transitionFrameIdx;
+
+    // Find the peak angle in the buffer (highest = most upright)
+    int peakIdx = 0;
+    double peakAngle = _recentAngles[0].$2;
+    for (int i = 1; i < _recentAngles.length; i++) {
+      if (_recentAngles[i].$2 > peakAngle) {
+        peakAngle = _recentAngles[i].$2;
+        peakIdx = i;
+      }
+    }
+
+    // Scan forward from peak to find first frame where angle drops
+    // below peak - threshold (= movement onset)
+    final threshold = peakAngle - _onsetThreshold;
+    for (int i = peakIdx + 1; i < _recentAngles.length; i++) {
+      if (_recentAngles[i].$2 < threshold) {
+        return _recentAngles[i].$1;
+      }
+    }
+
+    // No clear onset found — use the transition frame
+    return transitionFrameIdx;
   }
 
   double? _smoothedAngle() {

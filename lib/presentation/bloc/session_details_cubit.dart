@@ -76,13 +76,21 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     }
   }
 
-  /// Compensation for iOS AVPlayer position reporting delay.
+  /// Available playback speed options for analysis mode.
+  static const availableSpeeds = [0.25, 0.5, 0.75, 1.0];
+
+  /// Base lookahead at 1.0x, compensating for iOS AVPlayer platform channel
+  /// reporting delay (~2 frames at 30 FPS).
+  static const _baseLookAheadMicros = 66000;
+
+  /// Scaled lookahead for a given playback speed.
   ///
-  /// On iOS, `VideoPlayerController.value.position` arrives via platform
-  /// channels and is typically 2-3 frames behind the actual displayed
-  /// video texture. Adding this offset aligns the landmark overlay with
-  /// the frame the user actually sees on screen.
-  static const _lookAheadMicros = 66000; // ~2 frames at 30 FPS
+  /// The platform channel delay is constant in real time (~66 ms), but at
+  /// reduced speeds the video advances slower through that same real-time
+  /// window. Scaling keeps the landmark overlay aligned with the displayed
+  /// frame at any speed.
+  static int _scaledLookAheadMicros(double speed) =>
+      (_baseLookAheadMicros * speed).round();
 
   /// Listener called by [VideoPlayerController] on position/state changes.
   void _onVideoPositionChanged() {
@@ -95,9 +103,11 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final position = controller.value.position;
     final isPlaying = controller.value.isPlaying;
 
-    // Compensate for iOS platform channel delay during playback
+    // Compensate for iOS platform channel delay during playback,
+    // scaled by the current playback speed.
     final positionMicros = isPlaying
-        ? position.inMicroseconds + _lookAheadMicros
+        ? position.inMicroseconds +
+            _scaledLookAheadMicros(current.playbackSpeed)
         : position.inMicroseconds;
     final newIndex = _findNearestFrameIndex(current.frames, positionMicros);
 
@@ -171,6 +181,19 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       await controller.seekTo(Duration(microseconds: targetMicros));
       await controller.play();
     }
+  }
+
+  /// Set the video playback speed.
+  ///
+  /// Applies the speed to [VideoPlayerController] immediately and updates
+  /// state so the UI reflects the active speed. The lookahead compensation
+  /// scales automatically via [_scaledLookAheadMicros].
+  Future<void> setPlaybackSpeed(double speed) async {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    await _controller?.setPlaybackSpeed(speed);
+    emit(current.copyWith(playbackSpeed: speed));
   }
 
   /// Seek to a specific frame by index.

@@ -26,6 +26,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
   final bool isVideoReady;
   final Duration videoPosition;
   final Duration videoDuration;
+  final double playbackSpeed;
 
   const SessionDetailsLoaded({
     required this.session,
@@ -36,6 +37,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     this.isVideoReady = false,
     this.videoPosition = Duration.zero,
     this.videoDuration = Duration.zero,
+    this.playbackSpeed = 1.0,
   });
 
   int get totalFrames => frames.length;
@@ -50,6 +52,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     bool? isVideoReady,
     Duration? videoPosition,
     Duration? videoDuration,
+    double? playbackSpeed,
   }) {
     return SessionDetailsLoaded(
       session: session,
@@ -62,6 +65,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
       isVideoReady: isVideoReady ?? this.isVideoReady,
       videoPosition: videoPosition ?? this.videoPosition,
       videoDuration: videoDuration ?? this.videoDuration,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
     );
   }
 
@@ -75,6 +79,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     isVideoReady,
     videoPosition,
     videoDuration,
+    playbackSpeed,
   ];
 }
 

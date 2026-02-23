@@ -314,6 +314,9 @@ class _FramePlaybackControls extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          // Speed selector
+          _SpeedSelector(cubit: cubit, state: state),
           const SizedBox(height: 12),
           // Previous / Play-Pause / Next
           Row(
@@ -374,5 +377,72 @@ class _FramePlaybackControls extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Row of pill buttons for selecting playback speed.
+class _SpeedSelector extends StatelessWidget {
+  final SessionDetailsCubit cubit;
+  final SessionDetailsLoaded state;
+
+  const _SpeedSelector({required this.cubit, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      spacing: 8,
+      children: [
+        for (final speed in SessionDetailsCubit.availableSpeeds)
+          _SpeedPill(
+            speed: speed,
+            isActive: state.playbackSpeed == speed,
+            onTap: () => cubit.setPlaybackSpeed(speed),
+          ),
+      ],
+    );
+  }
+}
+
+class _SpeedPill extends StatelessWidget {
+  final double speed;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _SpeedPill({
+    required this.speed,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive
+              ? const Color(0xFF4CAF50)
+              : const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          _formatSpeed(speed),
+          style: TextStyle(
+            color: isActive ? Colors.white : const Color(0xFF888888),
+            fontSize: 12,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble() && speed >= 1.0) {
+      return '${speed.toInt()}x';
+    }
+    return '${speed}x';
   }
 }

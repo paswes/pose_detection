@@ -21,6 +21,7 @@ dependencies:
   video_player: ^2.10.1
   video_thumbnail: ^0.5.3
   wolt_modal_sheet: ^0.9.4
+  image_picker: ^1.1.2
   flutter_body_part_selector: ^1.2.0
 
 dev_dependencies:

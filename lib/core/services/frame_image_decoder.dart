@@ -57,6 +57,34 @@ class FrameImageDecoder {
     return images;
   }
 
+  /// Decode a single frame from a video at the given timestamp.
+  ///
+  /// [videoPath] — absolute path to the video file.
+  /// [timestampMicros] — frame timestamp in microseconds.
+  ///
+  /// Returns the decoded [ui.Image], or `null` if extraction fails.
+  Future<ui.Image?> decodeSingleFrame(
+    String videoPath,
+    int timestampMicros,
+  ) async {
+    final timestampMs = timestampMicros ~/ 1000;
+
+    try {
+      final bytes = await VideoThumbnail.thumbnailData(
+        video: videoPath,
+        imageFormat: ImageFormat.JPEG,
+        timeMs: timestampMs,
+        quality: 85,
+      );
+
+      if (bytes != null && bytes.isNotEmpty) {
+        return _decodeImage(bytes);
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
   /// Decode JPEG bytes to a [ui.Image].
   Future<ui.Image> _decodeImage(Uint8List bytes) async {
     final codec = await ui.instantiateImageCodec(bytes);

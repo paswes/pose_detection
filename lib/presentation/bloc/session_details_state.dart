@@ -13,41 +13,27 @@ sealed class SessionDetailsState extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Loading session data from database.
+/// Loading session data and preparing first frame.
 class SessionDetailsLoading extends SessionDetailsState {
   const SessionDetailsLoading();
 }
 
-/// Decoding video frames to images — shows progress.
-class SessionDetailsDecoding extends SessionDetailsState {
-  final int completed;
-  final int total;
-
-  const SessionDetailsDecoding({
-    required this.completed,
-    required this.total,
-  });
-
-  double get progress => total > 0 ? completed / total : 0.0;
-
-  @override
-  List<Object?> get props => [completed, total];
-}
-
-/// Frames decoded and ready for playback.
+/// Frames loaded and ready for playback.
 class SessionDetailsLoaded extends SessionDetailsState {
   final Session session;
   final List<TrackedFrame> frames;
-  final List<ui.Image> frameImages;
+  final ui.Image? currentImage;
   final int currentFrameIndex;
   final int? selectedLandmarkId;
+  final bool isAutoPlaying;
 
   const SessionDetailsLoaded({
     required this.session,
     required this.frames,
-    required this.frameImages,
+    this.currentImage,
     this.currentFrameIndex = 0,
     this.selectedLandmarkId,
+    this.isAutoPlaying = false,
   });
 
   int get totalFrames => frames.length;
@@ -55,23 +41,23 @@ class SessionDetailsLoaded extends SessionDetailsState {
   TrackedFrame? get currentFrame =>
       currentFrameIndex < frames.length ? frames[currentFrameIndex] : null;
 
-  ui.Image? get currentImage =>
-      currentFrameIndex < frameImages.length
-          ? frameImages[currentFrameIndex]
-          : null;
-
   SessionDetailsLoaded copyWith({
+    ui.Image? Function()? currentImage,
     int? currentFrameIndex,
     int? Function()? selectedLandmarkId,
+    bool? isAutoPlaying,
   }) {
     return SessionDetailsLoaded(
       session: session,
       frames: frames,
-      frameImages: frameImages,
+      currentImage: currentImage != null
+          ? currentImage()
+          : this.currentImage,
       currentFrameIndex: currentFrameIndex ?? this.currentFrameIndex,
       selectedLandmarkId: selectedLandmarkId != null
           ? selectedLandmarkId()
           : this.selectedLandmarkId,
+      isAutoPlaying: isAutoPlaying ?? this.isAutoPlaying,
     );
   }
 
@@ -81,6 +67,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     currentFrameIndex,
     selectedLandmarkId,
     totalFrames,
+    isAutoPlaying,
   ];
 }
 

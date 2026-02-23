@@ -6,6 +6,7 @@ import 'package:pose_detection/features/anatomy/presentation/pages/anatomy_page.
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
 import 'package:pose_detection/presentation/pages/session_details_page.dart';
+import 'package:pose_detection/presentation/pages/video_upload_page.dart';
 
 /// Home page showing recorded sessions with navigation to capture.
 class HomePage extends StatefulWidget {
@@ -41,6 +42,16 @@ class _HomePageState extends State<HomePage> {
     if (result == true) {
       _cubit.loadSessions();
     }
+  }
+
+  Future<void> _navigateToUpload() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const VideoUploadPage()),
+    );
+
+    if (!mounted) return;
+    _cubit.loadSessions();
   }
 
   @override
@@ -82,20 +93,41 @@ class _HomePageState extends State<HomePage> {
         floatingActionButton: BlocBuilder<SessionListCubit, List<Session>>(
           builder: (context, sessions) {
             if (sessions.isEmpty) return const SizedBox.shrink();
-            return GestureDetector(
-              onTap: _navigateToCapture,
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50),
-                  borderRadius: BorderRadius.circular(99),
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 12,
+              children: [
+                GestureDetector(
+                  onTap: _navigateToUpload,
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2196F3),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: const Icon(
+                      Icons.video_library_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
                 ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  color: Colors.white,
-                  size: 24,
+                GestureDetector(
+                  onTap: _navigateToCapture,
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             );
           },
         ),
@@ -133,6 +165,25 @@ class _HomePageState extends State<HomePage> {
               ),
               child: const Text(
                 'Starte erste Session',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: _navigateToUpload,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2196F3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Video hochladen',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 16,

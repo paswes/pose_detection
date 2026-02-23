@@ -54,7 +54,6 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
             builder: (context, state) {
               return switch (state) {
                 SessionDetailsLoading() => _buildLoading(),
-                SessionDetailsDecoding() => _buildDecoding(state),
                 SessionDetailsLoaded() => _buildLoaded(state),
                 SessionDetailsError() => _buildError(state),
               };
@@ -75,32 +74,6 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
           Text(
             'Laden...',
             style: TextStyle(color: Color(0xFF888888), fontSize: 16),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDecoding(SessionDetailsDecoding state) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 120,
-            height: 120,
-            child: CircularProgressIndicator(
-              value: state.progress > 0 ? state.progress : null,
-              color: const Color(0xFF4CAF50),
-              strokeWidth: 3,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            state.total > 0
-                ? 'Frames dekodieren: ${state.completed} / ${state.total}'
-                : 'Frames werden vorbereitet...',
-            style: const TextStyle(color: Color(0xFF888888), fontSize: 16),
           ),
         ],
       ),
@@ -168,10 +141,7 @@ class _FrameWithOverlay extends StatelessWidget {
     final image = state.currentImage;
     if (image == null) {
       return const Center(
-        child: Text(
-          'Kein Frame verfügbar',
-          style: TextStyle(color: Color(0xFF888888)),
-        ),
+        child: CircularProgressIndicator(color: Color(0xFF888888)),
       );
     }
 
@@ -319,7 +289,7 @@ class _FramePlaybackControls extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // Previous / Next
+          // Previous / Play-Pause / Next
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             spacing: 32,
@@ -334,6 +304,25 @@ class _FramePlaybackControls extends StatelessWidget {
                   ),
                   child: const Icon(
                     Icons.chevron_left_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: cubit.toggleAutoPlay,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: state.isAutoPlaying
+                        ? const Color(0xFF4CAF50)
+                        : const Color(0xFF2A2A2A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    state.isAutoPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
                     color: Colors.white,
                     size: 28,
                   ),

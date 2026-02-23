@@ -7,6 +7,8 @@ import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
 import 'package:pose_detection/core/services/person_validator.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/core/services/static_image_pose_detector.dart';
+import 'package:pose_detection/core/services/video_processing_service.dart';
 import 'package:pose_detection/core/services/frame_image_decoder.dart';
 import 'package:pose_detection/core/services/recording_service.dart';
 import 'package:pose_detection/data/database/app_database.dart';
@@ -18,6 +20,7 @@ import 'package:pose_detection/features/anatomy/presentation/cubit/anatomy_cubit
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
+import 'package:pose_detection/presentation/bloc/video_upload_cubit.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -67,6 +70,16 @@ Future<void> initializeDependencies({
     () => FrameImageDecoder(),
   );
 
+  sl.registerLazySingleton<StaticImagePoseDetector>(
+    () => StaticImagePoseDetector(),
+  );
+
+  sl.registerLazySingleton<VideoProcessingService>(
+    () => VideoProcessingService(
+      poseDetector: sl<StaticImagePoseDetector>(),
+    ),
+  );
+
   // Anatomy Feature
   sl.registerLazySingleton<IAnatomyRepository>(
     () => AnatomyRepository(),
@@ -97,6 +110,13 @@ Future<void> initializeDependencies({
       session: session,
       repository: sl<SessionRepository>(),
       decoder: sl<FrameImageDecoder>(),
+    ),
+  );
+
+  sl.registerFactory<VideoUploadCubit>(
+    () => VideoUploadCubit(
+      processingService: sl<VideoProcessingService>(),
+      sessionRepository: sl<SessionRepository>(),
     ),
   );
 }

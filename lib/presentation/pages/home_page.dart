@@ -72,10 +72,6 @@ class _HomePageState extends State<HomePage> {
   Widget _buildLoadedScaffold(List<Session> sessions) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Sessions',
-          style: TextStyle(fontWeight: FontWeight.w500),
-        ),
         actions: [
           GestureDetector(
             onTap: () => Navigator.push(

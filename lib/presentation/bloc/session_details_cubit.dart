@@ -54,7 +54,9 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
 
       _controller = VideoPlayerController.file(videoFile);
       await _controller!.initialize();
-      _controller!.addListener(_onVideoPositionChanged);
+
+      // Seek to start to ensure position is exactly 0
+      await _controller!.seekTo(Duration.zero);
 
       // Set initial frame for the painter
       frameNotifier.value = frames.first;
@@ -65,6 +67,10 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         isVideoReady: true,
         videoDuration: _controller!.value.duration,
       ));
+
+      // Add listener AFTER initial state is emitted, so any early
+      // callbacks find a valid SessionDetailsLoaded state
+      _controller!.addListener(_onVideoPositionChanged);
     } catch (e) {
       emit(SessionDetailsError(message: 'Fehler beim Laden: $e'));
     }
@@ -157,10 +163,12 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     if (controller.value.isPlaying) {
       await controller.pause();
     } else {
-      // If at the end, seek back to start before playing
-      if (controller.value.position >= controller.value.duration) {
-        await controller.seekTo(Duration.zero);
-      }
+      // Seek to the current frame's exact timestamp before playing,
+      // so playback starts from what the user sees — not from wherever
+      // the controller's internal position drifted to.
+      final targetMicros =
+          current.frames[current.currentFrameIndex].timestampMicros;
+      await controller.seekTo(Duration(microseconds: targetMicros));
       await controller.play();
     }
   }

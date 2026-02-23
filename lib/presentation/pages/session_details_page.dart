@@ -161,6 +161,22 @@ class _VideoWithOverlay extends StatelessWidget {
     required this.onLandmarkTapped,
   });
 
+  /// Determine which rep number the current frame is in/closest to.
+  ///
+  /// Finds the last rep whose `startFrameIndex` <= current frame.
+  /// Before the first rep starts, returns 1.
+  static int _currentRepNumber(SessionDetailsLoaded state) {
+    if (state.reps.isEmpty) return 0;
+    final frame = state.currentFrameIndex;
+    var repNum = 1;
+    for (final rep in state.reps) {
+      if (frame >= rep.startFrameIndex) {
+        repNum = rep.repNumber;
+      }
+    }
+    return repNum;
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = cubit.videoController;
@@ -234,7 +250,7 @@ class _VideoWithOverlay extends StatelessWidget {
                       ),
                       const Spacer(),
                       _OverlayBadge(
-                        value: '${state.repCount} of ${state.reps.length}',
+                        value: '${_currentRepNumber(state)} of ${state.reps.length}',
                         label: 'Reps',
                       ),
                       const Spacer(),

@@ -97,7 +97,7 @@ SliverWoltModalSheetPage _buildPage(
     hasTopBarLayer: false,
     mainContentSliversBuilder: (context) => [
       SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 32, 16, 48),
         sliver: SliverList.list(
           children: [
             // Metrics section

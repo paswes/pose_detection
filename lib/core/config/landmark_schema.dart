@@ -77,9 +77,9 @@ class LandmarkSchema {
 
   /// Landmarks relevant for Romanian Deadlift analysis.
   ///
-  /// Keeps the kinetic chain from shoulders to heels:
-  /// shoulders → elbows → wrists, hips → knees → ankles → heels.
-  /// Removes head (0-10), hands (17-22), and foot tips (31-32).
+  /// Keeps the kinetic chain from shoulders to ankles:
+  /// shoulders → elbows → wrists, hips → knees → ankles.
+  /// Removes head (0-10), hands (17-22), heels (29-30), and foot tips (31-32).
   static const rdlLandmarkIds = <int>{
     leftShoulder, rightShoulder,
     leftElbow, rightElbow,
@@ -87,7 +87,6 @@ class LandmarkSchema {
     leftHip, rightHip,
     leftKnee, rightKnee,
     leftAnkle, rightAnkle,
-    leftHeel, rightHeel,
   };
 
   // ---------------------------------------------------------------------------
@@ -216,10 +215,8 @@ class LandmarkSchema {
       [rightShoulder, rightElbow], [rightElbow, rightWrist],
       // Left leg
       [leftHip, leftKnee], [leftKnee, leftAnkle],
-      [leftAnkle, leftHeel],
       // Right leg
       [rightHip, rightKnee], [rightKnee, rightAnkle],
-      [rightAnkle, rightHeel],
     ],
   );
 }

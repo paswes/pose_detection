@@ -250,7 +250,8 @@ class _VideoWithOverlay extends StatelessWidget {
                       ),
                       const Spacer(),
                       _OverlayBadge(
-                        value: '${_currentRepNumber(state)} of ${state.reps.length}',
+                        value:
+                            '${_currentRepNumber(state)} of ${state.reps.length}',
                         label: 'Reps',
                       ),
                       const Spacer(),
@@ -414,7 +415,7 @@ class _ControlsSheet extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
 
-  static const double _initialChildSize = 0.3;
+  static const double _initialChildSize = 0.32;
   static const double _maxChildSize = 0.7;
 
   const _ControlsSheet({required this.cubit, required this.state});
@@ -449,7 +450,7 @@ class _ControlsSheet extends StatelessWidget {
                       // Rep pills (tap to seek to rep start)
                       if (state.reps.isNotEmpty)
                         _RepPillRow(cubit: cubit, state: state),
-                      if (state.reps.isNotEmpty) const SizedBox(height: 16),
+                      if (state.reps.isNotEmpty) const SizedBox(height: 24),
                       // Frame scrubber
                       _RepMarkerSlider(
                         cubit: cubit,

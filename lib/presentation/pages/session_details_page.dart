@@ -217,13 +217,9 @@ class _VideoWithOverlay extends StatelessWidget {
     final videoHeight = state.session.imageHeight;
     final topPadding = MediaQuery.of(context).padding.top;
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        bottom: Radius.circular(16),
-      ),
-      child: Container(
-        color: Colors.black,
-        child: LayoutBuilder(
+    return Container(
+      color: Colors.black,
+      child: LayoutBuilder(
           builder: (context, constraints) {
             final widgetSize = Size(
               constraints.maxWidth,
@@ -240,6 +236,7 @@ class _VideoWithOverlay extends StatelessWidget {
                   Positioned.fill(
                     child: FittedBox(
                       fit: BoxFit.contain,
+                      alignment: Alignment.topCenter,
                       child: SizedBox(
                         width: videoWidth,
                         height: videoHeight,
@@ -258,6 +255,7 @@ class _VideoWithOverlay extends StatelessWidget {
                         rawImageHeight: state.session.imageHeight,
                         isFrontCamera: state.session.isFrontCamera,
                         fitMode: FitMode.contain,
+                        alignY: 0.0,
                         schema: LandmarkSchema.rdl,
                         visibleLandmarkIds: LandmarkSchema.rdlLandmarkIds,
                         selectedLandmarkId: state.selectedLandmarkId,
@@ -298,8 +296,7 @@ class _VideoWithOverlay extends StatelessWidget {
             );
           },
         ),
-      ),
-    );
+      );
   }
 
   void _handleTap(Offset tapPosition, Size widgetSize) {
@@ -337,6 +334,7 @@ class _VideoWithOverlay extends StatelessWidget {
       videoSize,
       widgetSize,
       fitMode: FitMode.contain,
+      alignY: 0.0,
     );
 
     const hitRadius = 30.0;

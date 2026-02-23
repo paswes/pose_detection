@@ -44,9 +44,13 @@ class TransformCalculator {
 
   /// Calculates the BoxFit.contain transformation parameters.
   /// Fits the entire source inside the target, potentially letterboxing.
+  ///
+  /// [alignY] controls vertical placement of the fitted image: 0.0 = top,
+  /// 0.5 = center (default), 1.0 = bottom.
   static ImageTransform calculateContainTransform({
     required Size imageSize,
     required Size screenSize,
+    double alignY = 0.5,
   }) {
     final scaleX = screenSize.width / imageSize.width;
     final scaleY = screenSize.height / imageSize.height;
@@ -58,7 +62,7 @@ class TransformCalculator {
     final fittedHeight = imageSize.height * scale;
 
     final offsetX = (screenSize.width - fittedWidth) / 2;
-    final offsetY = (screenSize.height - fittedHeight) / 2;
+    final offsetY = (screenSize.height - fittedHeight) * alignY;
 
     return ImageTransform(
       scale: scale,

@@ -23,6 +23,7 @@ class LandmarkOverlayPainter extends CustomPainter {
   final LandmarkSchema _schema;
   final Set<int>? _visibleIds;
   final int? selectedLandmarkId;
+  final double alignY;
 
   LandmarkOverlayPainter({
     required this.frameNotifier,
@@ -32,6 +33,7 @@ class LandmarkOverlayPainter extends CustomPainter {
     this.isFrontCamera = false,
     this.fitMode = FitMode.cover,
     this.selectedLandmarkId,
+    this.alignY = 0.5,
     LandmarkSchema? schema,
     Set<int>? visibleLandmarkIds,
   })  : _schema = schema ?? sl<LandmarkSchema>(),
@@ -80,6 +82,7 @@ class LandmarkOverlayPainter extends CustomPainter {
       videoSize,
       size,
       fitMode: fitMode,
+      alignY: alignY,
     );
 
     final likelihoodMap = <int, double>{};
@@ -195,6 +198,7 @@ class LandmarkOverlayPainter extends CustomPainter {
         oldDelegate.fitMode != fitMode ||
         oldDelegate._schema != _schema ||
         oldDelegate._visibleIds != _visibleIds ||
-        oldDelegate.selectedLandmarkId != selectedLandmarkId;
+        oldDelegate.selectedLandmarkId != selectedLandmarkId ||
+        oldDelegate.alignY != alignY;
   }
 }

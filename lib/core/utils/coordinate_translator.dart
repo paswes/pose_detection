@@ -70,8 +70,9 @@ class CoordinateTranslator {
     Size imageSize,
     Size widgetSize, {
     FitMode fitMode = FitMode.cover,
+    double alignY = 0.5,
   }) {
-    final transform = _getTransform(imageSize, widgetSize, fitMode);
+    final transform = _getTransform(imageSize, widgetSize, fitMode, alignY: alignY);
 
     // Calculate Z-range for normalization
     double minZ = double.infinity;
@@ -103,8 +104,9 @@ class CoordinateTranslator {
   static ImageTransform _getTransform(
     Size imageSize,
     Size widgetSize,
-    FitMode fitMode,
-  ) {
+    FitMode fitMode, {
+    double alignY = 0.5,
+  }) {
     return switch (fitMode) {
       FitMode.cover => TransformCalculator.calculateCoverTransform(
           imageSize: imageSize,
@@ -113,6 +115,7 @@ class CoordinateTranslator {
       FitMode.contain => TransformCalculator.calculateContainTransform(
           imageSize: imageSize,
           screenSize: widgetSize,
+          alignY: alignY,
         ),
     };
   }

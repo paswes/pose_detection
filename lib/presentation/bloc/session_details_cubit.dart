@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
+import 'package:pose_detection/core/utils/rdl_rep_counter.dart';
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
@@ -17,6 +18,7 @@ import 'package:pose_detection/presentation/bloc/session_details_state.dart';
 class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   final Session session;
   final SessionRepository _repository;
+  final RdlRepCounter _repCounter = RdlRepCounter();
   VideoPlayerController? _controller;
 
   /// Direct repaint signal for the landmark overlay painter.
@@ -61,11 +63,15 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       // Set initial frame for the painter
       frameNotifier.value = frames.first;
 
+      // Process first frame for initial angle
+      _repCounter.processFrame(frames.first);
+
       emit(SessionDetailsLoaded(
         session: session,
         frames: frames,
         isVideoReady: true,
         videoDuration: _controller!.value.duration,
+        hipAngle: _repCounter.currentAngle,
       ));
 
       // Add listener AFTER initial state is emitted, so any early
@@ -114,6 +120,9 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     // Update painter directly for instant overlay sync (bypasses BLoC pipeline)
     if (newIndex != current.currentFrameIndex) {
       frameNotifier.value = current.frames[newIndex];
+
+      // Update rep counter — sequential advance during playback
+      _repCounter.processFrame(current.frames[newIndex]);
     }
 
     // Only emit BLoC state when something actually changed (for UI controls)
@@ -127,6 +136,8 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       currentFrameIndex: newIndex,
       videoPosition: position,
       isPlaying: isPlaying,
+      repCount: _repCounter.repCount,
+      hipAngle: () => _repCounter.currentAngle,
     ));
   }
 
@@ -197,6 +208,8 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   }
 
   /// Seek to a specific frame by index.
+  ///
+  /// Recalculates rep count from frame 0 to handle arbitrary jumps.
   Future<void> seekToFrame(int index) async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -204,12 +217,16 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final clamped = index.clamp(0, current.totalFrames - 1);
     final timestampMicros = current.frames[clamped].timestampMicros;
 
+    _repCounter.countRepsUpTo(current.frames, clamped);
+
     frameNotifier.value = current.frames[clamped];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
     emit(current.copyWith(
       currentFrameIndex: clamped,
       videoPosition: Duration(microseconds: timestampMicros),
+      repCount: _repCounter.repCount,
+      hipAngle: () => _repCounter.currentAngle,
     ));
   }
 
@@ -227,6 +244,8 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final nextIndex = current.currentFrameIndex + 1;
     final timestampMicros = current.frames[nextIndex].timestampMicros;
 
+    _repCounter.processFrame(current.frames[nextIndex]);
+
     frameNotifier.value = current.frames[nextIndex];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
@@ -234,10 +253,15 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       currentFrameIndex: nextIndex,
       videoPosition: Duration(microseconds: timestampMicros),
       isPlaying: false,
+      repCount: _repCounter.repCount,
+      hipAngle: () => _repCounter.currentAngle,
     ));
   }
 
   /// Go back one frame (pauses if playing).
+  ///
+  /// Recalculates rep count from scratch since stepping backward
+  /// can't be handled by the forward-only state machine.
   Future<void> previousFrame() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -251,6 +275,8 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final prevIndex = current.currentFrameIndex - 1;
     final timestampMicros = current.frames[prevIndex].timestampMicros;
 
+    _repCounter.countRepsUpTo(current.frames, prevIndex);
+
     frameNotifier.value = current.frames[prevIndex];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
@@ -258,6 +284,8 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       currentFrameIndex: prevIndex,
       videoPosition: Duration(microseconds: timestampMicros),
       isPlaying: false,
+      repCount: _repCounter.repCount,
+      hipAngle: () => _repCounter.currentAngle,
     ));
   }
 

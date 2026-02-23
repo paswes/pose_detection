@@ -106,7 +106,9 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   Widget _buildLoaded(SessionDetailsLoaded state) {
     return Column(
       children: [
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        _RepCounterDisplay(state: state),
+        const SizedBox(height: 16),
         Expanded(
           child: _VideoWithOverlay(
             cubit: _cubit,
@@ -272,6 +274,76 @@ class _VideoWithOverlay extends StatelessWidget {
       );
       onLandmarkTapped(tappedLandmark);
     }
+  }
+}
+
+/// Displays current rep count and hip hinge angle.
+class _RepCounterDisplay extends StatelessWidget {
+  final SessionDetailsLoaded state;
+
+  const _RepCounterDisplay({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        spacing: 12,
+        children: [
+          _MetricCard(
+            label: 'Reps',
+            value: '${state.repCount}',
+          ),
+          _MetricCard(
+            label: 'Hip Angle',
+            value: state.hipAngle != null
+                ? '${state.hipAngle!.toStringAsFixed(0)}°'
+                : '–',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MetricCard({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF888888),
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

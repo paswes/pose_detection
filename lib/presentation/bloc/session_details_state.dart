@@ -27,6 +27,8 @@ class SessionDetailsLoaded extends SessionDetailsState {
   final Duration videoPosition;
   final Duration videoDuration;
   final double playbackSpeed;
+  final int repCount;
+  final double? hipAngle;
 
   const SessionDetailsLoaded({
     required this.session,
@@ -38,6 +40,8 @@ class SessionDetailsLoaded extends SessionDetailsState {
     this.videoPosition = Duration.zero,
     this.videoDuration = Duration.zero,
     this.playbackSpeed = 1.0,
+    this.repCount = 0,
+    this.hipAngle,
   });
 
   int get totalFrames => frames.length;
@@ -53,6 +57,8 @@ class SessionDetailsLoaded extends SessionDetailsState {
     Duration? videoPosition,
     Duration? videoDuration,
     double? playbackSpeed,
+    int? repCount,
+    double? Function()? hipAngle,
   }) {
     return SessionDetailsLoaded(
       session: session,
@@ -66,6 +72,8 @@ class SessionDetailsLoaded extends SessionDetailsState {
       videoPosition: videoPosition ?? this.videoPosition,
       videoDuration: videoDuration ?? this.videoDuration,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      repCount: repCount ?? this.repCount,
+      hipAngle: hipAngle != null ? hipAngle() : this.hipAngle,
     );
   }
 
@@ -80,6 +88,8 @@ class SessionDetailsLoaded extends SessionDetailsState {
     videoPosition,
     videoDuration,
     playbackSpeed,
+    repCount,
+    hipAngle,
   ];
 }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/data/models/session.dart';
@@ -20,6 +22,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final SessionListCubit _cubit;
+  bool _isPicking = false;
 
   @override
   void initState() {
@@ -46,14 +49,93 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _navigateToUpload() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const VideoUploadPage()),
-    );
+  Future<void> _pickAndUploadVideo() async {
+    if (_isPicking) return;
 
-    if (!mounted) return;
-    _cubit.loadSessions();
+    setState(() => _isPicking = true);
+
+    try {
+      final picker = ImagePicker();
+      final video = await picker.pickVideo(source: ImageSource.gallery);
+
+      if (!mounted) return;
+      setState(() => _isPicking = false);
+
+      if (video == null) return;
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VideoUploadPage(videoPath: video.path),
+        ),
+      );
+
+      if (!mounted) return;
+      _cubit.loadSessions();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isPicking = false);
+    }
+  }
+
+  void _showMoreSheet() {
+    WoltModalSheet.show(
+      context: context,
+      pageListBuilder: (sheetContext) => [
+        SliverWoltModalSheetPage(
+          backgroundColor: const Color(0xFF1E1E1E),
+          surfaceTintColor: Colors.transparent,
+          hasSabGradient: false,
+          isTopBarLayerAlwaysVisible: true,
+          topBarTitle: const Text(
+            'Mehr',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          trailingNavBarWidget: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Color(0xFF888888)),
+              onPressed: () => Navigator.of(sheetContext).pop(),
+            ),
+          ),
+          mainContentSliversBuilder: (context) => [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              sliver: SliverList.list(
+                children: [
+                  _MoreSheetItem(
+                    icon: Icons.videocam_rounded,
+                    label: 'Live Capture',
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _navigateToCapture();
+                    },
+                  ),
+                  _MoreSheetItem(
+                    icon: Icons.accessibility_new_rounded,
+                    label: 'Anatomie',
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      Navigator.push(
+                        this.context,
+                        MaterialPageRoute(
+                          builder: (_) => const AnatomyPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+      modalBarrierColor: Colors.black54,
+    );
   }
 
   @override
@@ -74,15 +156,12 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         actions: [
           GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AnatomyPage()),
-            ),
+            onTap: _showMoreSheet,
             child: Container(
               margin: const EdgeInsets.only(right: 16),
               padding: const EdgeInsets.all(8),
               child: const Icon(
-                Icons.accessibility_new_rounded,
+                Icons.more_horiz_rounded,
                 color: Color(0xFF888888),
                 size: 24,
               ),
@@ -93,41 +172,29 @@ class _HomePageState extends State<HomePage> {
       body: sessions.isEmpty ? _buildEmptyState() : _buildSessionList(sessions),
       floatingActionButton: sessions.isEmpty
           ? null
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              spacing: 12,
-              children: [
-                GestureDetector(
-                  onTap: _navigateToUpload,
-                  child: Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2196F3),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: const Icon(
-                      Icons.video_library_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
+          : GestureDetector(
+              onTap: _pickAndUploadVideo,
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2196F3),
+                  borderRadius: BorderRadius.circular(99),
                 ),
-                GestureDetector(
-                  onTap: _navigateToCapture,
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ],
+                child: _isPicking
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.video_library_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+              ),
             ),
     );
   }
@@ -172,21 +239,30 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: _navigateToUpload,
+            onTap: _pickAndUploadVideo,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFF2196F3),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Video hochladen',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              child: _isPicking
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Video hochladen',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -317,6 +393,45 @@ class _InitializingScreen extends StatelessWidget {
   }
 }
 
+// -- More Sheet Item --
+
+class _MoreSheetItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _MoreSheetItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFF888888), size: 22),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // -- Session Card --
 
 class _SessionCard extends StatelessWidget {
@@ -439,7 +554,7 @@ class _SessionCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${minutes}m ${seconds}s  •  ${session.frameCount} frames  •  ${session.isFrontCamera ? 'Front' : 'Back'}  •  ${session.isLandscape ? 'Landscape' : 'Portrait'}',
+                        '${minutes}m ${seconds}s  •  ${session.frameCount} frames',
                         style: const TextStyle(
                           color: Color(0xFF666666),
                           fontSize: 13,

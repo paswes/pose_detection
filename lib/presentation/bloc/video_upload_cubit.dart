@@ -32,11 +32,19 @@ class VideoUploadCubit extends Cubit<VideoUploadState> {
         return;
       }
 
+      await processVideoFromPath(video.path);
+    } catch (e) {
+      emit(VideoUploadError(message: 'Fehler beim Verarbeiten: $e'));
+    }
+  }
+
+  /// Process an already-picked video file and save to DB.
+  Future<void> processVideoFromPath(String videoPath) async {
+    try {
       final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
 
-      // Process the video: extract frames + ML Kit detection
       final result = await _processingService.processVideo(
-        video.path,
+        videoPath,
         sessionId,
         onProgress: (completed, total) {
           emit(VideoUploadProcessing(
@@ -48,7 +56,6 @@ class VideoUploadCubit extends Cubit<VideoUploadState> {
 
       emit(const VideoUploadSaving());
 
-      // Build Session object
       final isLandscape = result.imageWidth > result.imageHeight;
       final session = Session(
         id: result.sessionId,

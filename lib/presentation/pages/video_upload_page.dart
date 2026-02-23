@@ -6,13 +6,15 @@ import 'package:pose_detection/presentation/bloc/video_upload_cubit.dart';
 import 'package:pose_detection/presentation/bloc/video_upload_state.dart';
 import 'package:pose_detection/presentation/pages/session_details_page.dart';
 
-/// Full-screen page that handles video picking, processing, and navigation.
+/// Full-screen page that processes a picked video and navigates to details.
 ///
-/// Immediately opens the gallery picker on launch. Shows processing progress
-/// while ML Kit detects poses on extracted frames. On completion, navigates
-/// to [SessionDetailsPage].
+/// When [videoPath] is provided, skips the gallery picker and processes
+/// directly. Otherwise opens the picker on launch.
 class VideoUploadPage extends StatefulWidget {
-  const VideoUploadPage({super.key});
+  /// Optional pre-picked video path to skip the gallery picker.
+  final String? videoPath;
+
+  const VideoUploadPage({super.key, this.videoPath});
 
   @override
   State<VideoUploadPage> createState() => _VideoUploadPageState();
@@ -25,7 +27,11 @@ class _VideoUploadPageState extends State<VideoUploadPage> {
   void initState() {
     super.initState();
     _cubit = sl<VideoUploadCubit>();
-    _cubit.pickAndProcessVideo();
+    if (widget.videoPath != null) {
+      _cubit.processVideoFromPath(widget.videoPath!);
+    } else {
+      _cubit.pickAndProcessVideo();
+    }
   }
 
   @override

@@ -76,28 +76,20 @@ class _HomePageState extends State<HomePage> {
         SliverWoltModalSheetPage(
           backgroundColor: const Color(0xFF1E1E1E),
           surfaceTintColor: Colors.transparent,
-          hasSabGradient: false,
-          isTopBarLayerAlwaysVisible: true,
-          topBarTitle: const Text(
-            'Mehr',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          trailingNavBarWidget: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              icon: const Icon(Icons.close, color: Color(0xFF888888)),
-              onPressed: () => Navigator.of(sheetContext).pop(),
-            ),
-          ),
+
           mainContentSliversBuilder: (context) => [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               sliver: SliverList.list(
                 children: [
+                  _MoreSheetItem(
+                    icon: Icons.video_library_rounded,
+                    label: 'Video hochladen',
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _pickAndUploadVideo();
+                    },
+                  ),
                   _MoreSheetItem(
                     icon: Icons.videocam_rounded,
                     label: 'Live Capture',
@@ -146,8 +138,12 @@ class _HomePageState extends State<HomePage> {
     final sessions = state.sessions;
     return Scaffold(
       appBar: AppBar(
+        title: Image.asset(
+          'assets/powered_by.png',
+          height: 28,
+        ),
         actions: [
-          if (sessions.isNotEmpty && !state.processingVideo)
+          if (!state.processingVideo)
             GestureDetector(
               onTap: _showMoreSheet,
               child: Container(
@@ -165,32 +161,6 @@ class _HomePageState extends State<HomePage> {
       body: sessions.isEmpty && !state.processingVideo
           ? _buildEmptyState()
           : _buildSessionList(state),
-      floatingActionButton: sessions.isEmpty && !state.processingVideo
-          ? null
-          : GestureDetector(
-              onTap: _pickAndUploadVideo,
-              child: Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: _isPicking
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.video_library_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-              ),
-            ),
     );
   }
 

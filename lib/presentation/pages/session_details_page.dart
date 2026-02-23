@@ -11,6 +11,7 @@ import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/domain/models/landmark.dart';
 import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_details_state.dart';
+import 'package:pose_detection/presentation/pages/session_analytics_page.dart';
 import 'package:pose_detection/presentation/widgets/landmark_detail_sheet.dart';
 import 'package:pose_detection/presentation/widgets/landmark_overlay_painter.dart';
 
@@ -103,6 +104,9 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
             cubit: _cubit,
             state: state,
             onBack: () => Navigator.pop(context),
+            onAnalyticsTapped: state.reps.isNotEmpty
+                ? () => _openAnalytics(state)
+                : null,
             onLandmarkTapped: (landmark) {
               _cubit.selectLandmark(landmark.id);
               showLandmarkDetailSheet(
@@ -119,6 +123,21 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
       ],
     );
   }
+
+  Future<void> _openAnalytics(SessionDetailsLoaded state) async {
+    final frameIndex = await Navigator.push<int>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SessionAnalyticsPage(
+          session: state.session,
+          reps: state.reps,
+        ),
+      ),
+    );
+    if (frameIndex != null && mounted) {
+      _cubit.seekToFrame(frameIndex);
+    }
+  }
 }
 
 // =============================================================================
@@ -129,12 +148,14 @@ class _VideoWithOverlay extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
   final VoidCallback onBack;
+  final VoidCallback? onAnalyticsTapped;
   final ValueChanged<LandmarkData> onLandmarkTapped;
 
   const _VideoWithOverlay({
     required this.cubit,
     required this.state,
     required this.onBack,
+    this.onAnalyticsTapped,
     required this.onLandmarkTapped,
   });
 
@@ -220,6 +241,14 @@ class _VideoWithOverlay extends StatelessWidget {
                             : '–',
                         label: 'Hips',
                       ),
+                      if (onAnalyticsTapped != null) ...[
+                        const SizedBox(width: 8),
+                        _OverlayButton(
+                          onTap: onAnalyticsTapped!,
+                          icon: Icons.bar_chart_rounded,
+                          size: 22,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -496,22 +525,6 @@ class _ControlsSheet extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _DragHandle extends StatelessWidget {
-  const _DragHandle();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 4,
-      decoration: BoxDecoration(
-        color: const Color(0xFF555555),
-        borderRadius: BorderRadius.circular(2),
-      ),
     );
   }
 }

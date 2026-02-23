@@ -9,6 +9,41 @@ import 'package:pose_detection/data/models/tracked_frame.dart';
 /// Phase of a single RDL repetition.
 enum RdlPhase { standing, descending }
 
+/// Per-rep analytics data captured during RDL tracking.
+class RdlRepData {
+  final int repNumber;
+  final double minHipAngle;
+  final int startFrameIndex;
+  final int bottomFrameIndex;
+  final int endFrameIndex;
+  final Duration descentDuration;
+  final Duration totalDuration;
+  final double? leftHipAngle;
+  final double? rightHipAngle;
+  final double? leftKneeAngle;
+  final double? rightKneeAngle;
+
+  const RdlRepData({
+    required this.repNumber,
+    required this.minHipAngle,
+    required this.startFrameIndex,
+    required this.bottomFrameIndex,
+    required this.endFrameIndex,
+    required this.descentDuration,
+    required this.totalDuration,
+    this.leftHipAngle,
+    this.rightHipAngle,
+    this.leftKneeAngle,
+    this.rightKneeAngle,
+  });
+
+  /// Absolute difference between left and right hip angles (degrees).
+  double? get hipAsymmetry {
+    if (leftHipAngle == null || rightHipAngle == null) return null;
+    return (leftHipAngle! - rightHipAngle!).abs();
+  }
+}
+
 /// Counts Romanian Deadlift reps by tracking the hip hinge angle
 /// (shoulder-center → hip-center → knee-center) through a state machine.
 ///
@@ -61,18 +96,31 @@ class RdlRepCounter {
   /// At 30 FPS, 15 frames = 500ms — brief occlusions won't reset state.
   static const _maxNullStreak = 15;
 
+  // Per-rep tracking state
+  final List<RdlRepData> _reps = [];
+  int _descentStartFrameIndex = 0;
+  int _descentStartTimestampMicros = 0;
+  double _minAngleDuringDescent = double.infinity;
+  int _bottomFrameIndex = 0;
+  int _bottomTimestampMicros = 0;
+  TrackedFrame? _bottomFrame;
+
   int get repCount => _repCount;
   RdlPhase get phase => _phase;
   double? get currentAngle => _currentAngle;
+  List<RdlRepData> get reps => List.unmodifiable(_reps);
 
   // TODO: Remove debug logging after calibration
   int _frameIndex = 0;
 
   /// Process a single frame. Returns `true` if the rep count changed.
-  bool processFrame(TrackedFrame frame) {
+  ///
+  /// [globalFrameIndex] is the index into the full frames list (for rep data).
+  bool processFrame(TrackedFrame frame, {int? globalFrameIndex}) {
     final angle = calculateHipAngle(frame);
     _currentAngle = angle;
     _frameIndex++;
+    final frameIdx = globalFrameIndex ?? (_frameIndex - 1);
 
     if (angle == null) {
       _nullStreak++;
@@ -96,6 +144,14 @@ class RdlRepCounter {
     final smoothed = _smoothedAngle();
     if (smoothed == null) return false;
 
+    // Track min angle during descent
+    if (_phase == RdlPhase.descending && smoothed < _minAngleDuringDescent) {
+      _minAngleDuringDescent = smoothed;
+      _bottomFrameIndex = frameIdx;
+      _bottomTimestampMicros = frame.timestampMicros;
+      _bottomFrame = frame;
+    }
+
     // DEBUG: Log every 10th frame + all state transitions
     if (_frameIndex % 10 == 0) {
       debugPrint('[RepCounter] frame=$_frameIndex raw=${angle.toStringAsFixed(1)} '
@@ -103,7 +159,7 @@ class RdlRepCounter {
           'descent=$_descentFrameCount reps=$_repCount');
     }
 
-    return _updatePhase(smoothed);
+    return _updatePhase(smoothed, frameIdx, frame);
   }
 
   /// Process a range of frames sequentially, from [startIndex] to
@@ -116,7 +172,7 @@ class RdlRepCounter {
     final start = startIndex.clamp(0, frames.length - 1);
     final end = endIndex.clamp(0, frames.length - 1);
     for (int i = start; i <= end; i++) {
-      processFrame(frames[i]);
+      processFrame(frames[i], globalFrameIndex: i);
     }
   }
 
@@ -126,7 +182,7 @@ class RdlRepCounter {
     reset();
     final end = targetIndex.clamp(0, frames.length - 1);
     for (int i = 0; i <= end; i++) {
-      processFrame(frames[i]);
+      processFrame(frames[i], globalFrameIndex: i);
     }
     debugPrint('[RepCounter] countRepsUpTo($targetIndex) → reps=$_repCount '
         'angleRange=${_minAngleSeen.toStringAsFixed(1)}..${_maxAngleSeen.toStringAsFixed(1)}');
@@ -143,6 +199,13 @@ class RdlRepCounter {
     _frameIndex = 0;
     _minAngleSeen = double.infinity;
     _maxAngleSeen = double.negativeInfinity;
+    _reps.clear();
+    _descentStartFrameIndex = 0;
+    _descentStartTimestampMicros = 0;
+    _minAngleDuringDescent = double.infinity;
+    _bottomFrameIndex = 0;
+    _bottomTimestampMicros = 0;
+    _bottomFrame = null;
   }
 
   /// Calculate the hip hinge angle from a frame's landmarks.
@@ -180,12 +243,76 @@ class RdlRepCounter {
     return _angle3Point(sx, sy, hx, hy, kx, ky);
   }
 
+  /// Calculate hip angle using only one side's landmarks.
+  /// shoulder → hip → knee for the specified side.
+  static double? calculateSideHipAngle(
+    TrackedFrame frame, {
+    required bool left,
+  }) {
+    if (!frame.isPersonDetected) return null;
+
+    final shoulder = _findLandmark(
+      frame,
+      left ? LandmarkSchema.leftShoulder : LandmarkSchema.rightShoulder,
+    );
+    final hip = _findLandmark(
+      frame,
+      left ? LandmarkSchema.leftHip : LandmarkSchema.rightHip,
+    );
+    final knee = _findLandmark(
+      frame,
+      left ? LandmarkSchema.leftKnee : LandmarkSchema.rightKnee,
+    );
+
+    if (shoulder == null || hip == null || knee == null) return null;
+
+    return _angle3Point(
+      shoulder.x, shoulder.y,
+      hip.x, hip.y,
+      knee.x, knee.y,
+    );
+  }
+
+  /// Calculate knee angle using one side's landmarks.
+  /// hip → knee → ankle for the specified side.
+  static double? calculateKneeAngle(
+    TrackedFrame frame, {
+    required bool left,
+  }) {
+    if (!frame.isPersonDetected) return null;
+
+    final hip = _findLandmark(
+      frame,
+      left ? LandmarkSchema.leftHip : LandmarkSchema.rightHip,
+    );
+    final knee = _findLandmark(
+      frame,
+      left ? LandmarkSchema.leftKnee : LandmarkSchema.rightKnee,
+    );
+    final ankle = _findLandmark(
+      frame,
+      left ? LandmarkSchema.leftAnkle : LandmarkSchema.rightAnkle,
+    );
+
+    if (hip == null || knee == null || ankle == null) return null;
+
+    return _angle3Point(
+      hip.x, hip.y,
+      knee.x, knee.y,
+      ankle.x, ankle.y,
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
 
   /// Update the state machine. Returns `true` if a rep was counted.
-  bool _updatePhase(double smoothedAngle) {
+  bool _updatePhase(
+    double smoothedAngle,
+    int frameIdx,
+    TrackedFrame frame,
+  ) {
     switch (_phase) {
       case RdlPhase.standing:
         if (smoothedAngle < _hingeAngle - _hysteresisMargin) {
@@ -194,6 +321,12 @@ class RdlRepCounter {
               '(threshold: <${(_hingeAngle - _hysteresisMargin).toStringAsFixed(0)})');
           _phase = RdlPhase.descending;
           _descentFrameCount = 0;
+          _descentStartFrameIndex = frameIdx;
+          _descentStartTimestampMicros = frame.timestampMicros;
+          _minAngleDuringDescent = smoothedAngle;
+          _bottomFrameIndex = frameIdx;
+          _bottomTimestampMicros = frame.timestampMicros;
+          _bottomFrame = frame;
         }
         return false;
 
@@ -202,6 +335,37 @@ class RdlRepCounter {
         if (smoothedAngle > _standingAngle + _hysteresisMargin &&
             _descentFrameCount >= _minDescentFrames) {
           _repCount++;
+
+          // Snapshot per-rep data
+          final bottomFrame = _bottomFrame;
+          _reps.add(RdlRepData(
+            repNumber: _repCount,
+            minHipAngle: _minAngleDuringDescent,
+            startFrameIndex: _descentStartFrameIndex,
+            bottomFrameIndex: _bottomFrameIndex,
+            endFrameIndex: frameIdx,
+            descentDuration: Duration(
+              microseconds:
+                  _bottomTimestampMicros - _descentStartTimestampMicros,
+            ),
+            totalDuration: Duration(
+              microseconds:
+                  frame.timestampMicros - _descentStartTimestampMicros,
+            ),
+            leftHipAngle: bottomFrame != null
+                ? calculateSideHipAngle(bottomFrame, left: true)
+                : null,
+            rightHipAngle: bottomFrame != null
+                ? calculateSideHipAngle(bottomFrame, left: false)
+                : null,
+            leftKneeAngle: bottomFrame != null
+                ? calculateKneeAngle(bottomFrame, left: true)
+                : null,
+            rightKneeAngle: bottomFrame != null
+                ? calculateKneeAngle(bottomFrame, left: false)
+                : null,
+          ));
+
           debugPrint('[RepCounter] DESCENDING→STANDING REP #$_repCount at frame=$_frameIndex '
               'smoothed=${smoothedAngle.toStringAsFixed(1)} descent=$_descentFrameCount '
               '(threshold: >${(_standingAngle + _hysteresisMargin).toStringAsFixed(0)})');

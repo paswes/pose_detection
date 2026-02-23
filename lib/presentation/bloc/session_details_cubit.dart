@@ -64,7 +64,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       frameNotifier.value = frames.first;
 
       // Process first frame for initial angle
-      _repCounter.processFrame(frames.first);
+      _repCounter.processFrame(frames.first, globalFrameIndex: 0);
 
       emit(SessionDetailsLoaded(
         session: session,
@@ -72,6 +72,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         isVideoReady: true,
         videoDuration: _controller!.value.duration,
         hipAngle: _repCounter.currentAngle,
+        reps: _repCounter.reps,
       ));
 
       // Add listener AFTER initial state is emitted, so any early
@@ -149,6 +150,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       isPlaying: isPlaying,
       repCount: _repCounter.repCount,
       hipAngle: () => _repCounter.currentAngle,
+      reps: _repCounter.reps,
     ));
   }
 
@@ -201,7 +203,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       // If at the last frame, restart from the beginning
       if (current.currentFrameIndex >= current.totalFrames - 1) {
         _repCounter.reset();
-        _repCounter.processFrame(current.frames.first);
+        _repCounter.processFrame(current.frames.first, globalFrameIndex: 0);
         frameNotifier.value = current.frames.first;
         await controller.seekTo(Duration.zero);
         emit(current.copyWith(
@@ -209,6 +211,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
           videoPosition: Duration.zero,
           repCount: _repCounter.repCount,
           hipAngle: () => _repCounter.currentAngle,
+          reps: _repCounter.reps,
         ));
         await controller.play();
         return;
@@ -257,6 +260,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       videoPosition: Duration(microseconds: timestampMicros),
       repCount: _repCounter.repCount,
       hipAngle: () => _repCounter.currentAngle,
+      reps: _repCounter.reps,
     ));
   }
 
@@ -274,7 +278,10 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final nextIndex = current.currentFrameIndex + 1;
     final timestampMicros = current.frames[nextIndex].timestampMicros;
 
-    _repCounter.processFrame(current.frames[nextIndex]);
+    _repCounter.processFrame(
+      current.frames[nextIndex],
+      globalFrameIndex: nextIndex,
+    );
 
     frameNotifier.value = current.frames[nextIndex];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
@@ -285,6 +292,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       isPlaying: false,
       repCount: _repCounter.repCount,
       hipAngle: () => _repCounter.currentAngle,
+      reps: _repCounter.reps,
     ));
   }
 
@@ -316,6 +324,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       isPlaying: false,
       repCount: _repCounter.repCount,
       hipAngle: () => _repCounter.currentAngle,
+      reps: _repCounter.reps,
     ));
   }
 

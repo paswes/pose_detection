@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import 'package:pose_detection/core/utils/rdl_rep_counter.dart';
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 
@@ -29,6 +30,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
   final double playbackSpeed;
   final int repCount;
   final double? hipAngle;
+  final List<RdlRepData> reps;
 
   const SessionDetailsLoaded({
     required this.session,
@@ -42,6 +44,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     this.playbackSpeed = 1.0,
     this.repCount = 0,
     this.hipAngle,
+    this.reps = const [],
   });
 
   int get totalFrames => frames.length;
@@ -59,6 +62,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     double? playbackSpeed,
     int? repCount,
     double? Function()? hipAngle,
+    List<RdlRepData>? reps,
   }) {
     return SessionDetailsLoaded(
       session: session,
@@ -74,6 +78,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       repCount: repCount ?? this.repCount,
       hipAngle: hipAngle != null ? hipAngle() : this.hipAngle,
+      reps: reps ?? this.reps,
     );
   }
 
@@ -90,6 +95,7 @@ class SessionDetailsLoaded extends SessionDetailsState {
     playbackSpeed,
     repCount,
     hipAngle,
+    reps,
   ];
 }
 

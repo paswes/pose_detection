@@ -268,7 +268,7 @@ class _InitializingScreen extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: state.totalFrames > 0 ? state.progress : null,
                     backgroundColor: const Color(0xFF2A2A2A),
-                    color: Color.fromARGB(255, 74, 230, 215),
+                    color: const Color(0xFF4AE6D7),
                     minHeight: 4,
                   ),
                 ),
@@ -367,7 +367,7 @@ class _ProcessingCard extends StatelessWidget {
                 padding: EdgeInsets.all(12),
                 child: CircularProgressIndicator(
                   value: total > 0 ? progress : null,
-                  color: const Color(0xFF4CAF50),
+                  color: const Color(0xFF4AE6D7),
                   strokeWidth: 3,
                 ),
               ),
@@ -461,18 +461,14 @@ class _SessionCard extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: session.isDemo
-                        ? const Color(0xFF2196F3).withValues(alpha: 0.15)
-                        : const Color(0xFF4CAF50).withValues(alpha: 0.15),
+                        ? const Color(0xFF4AE6D7).withValues(alpha: 0.15)
+                        : const Color(0xFF4AE6D7).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    session.isDemo
-                        ? Icons.play_circle_outline_rounded
-                        : Icons.videocam_rounded,
-                    color: session.isDemo
-                        ? const Color(0xFF2196F3)
-                        : const Color(0xFF4CAF50),
-                    size: 24,
+                  child: Image.asset(
+                    'assets/logo.png',
+                    width: 24,
+                    height: 24,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -501,14 +497,14 @@ class _SessionCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(
-                                  0xFF2196F3,
+                                  0xFF4AE6D7,
                                 ).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: const Text(
                                 'Demo',
                                 style: TextStyle(
-                                  color: Color(0xFF2196F3),
+                                  color: Color(0xFF4AE6D7),
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                 ),

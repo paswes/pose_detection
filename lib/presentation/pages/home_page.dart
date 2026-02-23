@@ -304,7 +304,7 @@ class _InitializingScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Pose Engine',
+                'Nutrilize AI Meetup',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w600,

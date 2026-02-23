@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:pose_detection/features/anatomy/domain/entities/muscle_group.dart';
 import 'package:pose_detection/features/anatomy/domain/entities/muscle_status.dart';
 import 'package:pose_detection/features/anatomy/domain/repositories/i_anatomy_repository.dart';
 import 'package:pose_detection/features/anatomy/presentation/cubit/anatomy_state.dart';
@@ -23,32 +22,6 @@ class AnatomyCubit extends Cubit<AnatomyState> {
     } catch (e) {
       emit(AnatomyError(message: e.toString()));
     }
-  }
-
-  /// Toggle between front and back body view.
-  void toggleView() {
-    final current = state;
-    if (current is! AnatomyLoaded) return;
-
-    final newView = current.currentView == BodyView.front
-        ? BodyView.back
-        : BodyView.front;
-
-    emit(current.copyWith(
-      currentView: newView,
-      selectedMuscleId: () => null,
-    ));
-  }
-
-  /// Set current view directly.
-  void setView(BodyView view) {
-    final current = state;
-    if (current is! AnatomyLoaded) return;
-
-    emit(current.copyWith(
-      currentView: view,
-      selectedMuscleId: () => null,
-    ));
   }
 
   /// Select a muscle to show its detail sheet.
@@ -86,7 +59,7 @@ class AnatomyCubit extends Cubit<AnatomyState> {
     if (current is! AnatomyLoaded) return;
 
     final random = Random();
-    final muscles = List<MuscleGroup>.from(current.muscles);
+    final muscles = List.of(current.muscles);
     final count = 4 + random.nextInt(3); // 4-6 muscles
 
     // Shuffle and pick

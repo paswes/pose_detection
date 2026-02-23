@@ -21,6 +21,7 @@ dependencies:
   video_player: ^2.10.1
   video_thumbnail: ^0.5.3
   wolt_modal_sheet: ^0.9.4
+  muscle_selector: ^1.0.4
 
 dev_dependencies:
   flutter_test:

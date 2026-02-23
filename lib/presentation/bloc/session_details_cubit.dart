@@ -70,6 +70,14 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     }
   }
 
+  /// Compensation for iOS AVPlayer position reporting delay.
+  ///
+  /// On iOS, `VideoPlayerController.value.position` arrives via platform
+  /// channels and is typically 2-3 frames behind the actual displayed
+  /// video texture. Adding this offset aligns the landmark overlay with
+  /// the frame the user actually sees on screen.
+  static const _lookAheadMicros = 66000; // ~2 frames at 30 FPS
+
   /// Listener called by [VideoPlayerController] on position/state changes.
   void _onVideoPositionChanged() {
     final current = state;
@@ -79,9 +87,13 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     if (controller == null) return;
 
     final position = controller.value.position;
-    final positionMicros = position.inMicroseconds;
-    final newIndex = _findNearestFrameIndex(current.frames, positionMicros);
     final isPlaying = controller.value.isPlaying;
+
+    // Compensate for iOS platform channel delay during playback
+    final positionMicros = isPlaying
+        ? position.inMicroseconds + _lookAheadMicros
+        : position.inMicroseconds;
+    final newIndex = _findNearestFrameIndex(current.frames, positionMicros);
 
     // Update painter directly for instant overlay sync (bypasses BLoC pipeline)
     if (newIndex != current.currentFrameIndex) {

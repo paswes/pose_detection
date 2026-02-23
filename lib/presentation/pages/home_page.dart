@@ -94,9 +94,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: sessions.isEmpty
-          ? _buildEmptyState()
-          : _buildSessionList(sessions),
+      body: sessions.isEmpty ? _buildEmptyState() : _buildSessionList(sessions),
       floatingActionButton: sessions.isEmpty
           ? null
           : Column(
@@ -159,7 +157,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 32),
           GestureDetector(
-            onTap: _navigateToCapture,
+            onTap: _cubit.loadDemoSession,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               decoration: BoxDecoration(
@@ -167,7 +165,7 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'Starte erste Session',
+                'Demo RDL laden',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -418,8 +416,9 @@ class _SessionCard extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2196F3)
-                                    .withValues(alpha: 0.2),
+                                color: const Color(
+                                  0xFF2196F3,
+                                ).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: const Text(

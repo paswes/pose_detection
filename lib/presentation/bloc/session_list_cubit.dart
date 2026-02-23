@@ -14,24 +14,25 @@ class SessionListCubit extends Cubit<SessionListState> {
     required DemoSessionService demoService,
   })  : _repository = repository,
         _demoService = demoService,
-        super(const SessionListInitializing());
+        super(const SessionListLoaded(sessions: []));
 
-  /// Seed the demo session (if needed) and load all sessions.
+  /// Load all sessions from the database.
   Future<void> loadSessions() async {
-    final needsDemo = await _demoService.needsProcessing();
+    final sessions = await _repository.getAllSessions();
+    emit(SessionListLoaded(sessions: sessions));
+  }
 
-    if (needsDemo) {
-      emit(const SessionListInitializing());
-      await _demoService.ensureDemoSession(
-        onProgress: (completed, total) {
-          emit(SessionListInitializing(
-            completedFrames: completed,
-            totalFrames: total,
-          ));
-        },
-      );
-    }
-
+  /// Process and load the bundled demo RDL video on demand.
+  Future<void> loadDemoSession() async {
+    emit(const SessionListInitializing());
+    await _demoService.ensureDemoSession(
+      onProgress: (completed, total) {
+        emit(SessionListInitializing(
+          completedFrames: completed,
+          totalFrames: total,
+        ));
+      },
+    );
     final sessions = await _repository.getAllSessions();
     emit(SessionListLoaded(sessions: sessions));
   }

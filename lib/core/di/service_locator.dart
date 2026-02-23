@@ -5,6 +5,7 @@ import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
+import 'package:pose_detection/core/services/demo_session_service.dart';
 import 'package:pose_detection/core/services/person_validator.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
 import 'package:pose_detection/core/services/static_image_pose_detector.dart';
@@ -76,6 +77,13 @@ Future<void> initializeDependencies({
     ),
   );
 
+  sl.registerLazySingleton<DemoSessionService>(
+    () => DemoSessionService(
+      repository: sl<SessionRepository>(),
+      processingService: sl<VideoProcessingService>(),
+    ),
+  );
+
   // Anatomy Feature
   sl.registerLazySingleton<IAnatomyRepository>(
     () => AnatomyRepository(),
@@ -98,7 +106,10 @@ Future<void> initializeDependencies({
   );
 
   sl.registerFactory<SessionListCubit>(
-    () => SessionListCubit(repository: sl<SessionRepository>()),
+    () => SessionListCubit(
+      repository: sl<SessionRepository>(),
+      demoService: sl<DemoSessionService>(),
+    ),
   );
 
   sl.registerFactoryParam<SessionDetailsCubit, Session, void>(

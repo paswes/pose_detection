@@ -174,6 +174,9 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   }
 
   /// Toggle play/pause.
+  ///
+  /// When playback has finished (position at the last frame), pressing
+  /// play resets to the beginning so the video can be re-watched.
   Future<void> togglePlayPause() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -184,6 +187,22 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     if (controller.value.isPlaying) {
       await controller.pause();
     } else {
+      // If at the last frame, restart from the beginning
+      if (current.currentFrameIndex >= current.totalFrames - 1) {
+        _repCounter.reset();
+        _repCounter.processFrame(current.frames.first);
+        frameNotifier.value = current.frames.first;
+        await controller.seekTo(Duration.zero);
+        emit(current.copyWith(
+          currentFrameIndex: 0,
+          videoPosition: Duration.zero,
+          repCount: _repCounter.repCount,
+          hipAngle: () => _repCounter.currentAngle,
+        ));
+        await controller.play();
+        return;
+      }
+
       // Seek to the current frame's exact timestamp before playing,
       // so playback starts from what the user sees — not from wherever
       // the controller's internal position drifted to.

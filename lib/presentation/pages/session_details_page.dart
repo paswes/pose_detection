@@ -208,15 +208,17 @@ class _VideoWithOverlay extends StatelessWidget {
                         icon: Icons.chevron_left_rounded,
                         size: 28,
                       ),
-                      const SizedBox(width: 8),
-                      _FrameInfo(
-                        frameIndex: state.currentFrameIndex,
-                        totalFrames: state.totalFrames,
+                      const Spacer(),
+                      _OverlayBadge(
+                        value: '${state.repCount}',
+                        label: 'Reps',
                       ),
                       const SizedBox(width: 8),
-                      _RepBadge(
-                        repCount: state.repCount,
-                        hipAngle: state.hipAngle,
+                      _OverlayBadge(
+                        value: state.hipAngle != null
+                            ? '${state.hipAngle!.toStringAsFixed(0)}°'
+                            : '–',
+                        label: 'Hips',
                       ),
                     ],
                   ),
@@ -322,57 +324,11 @@ class _OverlayButton extends StatelessWidget {
   }
 }
 
-class _RepBadge extends StatelessWidget {
-  final int repCount;
-  final double? hipAngle;
+class _OverlayBadge extends StatelessWidget {
+  final String value;
+  final String label;
 
-  const _RepBadge({required this.repCount, this.hipAngle});
-
-  static const _valueStyle = TextStyle(
-    color: Colors.white,
-    fontSize: 15,
-    fontWeight: FontWeight.w700,
-    fontFeatures: [FontFeature.tabularFigures()],
-  );
-
-  static const _labelStyle = TextStyle(
-    color: Color(0xFF999999),
-    fontSize: 11,
-    fontWeight: FontWeight.w400,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final angleText = hipAngle != null
-        ? '${hipAngle!.toStringAsFixed(0)}°'
-        : '–';
-
-    return Container(
-      width: 140,
-      height: 40,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        spacing: 6,
-        children: [
-          Text('$repCount', style: _valueStyle),
-          Text('Reps', style: _labelStyle),
-          Container(width: 1, height: 16, color: const Color(0xFF555555)),
-          Text(angleText, style: _valueStyle),
-        ],
-      ),
-    );
-  }
-}
-
-class _FrameInfo extends StatelessWidget {
-  final int frameIndex;
-  final int totalFrames;
-
-  const _FrameInfo({required this.frameIndex, required this.totalFrames});
+  const _OverlayBadge({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -383,15 +339,28 @@ class _FrameInfo extends StatelessWidget {
           color: Colors.black.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(20),
         ),
-        alignment: Alignment.center,
-        child: Text(
-          'Frame ${frameIndex + 1} / $totalFrames',
-          style: const TextStyle(
-            color: Color(0xFF999999),
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            fontFeatures: [FontFeature.tabularFigures()],
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          spacing: 8,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF999999),
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -434,17 +403,32 @@ class _ControlsSheet extends StatelessWidget {
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding + 16),
+                  padding: EdgeInsets.fromLTRB(16, 24, 16, bottomPadding + 16),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Drag handle
-                      const Padding(
+                      /* const Padding(
                         padding: EdgeInsets.symmetric(vertical: 10),
                         child: _DragHandle(),
+                      ), */
+                      // Frame counter
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: EdgeInsets.only(right: 16),
+                          child: Text(
+                            '${state.currentFrameIndex + 1} / ${state.totalFrames}',
+                            style: const TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 10,
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ),
                       ),
+                      const SizedBox(height: 4),
                       // Frame scrubber
-                      const SizedBox(height: 16),
                       SliderTheme(
                         data: SliderThemeData(
                           activeTrackColor: const Color(0xFF4CAF50),

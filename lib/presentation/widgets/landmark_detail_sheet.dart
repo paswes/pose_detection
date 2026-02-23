@@ -85,28 +85,29 @@ SliverWoltModalSheetPage _buildPage(
       ),
     ),
     isTopBarLayerAlwaysVisible: true,
-    trailingNavBarWidget: Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: IconButton(
-        icon: const Icon(Icons.close, color: Color(0xFF888888)),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-    ),
     mainContentSliversBuilder: (context) => [
       SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         sliver: SliverList.list(
           children: [
             // Coordinates section
-            const _SectionHeader(title: 'KOORDINATEN'),
-            const SizedBox(height: 12),
-            _InfoRow(label: 'X', value: landmark.x.toStringAsFixed(1)),
-            const SizedBox(height: 8),
-            _InfoRow(label: 'Y', value: landmark.y.toStringAsFixed(1)),
-            const SizedBox(height: 8),
-            _InfoRow(
-              label: 'Z (Tiefe)',
-              value: landmark.z.toStringAsFixed(1),
+            const SizedBox(height: 16),
+            Row(
+              spacing: 8,
+              children: [
+                _CoordinateBox(
+                  label: 'X',
+                  value: landmark.x.toStringAsFixed(1),
+                ),
+                _CoordinateBox(
+                  label: 'Y',
+                  value: landmark.y.toStringAsFixed(1),
+                ),
+                _CoordinateBox(
+                  label: 'Z',
+                  value: landmark.z.toStringAsFixed(1),
+                ),
+              ],
             ),
 
             if (connections.isNotEmpty) ...[
@@ -177,38 +178,44 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
+class _CoordinateBox extends StatelessWidget {
   final String label;
   final String value;
 
-  const _InfoRow({required this.label, required this.value});
+  const _CoordinateBox({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF666666),
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(12),
         ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFFCCCCCC),
-              fontSize: 13,
+        child: Column(
+          spacing: 4,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF666666),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Color(0xFFCCCCCC),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -225,7 +232,7 @@ class _ConnectionRow extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
             Container(

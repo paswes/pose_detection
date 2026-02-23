@@ -36,9 +36,9 @@ class LandmarkOverlayPainter extends CustomPainter {
     this.alignY = 0.5,
     LandmarkSchema? schema,
     Set<int>? visibleLandmarkIds,
-  })  : _schema = schema ?? sl<LandmarkSchema>(),
-        _visibleIds = visibleLandmarkIds,
-        super(repaint: frameNotifier);
+  }) : _schema = schema ?? sl<LandmarkSchema>(),
+       _visibleIds = visibleLandmarkIds,
+       super(repaint: frameNotifier);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -66,24 +66,26 @@ class LandmarkOverlayPainter extends CustomPainter {
         x = videoSize.width - x;
       }
 
-      landmarks.add(Landmark(
-        id: l.id,
-        x: x,
-        y: y,
-        z: l.z,
-        likelihood: l.likelihood,
-      ));
+      landmarks.add(
+        Landmark(
+          id: l.id,
+          x: x,
+          y: y,
+          z: l.z,
+          likelihood: l.likelihood,
+        ),
+      );
     }
 
     // Translate to widget coordinates using the matching BoxFit transform
     final translatedPoints =
         CoordinateTranslator.translateAllLandmarksWithDepth(
-      landmarks,
-      videoSize,
-      size,
-      fitMode: fitMode,
-      alignY: alignY,
-    );
+          landmarks,
+          videoSize,
+          size,
+          fitMode: fitMode,
+          alignY: alignY,
+        );
 
     final likelihoodMap = <int, double>{};
     for (final l in landmarks) {
@@ -113,15 +115,23 @@ class LandmarkOverlayPainter extends CustomPainter {
 
       final baseRadius = 4.0 + (depth * 4.0);
       final color = _getLikelihoodColor(likelihood);
-      final dimFactor = hasSelection && !isSelected ? 0.3 : 1.0;
+      final dimFactor = hasSelection && !isSelected ? 0.2 : 1.0;
+      final drawRadius = isSelected ? baseRadius * 2.0 : baseRadius;
 
       if (isSelected) {
-        // Selection glow — white, larger
-        final selectionGlow = Paint()
-          ..color = Colors.white.withValues(alpha: 0.4)
+        // Outer pulse glow — very large, soft
+        final outerGlow = Paint()
+          ..color = color.withValues(alpha: 0.3)
           ..style = PaintingStyle.fill
-          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 8);
-        canvas.drawCircle(position, baseRadius + 8, selectionGlow);
+          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 24);
+        canvas.drawCircle(position, drawRadius + 20, outerGlow);
+
+        // Inner selection glow — bright white
+        final selectionGlow = Paint()
+          ..color = Colors.white.withValues(alpha: 0.9)
+          ..style = PaintingStyle.fill
+          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 14);
+        canvas.drawCircle(position, drawRadius + 10, selectionGlow);
       }
 
       // Glow
@@ -129,20 +139,22 @@ class LandmarkOverlayPainter extends CustomPainter {
         ..color = color.withValues(alpha: 0.3 * dimFactor)
         ..style = PaintingStyle.fill
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4);
-      canvas.drawCircle(position, baseRadius + 3, glowPaint);
+      canvas.drawCircle(position, drawRadius + 3, glowPaint);
 
       // Fill
       final fillPaint = Paint()
         ..color = color.withValues(alpha: dimFactor)
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(position, baseRadius, fillPaint);
+      canvas.drawCircle(position, drawRadius, fillPaint);
 
       // Outline
       final outlinePaint = Paint()
-        ..color = Colors.white.withValues(alpha: (isSelected ? 0.9 : 0.5) * dimFactor)
+        ..color = Colors.white.withValues(
+          alpha: (isSelected ? 1.0 : 0.5) * dimFactor,
+        )
         ..style = PaintingStyle.stroke
-        ..strokeWidth = isSelected ? 2.0 : 1.0;
-      canvas.drawCircle(position, baseRadius, outlinePaint);
+        ..strokeWidth = isSelected ? 3.0 : 1.0;
+      canvas.drawCircle(position, drawRadius, outlinePaint);
     }
   }
 
@@ -164,14 +176,31 @@ class LandmarkOverlayPainter extends CustomPainter {
         final avgDepth = (p1.normalizedDepth + p2.normalizedDepth) / 2;
         final avgLikelihood =
             ((likelihoodMap[id1] ?? 0.5) + (likelihoodMap[id2] ?? 0.5)) / 2;
-        final lineWidth = 1.5 + (avgDepth * 2.0);
-        final touchesSelected = id1 == selectedLandmarkId ||
-            id2 == selectedLandmarkId;
+        final baseLineWidth = 1.5 + (avgDepth * 2.0);
+        final touchesSelected =
+            id1 == selectedLandmarkId || id2 == selectedLandmarkId;
         final dimFactor = hasSelection && !touchesSelected ? 0.3 : 1.0;
         final alpha = (0.3 + (avgLikelihood * 0.5)) * dimFactor;
 
+        final lineColor = touchesSelected
+            ? _getLikelihoodColor(avgLikelihood)
+            : Colors.white;
+        final lineWidth = touchesSelected ? baseLineWidth * 2.0 : baseLineWidth;
+        final lineAlpha = touchesSelected ? 0.9 : alpha;
+
+        if (touchesSelected) {
+          // Connection glow behind the line
+          final glowPaint = Paint()
+            ..color = lineColor.withValues(alpha: 0.4)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = lineWidth + 6
+            ..strokeCap = StrokeCap.round
+            ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 6);
+          canvas.drawLine(p1.position, p2.position, glowPaint);
+        }
+
         final linePaint = Paint()
-          ..color = Colors.white.withValues(alpha: alpha)
+          ..color = lineColor.withValues(alpha: lineAlpha)
           ..style = PaintingStyle.stroke
           ..strokeWidth = lineWidth
           ..strokeCap = StrokeCap.round;

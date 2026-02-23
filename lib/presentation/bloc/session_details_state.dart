@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:equatable/equatable.dart';
+
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 
@@ -10,56 +13,76 @@ sealed class SessionDetailsState extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Loading session data and initializing video player.
+/// Loading session data from database.
 class SessionDetailsLoading extends SessionDetailsState {
   const SessionDetailsLoading();
 }
 
-/// Session data loaded and video player ready.
+/// Decoding video frames to images — shows progress.
+class SessionDetailsDecoding extends SessionDetailsState {
+  final int completed;
+  final int total;
+
+  const SessionDetailsDecoding({
+    required this.completed,
+    required this.total,
+  });
+
+  double get progress => total > 0 ? completed / total : 0.0;
+
+  @override
+  List<Object?> get props => [completed, total];
+}
+
+/// Frames decoded and ready for playback.
 class SessionDetailsLoaded extends SessionDetailsState {
   final Session session;
   final List<TrackedFrame> frames;
-  final bool isPlaying;
-  final Duration position;
-  final Duration duration;
-  final TrackedFrame? currentFrame;
+  final List<ui.Image> frameImages;
+  final int currentFrameIndex;
+  final bool isAutoPlaying;
 
   const SessionDetailsLoaded({
     required this.session,
     required this.frames,
-    required this.isPlaying,
-    required this.position,
-    required this.duration,
-    this.currentFrame,
+    required this.frameImages,
+    this.currentFrameIndex = 0,
+    this.isAutoPlaying = false,
   });
 
+  int get totalFrames => frames.length;
+
+  TrackedFrame? get currentFrame =>
+      currentFrameIndex < frames.length ? frames[currentFrameIndex] : null;
+
+  ui.Image? get currentImage =>
+      currentFrameIndex < frameImages.length
+          ? frameImages[currentFrameIndex]
+          : null;
+
   SessionDetailsLoaded copyWith({
-    bool? isPlaying,
-    Duration? position,
-    Duration? duration,
-    TrackedFrame? currentFrame,
+    int? currentFrameIndex,
+    bool? isAutoPlaying,
   }) {
     return SessionDetailsLoaded(
       session: session,
       frames: frames,
-      isPlaying: isPlaying ?? this.isPlaying,
-      position: position ?? this.position,
-      duration: duration ?? this.duration,
-      currentFrame: currentFrame ?? this.currentFrame,
+      frameImages: frameImages,
+      currentFrameIndex: currentFrameIndex ?? this.currentFrameIndex,
+      isAutoPlaying: isAutoPlaying ?? this.isAutoPlaying,
     );
   }
 
   @override
   List<Object?> get props => [
     session.id,
-    isPlaying,
-    position,
-    duration,
-    currentFrame?.timestampMicros,
+    currentFrameIndex,
+    isAutoPlaying,
+    totalFrames,
   ];
 }
 
-/// Error loading session or video.
+/// Error loading session or decoding frames.
 class SessionDetailsError extends SessionDetailsState {
   final String message;
 

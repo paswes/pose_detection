@@ -7,6 +7,7 @@ import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/camera_service.dart';
 import 'package:pose_detection/core/services/person_validator.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
+import 'package:pose_detection/core/services/frame_image_decoder.dart';
 import 'package:pose_detection/core/services/recording_service.dart';
 import 'package:pose_detection/data/database/app_database.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
@@ -62,6 +63,10 @@ Future<void> initializeDependencies({
     () => RecordingService(),
   );
 
+  sl.registerLazySingleton<FrameImageDecoder>(
+    () => FrameImageDecoder(),
+  );
+
   // Anatomy Feature
   sl.registerLazySingleton<IAnatomyRepository>(
     () => AnatomyRepository(),
@@ -91,6 +96,7 @@ Future<void> initializeDependencies({
     (session, _) => SessionDetailsCubit(
       session: session,
       repository: sl<SessionRepository>(),
+      decoder: sl<FrameImageDecoder>(),
     ),
   );
 }

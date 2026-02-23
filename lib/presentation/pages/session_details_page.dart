@@ -1,19 +1,13 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:video_player/video_player.dart';
 
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/data/models/session.dart';
-import 'package:pose_detection/data/models/tracked_frame.dart';
-import 'package:pose_detection/domain/models/detected_pose.dart';
-import 'package:pose_detection/domain/models/landmark.dart';
 import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_details_state.dart';
-import 'package:pose_detection/presentation/widgets/pose_painter.dart';
+import 'package:pose_detection/presentation/widgets/frame_image_painter.dart';
 
-/// Page for viewing a recorded session with video playback
+/// Page for viewing a recorded session with frame-based playback
 /// and synchronized landmark overlay.
 class SessionDetailsPage extends StatefulWidget {
   final Session session;
@@ -56,6 +50,7 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
             builder: (context, state) {
               return switch (state) {
                 SessionDetailsLoading() => _buildLoading(),
+                SessionDetailsDecoding() => _buildDecoding(state),
                 SessionDetailsLoaded() => _buildLoaded(state),
                 SessionDetailsError() => _buildError(state),
               };
@@ -76,6 +71,32 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
           Text(
             'Laden...',
             style: TextStyle(color: Color(0xFF888888), fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDecoding(SessionDetailsDecoding state) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 120,
+            height: 120,
+            child: CircularProgressIndicator(
+              value: state.progress > 0 ? state.progress : null,
+              color: const Color(0xFF4CAF50),
+              strokeWidth: 3,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            state.total > 0
+                ? 'Frames dekodieren: ${state.completed} / ${state.total}'
+                : 'Frames werden vorbereitet...',
+            style: const TextStyle(color: Color(0xFF888888), fontSize: 16),
           ),
         ],
       ),
@@ -106,92 +127,36 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   Widget _buildLoaded(SessionDetailsLoaded state) {
     return Column(
       children: [
-        // _SessionMetadata(
-        //   session: state.session,
-        //   frameCount: state.frames.length,
-        // ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
         Expanded(
-          child: _VideoWithOverlay(
-            cubit: _cubit,
+          child: _FrameWithOverlay(
             state: state,
           ),
         ),
-        SizedBox(height: 24),
-        _PlaybackControls(cubit: _cubit, state: state),
+        const SizedBox(height: 24),
+        _FramePlaybackControls(cubit: _cubit, state: state),
       ],
     );
   }
 }
 
-/// Displays session metadata in a compact card.
-class _SessionMetadata extends StatelessWidget {
-  final Session session;
-  final int frameCount;
-
-  const _SessionMetadata({required this.session, required this.frameCount});
-
-  @override
-  Widget build(BuildContext context) {
-    final duration = session.duration;
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    final dateStr =
-        '${session.createdAt.day.toString().padLeft(2, '0')}.${session.createdAt.month.toString().padLeft(2, '0')}.${session.createdAt.year}';
-    final timeStr =
-        '${session.createdAt.hour.toString().padLeft(2, '0')}:${session.createdAt.minute.toString().padLeft(2, '0')}';
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Text(
-            '$dateStr $timeStr',
-            style: const TextStyle(color: Color(0xFF888888), fontSize: 13),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '${minutes}m ${seconds}s',
-            style: const TextStyle(color: Color(0xFF888888), fontSize: 13),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '$frameCount Frames',
-            style: const TextStyle(color: Color(0xFF888888), fontSize: 13),
-          ),
-          const Spacer(),
-          Text(
-            '${session.isFrontCamera ? 'Front' : 'Back'} • ${session.isLandscape ? 'Landscape' : 'Portrait'}',
-            style: const TextStyle(color: Color(0xFF666666), fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Video player with landmark overlay stack.
-class _VideoWithOverlay extends StatelessWidget {
-  final SessionDetailsCubit cubit;
+/// Renders the current frame image with landmarks in a single paint pass.
+class _FrameWithOverlay extends StatelessWidget {
   final SessionDetailsLoaded state;
 
-  const _VideoWithOverlay({required this.cubit, required this.state});
+  const _FrameWithOverlay({required this.state});
 
   @override
   Widget build(BuildContext context) {
-    final controller = cubit.videoController;
-    if (controller == null || !controller.value.isInitialized) {
+    final image = state.currentImage;
+    if (image == null) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+        child: Text(
+          'Kein Frame verfügbar',
+          style: TextStyle(color: Color(0xFF888888)),
+        ),
       );
     }
-
-    final videoSize = controller.value.size;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
@@ -204,196 +169,128 @@ class _VideoWithOverlay extends StatelessWidget {
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final widgetSize = Size(
-              constraints.maxWidth,
-              constraints.maxHeight,
-            );
-
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                // Video layer
-                FittedBox(
-                  fit: BoxFit.cover,
-                  clipBehavior: Clip.hardEdge,
-                  child: SizedBox(
-                    width: videoSize.width,
-                    height: videoSize.height,
-                    child: VideoPlayer(controller),
-                  ),
-                ),
-                // Landmark overlay — driven directly by VideoPlayerController
-                // to bypass BLoC rebuild latency
-                ValueListenableBuilder<VideoPlayerValue>(
-                  valueListenable: controller,
-                  builder: (context, value, child) {
-                    // Hide overlay when paused at start (position 0 and not playing)
-                    if (value.position == Duration.zero && !value.isPlaying) {
-                      return const SizedBox.shrink();
-                    }
-
-                    final frame = cubit.findFrameForPosition(value.position);
-
-                    // Show overlay only when frame exists AND person was detected in that frame.
-                    // Since we now store ALL frames (including no-person), this check is meaningful.
-                    if (frame == null || !frame.isPersonDetected) {
-                      return const SizedBox.shrink();
-                    }
-
-                    final pose = _buildPoseForPlayback(
-                      frame,
-                      videoSize,
-                      state.session,
-                    );
-
-                    Widget overlay = CustomPaint(
-                      size: widgetSize,
-                      painter: PosePainter(
-                        pose: pose,
-                        imageSize: videoSize,
-                        widgetSize: widgetSize,
-                      ),
-                    );
-
-                    if (state.session.isFrontCamera) {
-                      overlay = Transform.flip(flipX: true, child: overlay);
-                    }
-
-                    return overlay;
-                  },
-                ),
-              ],
+            return CustomPaint(
+              size: Size(constraints.maxWidth, constraints.maxHeight),
+              painter: FrameImagePainter(
+                frameImage: image,
+                trackedFrame: state.currentFrame,
+                rawImageWidth: state.session.imageWidth,
+                rawImageHeight: state.session.imageHeight,
+                isFrontCamera: state.session.isFrontCamera,
+              ),
             );
           },
         ),
       ),
     );
   }
-
-  /// Builds a [DetectedPose] for playback by normalizing raw ML Kit buffer
-  /// coordinates into video pixel space.
-  ///
-  /// ML Kit on iOS returns landmarks in raw camera buffer space (e.g. 1920x1080
-  /// landscape). The recorded video is in visual orientation (e.g. 1080x1920
-  /// portrait). We normalize coordinates proportionally so they map correctly
-  /// to the video frame, then PosePainter applies BoxFit.cover from videoSize
-  /// to widgetSize — matching the video FittedBox exactly.
-  DetectedPose _buildPoseForPlayback(
-    TrackedFrame frame,
-    ui.Size videoSize,
-    Session session,
-  ) {
-    final rawW = session.imageWidth;
-    final rawH = session.imageHeight;
-
-    final landmarks = frame.landmarks.map((l) {
-      return Landmark(
-        id: l.id,
-        x: (l.x / rawW) * videoSize.width,
-        y: (l.y / rawH) * videoSize.height,
-        z: l.z,
-        likelihood: l.likelihood,
-      );
-    }).toList();
-
-    return DetectedPose(
-      landmarks: landmarks,
-      imageSize: videoSize,
-      timestampMicros: frame.timestampMicros,
-    );
-  }
 }
 
-/// Playback controls: slider, timestamps, play/pause, frame step.
-class _PlaybackControls extends StatelessWidget {
+/// Playback controls: slider, frame counter, prev/play/next buttons.
+class _FramePlaybackControls extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
 
-  const _PlaybackControls({required this.cubit, required this.state});
+  const _FramePlaybackControls({required this.cubit, required this.state});
 
   @override
   Widget build(BuildContext context) {
-    final positionMs = state.position.inMilliseconds.toDouble();
-    final durationMs = state.duration.inMilliseconds.toDouble();
-    final sliderValue = durationMs > 0
-        ? positionMs.clamp(0.0, durationMs)
-        : 0.0;
+    final frameIndex = state.currentFrameIndex;
+    final totalFrames = state.totalFrames;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Progress bar (read-only)
-          IgnorePointer(
-            child: SliderTheme(
-              data: SliderThemeData(
-                activeTrackColor: const Color(0xFF4CAF50),
-                inactiveTrackColor: const Color(0xFF333333),
-                thumbColor: const Color(0xFF4CAF50),
-                overlayShape: SliderComponentShape.noOverlay,
-                trackHeight: 3,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-              ),
-              child: Slider(
-                value: sliderValue,
-                max: durationMs > 0 ? durationMs : 1.0,
-                onChanged: (_) {},
-              ),
+          // Frame scrubber
+          SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: const Color(0xFF4CAF50),
+              inactiveTrackColor: const Color(0xFF333333),
+              thumbColor: const Color(0xFF4CAF50),
+              overlayShape: SliderComponentShape.noOverlay,
+              trackHeight: 3,
+              thumbShape:
+                  const RoundSliderThumbShape(enabledThumbRadius: 5),
+            ),
+            child: Slider(
+              value: frameIndex.toDouble(),
+              max: totalFrames > 1 ? (totalFrames - 1).toDouble() : 0,
+              onChanged: (value) => cubit.goToFrame(value.round()),
             ),
           ),
-          // Timestamps
+          // Frame counter
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _formatDuration(state.position),
-                  style: const TextStyle(
-                    color: Color(0xFF888888),
-                    fontSize: 12,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-                Text(
-                  _formatDuration(state.duration),
-                  style: const TextStyle(
-                    color: Color(0xFF888888),
-                    fontSize: 12,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
+            child: Text(
+              'Frame ${frameIndex + 1} / $totalFrames',
+              style: const TextStyle(
+                color: Color(0xFF888888),
+                fontSize: 12,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          // Play / Pause
-          GestureDetector(
-            onTap: cubit.togglePlayback,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Color(0xFF4CAF50),
-                shape: BoxShape.circle,
+          const SizedBox(height: 12),
+          // Prev / Play-Pause / Next
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            spacing: 24,
+            children: [
+              // Previous
+              GestureDetector(
+                onTap: cubit.previousFrame,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2A2A2A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.skip_previous_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
               ),
-              child: Icon(
-                state.isPlaying
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 28,
+              // Play / Pause
+              GestureDetector(
+                onTap: cubit.toggleAutoPlay,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF4CAF50),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    state.isAutoPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
               ),
-            ),
+              // Next
+              GestureDetector(
+                onTap: cubit.nextFrame,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2A2A2A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.skip_next_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
-  }
-
-  String _formatDuration(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
   }
 }

@@ -1,153 +1,155 @@
-import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:video_player/video_player.dart';
 
+import 'package:pose_detection/core/services/frame_image_decoder.dart';
 import 'package:pose_detection/data/models/session.dart';
-import 'package:pose_detection/data/models/tracked_frame.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
 import 'package:pose_detection/presentation/bloc/session_details_state.dart';
 
-/// Manages video playback and landmark frame synchronization
-/// for a recorded session.
+/// Manages frame-based playback for a recorded session.
+///
+/// Replaces the previous VideoPlayer approach with pre-decoded
+/// frame images for guaranteed landmark-video synchronization.
 class SessionDetailsCubit extends Cubit<SessionDetailsState> {
-  /// Forward offset to compensate for VideoPlayer position reporting lag on iOS.
-  /// The video_player package reports position ~30-80ms behind the rendered frame.
-  static const _positionLookaheadMicros = 50000; // 50ms
+  static const _autoPlayIntervalMs = 33; // ~30 fps
 
   final Session session;
   final SessionRepository _repository;
+  final FrameImageDecoder _decoder;
 
-  VideoPlayerController? _videoController;
-  List<TrackedFrame> _frames = [];
-  List<int> _relativeOffsetsMicros = [];
-
-  /// Access the video controller for the UI layer.
-  VideoPlayerController? get videoController => _videoController;
+  Timer? _autoPlayTimer;
 
   SessionDetailsCubit({
     required this.session,
     required SessionRepository repository,
+    required FrameImageDecoder decoder,
   }) : _repository = repository,
+       _decoder = decoder,
        super(const SessionDetailsLoading());
 
-  /// Load frames and initialize the video player.
+  /// Load tracked frames from DB, then decode video frames to images.
   Future<void> initialize() async {
     try {
-      final videoFile = File(session.videoPath);
-      if (!videoFile.existsSync()) {
+      final frames = await _repository.getFramesForSession(session.id);
+
+      if (frames.isEmpty) {
+        emit(const SessionDetailsError(message: 'Keine Frames gefunden'));
+        return;
+      }
+
+      emit(const SessionDetailsDecoding(completed: 0, total: 0));
+
+      final timestamps = frames.map((f) => f.timestampMicros).toList();
+
+      final images = await _decoder.decodeAllFrames(
+        session.videoPath,
+        timestamps,
+        onProgress: (completed, total) {
+          emit(SessionDetailsDecoding(completed: completed, total: total));
+        },
+      );
+
+      if (images.isEmpty) {
         emit(const SessionDetailsError(
-          message: 'Videodatei nicht gefunden',
+          message: 'Frames konnten nicht geladen werden',
         ));
         return;
       }
 
-      _frames = await _repository.getFramesForSession(session.id);
-
-      // Frame timestamps are already relative to video start
-      // (computed as captureTimestamp - videoStartTimestamp in RecordingService).
-      // Use them directly — video player position 0 = video start, not first frame.
-      if (_frames.isNotEmpty) {
-        _relativeOffsetsMicros = _frames
-            .map((f) => f.timestampMicros)
-            .toList();
-      }
-
-      _videoController = VideoPlayerController.file(videoFile);
-      await _videoController!.initialize();
-
-      _videoController!.addListener(_onVideoPositionChanged);
-
-      final duration = _videoController!.value.duration;
-
       emit(SessionDetailsLoaded(
         session: session,
-        frames: _frames,
-        isPlaying: false,
-        position: Duration.zero,
-        duration: duration,
-        // Don't show frame until playback starts - prevents landmarks
-        // from appearing before video plays
-        currentFrame: null,
+        frames: frames,
+        frameImages: images,
       ));
     } catch (e) {
       emit(SessionDetailsError(message: 'Fehler beim Laden: $e'));
     }
   }
 
-  void _onVideoPositionChanged() {
-    final controller = _videoController;
-    if (controller == null) return;
+  /// Jump to a specific frame by index.
+  void goToFrame(int index) {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
 
-    final currentState = state;
-    if (currentState is! SessionDetailsLoaded) return;
-
-    final position = controller.value.position;
-    final isPlaying = controller.value.isPlaying;
-
-    final playStateChanged = isPlaying != currentState.isPlaying;
-    final positionChanged = position != currentState.position;
-
-    if (!playStateChanged && !positionChanged) return;
-
-    emit(currentState.copyWith(
-      position: position,
-      isPlaying: isPlaying,
-    ));
+    final clamped = index.clamp(0, current.totalFrames - 1);
+    emit(current.copyWith(currentFrameIndex: clamped));
   }
 
-  /// Find the nearest tracked frame for a given video position.
-  /// Exposed for direct use by the overlay widget to bypass BLoC rebuild latency.
-  TrackedFrame? findFrameForPosition(Duration position) {
-    return _findNearestFrame(position);
-  }
+  /// Advance to the next frame.
+  void nextFrame() {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
 
-  TrackedFrame? _findNearestFrame(Duration position) {
-    if (_frames.isEmpty || _relativeOffsetsMicros.isEmpty) return null;
-
-    final targetMicros = position.inMicroseconds + _positionLookaheadMicros;
-
-    // Binary search for the closest frame
-    int low = 0;
-    int high = _relativeOffsetsMicros.length - 1;
-
-    while (low < high) {
-      final mid = (low + high) ~/ 2;
-      if (_relativeOffsetsMicros[mid] < targetMicros) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-
-    // Check neighbors to find the true closest
-    if (low > 0) {
-      final diffLow = (targetMicros - _relativeOffsetsMicros[low - 1]).abs();
-      final diffHigh = (targetMicros - _relativeOffsetsMicros[low]).abs();
-      if (diffLow < diffHigh) {
-        return _frames[low - 1];
-      }
-    }
-
-    return _frames[low];
-  }
-
-  /// Toggle between play and pause.
-  Future<void> togglePlayback() async {
-    final controller = _videoController;
-    if (controller == null) return;
-
-    if (controller.value.isPlaying) {
-      await controller.pause();
+    if (current.currentFrameIndex < current.totalFrames - 1) {
+      emit(current.copyWith(
+        currentFrameIndex: current.currentFrameIndex + 1,
+      ));
     } else {
-      await controller.play();
+      // Reached end — stop auto-play
+      _stopAutoPlay();
+      emit(current.copyWith(
+        currentFrameIndex: current.totalFrames - 1,
+        isAutoPlaying: false,
+      ));
     }
+  }
+
+  /// Go back one frame.
+  void previousFrame() {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    if (current.currentFrameIndex > 0) {
+      emit(current.copyWith(
+        currentFrameIndex: current.currentFrameIndex - 1,
+      ));
+    }
+  }
+
+  /// Toggle auto-play on/off (~30fps frame advancement).
+  void toggleAutoPlay() {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    if (current.isAutoPlaying) {
+      _stopAutoPlay();
+      emit(current.copyWith(isAutoPlaying: false));
+    } else {
+      // If at the end, restart from beginning
+      final startIndex = current.currentFrameIndex >= current.totalFrames - 1
+          ? 0
+          : current.currentFrameIndex;
+
+      emit(current.copyWith(
+        isAutoPlaying: true,
+        currentFrameIndex: startIndex,
+      ));
+
+      _autoPlayTimer = Timer.periodic(
+        const Duration(milliseconds: _autoPlayIntervalMs),
+        (_) => nextFrame(),
+      );
+    }
+  }
+
+  /// Seek to a position by slider percent (0.0–1.0).
+  void seekToPercent(double percent) {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    final index = (percent * (current.totalFrames - 1)).round();
+    goToFrame(index);
+  }
+
+  void _stopAutoPlay() {
+    _autoPlayTimer?.cancel();
+    _autoPlayTimer = null;
   }
 
   @override
   Future<void> close() {
-    _videoController?.removeListener(_onVideoPositionChanged);
-    _videoController?.dispose();
+    _stopAutoPlay();
     return super.close();
   }
 }

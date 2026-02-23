@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/data/models/session.dart';
+import 'package:pose_detection/features/anatomy/presentation/pages/anatomy_page.dart';
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
 import 'package:pose_detection/presentation/pages/session_details_page.dart';
@@ -52,6 +53,23 @@ class _HomePageState extends State<HomePage> {
             'Sessions',
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
+          actions: [
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AnatomyPage()),
+              ),
+              child: Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.all(8),
+                child: const Icon(
+                  Icons.accessibility_new_rounded,
+                  color: Color(0xFF888888),
+                  size: 24,
+                ),
+              ),
+            ),
+          ],
         ),
         body: BlocBuilder<SessionListCubit, List<Session>>(
           builder: (context, sessions) {

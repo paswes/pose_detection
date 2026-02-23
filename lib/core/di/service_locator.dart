@@ -11,6 +11,9 @@ import 'package:pose_detection/core/services/recording_service.dart';
 import 'package:pose_detection/data/database/app_database.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
 import 'package:pose_detection/data/models/session.dart';
+import 'package:pose_detection/features/anatomy/data/repositories/anatomy_repository.dart';
+import 'package:pose_detection/features/anatomy/domain/repositories/i_anatomy_repository.dart';
+import 'package:pose_detection/features/anatomy/presentation/cubit/anatomy_cubit.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
@@ -57,6 +60,15 @@ Future<void> initializeDependencies({
 
   sl.registerLazySingleton<RecordingService>(
     () => RecordingService(),
+  );
+
+  // Anatomy Feature
+  sl.registerLazySingleton<IAnatomyRepository>(
+    () => AnatomyRepository(),
+  );
+
+  sl.registerFactory<AnatomyCubit>(
+    () => AnatomyCubit(repository: sl<IAnatomyRepository>()),
   );
 
   // BLoC / Cubit

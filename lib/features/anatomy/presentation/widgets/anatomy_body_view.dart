@@ -98,8 +98,9 @@ class AnatomyBodyView extends StatelessWidget {
 
     // Build muscle sets per status.
     final trainedMuscles = _collectMuscles((m) => m.status is TrainedStatus);
-    final complaintMuscles =
-        _collectMuscles((m) => m.status is ComplaintStatus);
+    final complaintMuscles = _collectMuscles(
+      (m) => m.status is ComplaintStatus,
+    );
     final weakMuscles = _collectMuscles((m) => m.status is WeakStatus);
 
     // Currently selected/tapped muscle highlight.
@@ -107,50 +108,53 @@ class AnatomyBodyView extends StatelessWidget {
         ? _BodyPartMapper.musclesForAppId(selectedMuscleId!)
         : <Muscle>{};
 
-    return InteractiveViewer(
-      minScale: 1.0,
-      maxScale: 3.0,
-      child: Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Layer 1: Trained muscles (green)
-            if (trainedMuscles.isNotEmpty)
-              _StatusLayer(
-                key: ValueKey('trained_${isFront}_$trainedMuscles'),
-                isFront: isFront,
-                selectedMuscles: trainedMuscles,
-                color: const Color(0xFF4CAF50),
-              ),
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: InteractiveViewer(
+        minScale: 1.0,
+        maxScale: 3.0,
+        child: Center(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Layer 1: Trained muscles (green)
+              if (trainedMuscles.isNotEmpty)
+                _StatusLayer(
+                  key: ValueKey('trained_${isFront}_$trainedMuscles'),
+                  isFront: isFront,
+                  selectedMuscles: trainedMuscles,
+                  color: const Color(0xFF4CAF50),
+                ),
 
-            // Layer 2: Complaint muscles (red)
-            if (complaintMuscles.isNotEmpty)
-              _StatusLayer(
-                key: ValueKey('complaint_${isFront}_$complaintMuscles'),
-                isFront: isFront,
-                selectedMuscles: complaintMuscles,
-                color: const Color(0xFFFF5252),
-              ),
+              // Layer 2: Complaint muscles (red)
+              if (complaintMuscles.isNotEmpty)
+                _StatusLayer(
+                  key: ValueKey('complaint_${isFront}_$complaintMuscles'),
+                  isFront: isFront,
+                  selectedMuscles: complaintMuscles,
+                  color: const Color(0xFFFF5252),
+                ),
 
-            // Layer 3: Weak muscles (yellow)
-            if (weakMuscles.isNotEmpty)
-              _StatusLayer(
-                key: ValueKey('weak_${isFront}_$weakMuscles'),
-                isFront: isFront,
-                selectedMuscles: weakMuscles,
-                color: const Color(0xFFFFEB3B),
-              ),
+              // Layer 3: Weak muscles (yellow)
+              if (weakMuscles.isNotEmpty)
+                _StatusLayer(
+                  key: ValueKey('weak_${isFront}_$weakMuscles'),
+                  isFront: isFront,
+                  selectedMuscles: weakMuscles,
+                  color: const Color(0xFFFFEB3B),
+                ),
 
-            // Layer 4: Interactive tap layer
-            InteractiveBodySvg(
-              key: ValueKey('interactive_$isFront'),
-              isFront: isFront,
-              selectedMuscles: selectedMuscles,
-              onMuscleTap: _handleMuscleTap,
-              highlightColor: Colors.white.withValues(alpha: 0.25),
-              fit: BoxFit.contain,
-            ),
-          ],
+              // Layer 4: Interactive tap layer
+              InteractiveBodySvg(
+                key: ValueKey('interactive_$isFront'),
+                isFront: isFront,
+                selectedMuscles: selectedMuscles,
+                onMuscleTap: _handleMuscleTap,
+                highlightColor: Colors.white.withValues(alpha: 0.25),
+                fit: BoxFit.contain,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -33,10 +33,13 @@ class SessionAnalyticsPage extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        leading: const Icon(
-          Icons.chevron_left_rounded,
-          color: Colors.white,
-          size: 28,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(
+            Icons.chevron_left_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
         ),
       ),
       backgroundColor: Colors.black,

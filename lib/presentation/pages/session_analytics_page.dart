@@ -21,52 +21,30 @@ class SessionAnalyticsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Analyse',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        leading: const Icon(
+          Icons.chevron_left_rounded,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          SizedBox(height: topPadding + 8),
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.chevron_left_rounded,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Analyse',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Content
           Expanded(
             child: ListView.builder(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding + 16),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding + 16),
               itemCount: reps.length + 1, // +1 for summary
               itemBuilder: (context, index) {
                 if (index == 0) return _SetSummary(reps: reps);
@@ -102,22 +80,21 @@ class _SetSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final avgMinAngle = reps.isEmpty
         ? 0.0
-        : reps.map((r) => r.minHipAngle).reduce((a, b) => a + b) /
-            reps.length;
+        : reps.map((r) => r.minHipAngle).reduce((a, b) => a + b) / reps.length;
     final avgDescentSec = reps.isEmpty
         ? 0.0
         : reps
-                .map((r) => r.descentDuration.inMilliseconds)
-                .reduce((a, b) => a + b) /
-            reps.length /
-            1000;
+                  .map((r) => r.descentDuration.inMilliseconds)
+                  .reduce((a, b) => a + b) /
+              reps.length /
+              1000;
     final avgTotalSec = reps.isEmpty
         ? 0.0
         : reps
-                .map((r) => r.totalDuration.inMilliseconds)
-                .reduce((a, b) => a + b) /
-            reps.length /
-            1000;
+                  .map((r) => r.totalDuration.inMilliseconds)
+                  .reduce((a, b) => a + b) /
+              reps.length /
+              1000;
 
     return Container(
       padding: const EdgeInsets.all(16),

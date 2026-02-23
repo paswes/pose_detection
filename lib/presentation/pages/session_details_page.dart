@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
-import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
@@ -48,15 +47,12 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
       value: _cubit,
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: SafeArea(
-          top: false,
-          child: BlocBuilder<SessionDetailsCubit, SessionDetailsState>(
-            builder: (context, state) => switch (state) {
-              SessionDetailsLoading() => _buildLoading(),
-              SessionDetailsLoaded() => _buildLoaded(state),
-              SessionDetailsError() => _buildError(state),
-            },
-          ),
+        body: BlocBuilder<SessionDetailsCubit, SessionDetailsState>(
+          builder: (context, state) => switch (state) {
+            SessionDetailsLoading() => _buildLoading(),
+            SessionDetailsLoaded() => _buildLoaded(state),
+            SessionDetailsError() => _buildError(state),
+          },
         ),
       ),
     );
@@ -100,14 +96,13 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   }
 
   Widget _buildLoaded(SessionDetailsLoaded state) {
-    return Column(
+    return Stack(
       children: [
-        Expanded(
+        Positioned.fill(
           child: _VideoWithOverlay(
             cubit: _cubit,
             state: state,
             onBack: () => Navigator.pop(context),
-            onOptionsTapped: () => _showOptionsSheet(state),
             onLandmarkTapped: (landmark) {
               _cubit.selectLandmark(landmark.id);
               showLandmarkDetailSheet(
@@ -120,67 +115,8 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
             },
           ),
         ),
-        _FramePlaybackControls(cubit: _cubit, state: state),
+        _ControlsSheet(cubit: _cubit, state: state),
       ],
-    );
-  }
-
-  void _showOptionsSheet(SessionDetailsLoaded state) {
-    HapticFeedback.lightImpact();
-    WoltModalSheet.show(
-      context: context,
-      pageListBuilder: (sheetContext) => [
-        SliverWoltModalSheetPage(
-          backgroundColor: const Color(0xFF1E1E1E),
-          surfaceTintColor: Colors.transparent,
-          hasSabGradient: false,
-          isTopBarLayerAlwaysVisible: true,
-          topBarTitle: const Text(
-            'Optionen',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          trailingNavBarWidget: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              icon: const Icon(Icons.close, color: Color(0xFF888888)),
-              onPressed: () => Navigator.of(sheetContext).pop(),
-            ),
-          ),
-          mainContentSliversBuilder: (context) => [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              sliver: SliverList.list(
-                children: [
-                  const _SheetSectionHeader(title: 'GESCHWINDIGKEIT'),
-                  const SizedBox(height: 12),
-                  Row(
-                    spacing: 8,
-                    children: [
-                      for (final speed
-                          in SessionDetailsCubit.availableSpeeds)
-                        Expanded(
-                          child: _SheetSpeedPill(
-                            speed: speed,
-                            isActive: state.playbackSpeed == speed,
-                            onTap: () {
-                              _cubit.setPlaybackSpeed(speed);
-                              Navigator.of(sheetContext).pop();
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-      modalBarrierColor: Colors.black54,
     );
   }
 }
@@ -193,14 +129,12 @@ class _VideoWithOverlay extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
   final VoidCallback onBack;
-  final VoidCallback onOptionsTapped;
   final ValueChanged<LandmarkData> onLandmarkTapped;
 
   const _VideoWithOverlay({
     required this.cubit,
     required this.state,
     required this.onBack,
-    required this.onOptionsTapped,
     required this.onLandmarkTapped,
   });
 
@@ -220,83 +154,79 @@ class _VideoWithOverlay extends StatelessWidget {
     return Container(
       color: Colors.black,
       child: LayoutBuilder(
-          builder: (context, constraints) {
-            final widgetSize = Size(
-              constraints.maxWidth,
-              constraints.maxHeight,
-            );
-            return GestureDetector(
-              onTapUp: (details) => _handleTap(
-                details.localPosition,
-                widgetSize,
-              ),
-              child: Stack(
-                children: [
-                  // Layer 1: Video (BoxFit.contain — full frame, no crop)
-                  Positioned.fill(
-                    child: FittedBox(
-                      fit: BoxFit.contain,
-                      alignment: Alignment.topCenter,
-                      child: SizedBox(
-                        width: videoWidth,
-                        height: videoHeight,
-                        child: VideoPlayer(controller),
+        builder: (context, constraints) {
+          final widgetSize = Size(
+            constraints.maxWidth,
+            constraints.maxHeight,
+          );
+          return GestureDetector(
+            onTapUp: (details) => _handleTap(
+              details.localPosition,
+              widgetSize,
+            ),
+            child: Stack(
+              children: [
+                // Layer 1: Video (BoxFit.contain — full frame, no crop)
+                Positioned.fill(
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      width: videoWidth,
+                      height: videoHeight,
+                      child: VideoPlayer(controller),
+                    ),
+                  ),
+                ),
+                // Layer 2: Landmark overlay (contain to match video)
+                Positioned.fill(
+                  child: CustomPaint(
+                    size: widgetSize,
+                    painter: LandmarkOverlayPainter(
+                      frameNotifier: cubit.frameNotifier,
+                      videoSize: Size(videoWidth, videoHeight),
+                      rawImageWidth: state.session.imageWidth,
+                      rawImageHeight: state.session.imageHeight,
+                      isFrontCamera: state.session.isFrontCamera,
+                      fitMode: FitMode.contain,
+                      alignY: 0.0,
+                      schema: LandmarkSchema.rdl,
+                      visibleLandmarkIds: LandmarkSchema.rdlLandmarkIds,
+                      selectedLandmarkId: state.selectedLandmarkId,
+                    ),
+                  ),
+                ),
+                // Layer 3: Top HUD (safe area aware)
+                Positioned(
+                  top: topPadding + 8,
+                  left: 16,
+                  right: 16,
+                  child: Row(
+                    children: [
+                      _OverlayButton(
+                        onTap: onBack,
+                        icon: Icons.chevron_left_rounded,
+                        size: 28,
                       ),
-                    ),
-                  ),
-                  // Layer 2: Landmark overlay (contain to match video)
-                  Positioned.fill(
-                    child: CustomPaint(
-                      size: widgetSize,
-                      painter: LandmarkOverlayPainter(
-                        frameNotifier: cubit.frameNotifier,
-                        videoSize: Size(videoWidth, videoHeight),
-                        rawImageWidth: state.session.imageWidth,
-                        rawImageHeight: state.session.imageHeight,
-                        isFrontCamera: state.session.isFrontCamera,
-                        fitMode: FitMode.contain,
-                        alignY: 0.0,
-                        schema: LandmarkSchema.rdl,
-                        visibleLandmarkIds: LandmarkSchema.rdlLandmarkIds,
-                        selectedLandmarkId: state.selectedLandmarkId,
+                      const SizedBox(width: 8),
+                      _FrameInfo(
+                        frameIndex: state.currentFrameIndex,
+                        totalFrames: state.totalFrames,
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      _RepBadge(
+                        repCount: state.repCount,
+                        hipAngle: state.hipAngle,
+                      ),
+                    ],
                   ),
-                  // Layer 3: Back button (top-left)
-                  Positioned(
-                    top: topPadding + 8,
-                    left: 16,
-                    child: _OverlayButton(
-                      onTap: onBack,
-                      icon: Icons.chevron_left_rounded,
-                      size: 28,
-                    ),
-                  ),
-                  // Layer 4: Rep + angle badge (top-right)
-                  Positioned(
-                    top: topPadding + 8,
-                    right: 16,
-                    child: _RepBadge(
-                      repCount: state.repCount,
-                      hipAngle: state.hipAngle,
-                    ),
-                  ),
-                  // Layer 5: Options button (bottom-right)
-                  Positioned(
-                    bottom: 16,
-                    right: 16,
-                    child: _OverlayButton(
-                      onTap: onOptionsTapped,
-                      icon: Icons.tune_rounded,
-                      size: 22,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _handleTap(Offset tapPosition, Size widgetSize) {
@@ -319,23 +249,25 @@ class _VideoWithOverlay extends StatelessWidget {
       if (state.session.isFrontCamera) {
         x = videoSize.width - x;
       }
-      landmarks.add(Landmark(
-        id: l.id,
-        x: x,
-        y: y,
-        z: l.z,
-        likelihood: l.likelihood,
-      ));
+      landmarks.add(
+        Landmark(
+          id: l.id,
+          x: x,
+          y: y,
+          z: l.z,
+          likelihood: l.likelihood,
+        ),
+      );
     }
 
     final translatedPoints =
         CoordinateTranslator.translateAllLandmarksWithDepth(
-      landmarks,
-      videoSize,
-      widgetSize,
-      fitMode: FitMode.contain,
-      alignY: 0.0,
-    );
+          landmarks,
+          videoSize,
+          widgetSize,
+          fitMode: FitMode.contain,
+          alignY: 0.0,
+        );
 
     const hitRadius = 30.0;
     int? closestId;
@@ -436,146 +368,203 @@ class _RepBadge extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// Frame playback controls
-// =============================================================================
+class _FrameInfo extends StatelessWidget {
+  final int frameIndex;
+  final int totalFrames;
 
-class _FramePlaybackControls extends StatelessWidget {
-  final SessionDetailsCubit cubit;
-  final SessionDetailsLoaded state;
-
-  const _FramePlaybackControls({required this.cubit, required this.state});
+  const _FrameInfo({required this.frameIndex, required this.totalFrames});
 
   @override
   Widget build(BuildContext context) {
-    final frameIndex = state.currentFrameIndex;
-    final totalFrames = state.totalFrames;
+    return Expanded(
+      child: Container(
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          'Frame ${frameIndex + 1} / $totalFrames',
+          style: const TextStyle(
+            color: Color(0xFF999999),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Frame scrubber
-          SliderTheme(
-            data: SliderThemeData(
-              activeTrackColor: const Color(0xFF4CAF50),
-              inactiveTrackColor: const Color(0xFF333333),
-              thumbColor: const Color(0xFF4CAF50),
-              overlayShape: SliderComponentShape.noOverlay,
-              trackHeight: 3,
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 5),
-            ),
-            child: Slider(
-              value: frameIndex.toDouble(),
-              max: totalFrames > 1 ? (totalFrames - 1).toDouble() : 0,
-              onChanged: (value) => cubit.seekToFrame(value.round()),
-            ),
+// =============================================================================
+// Draggable controls sheet
+// =============================================================================
+
+class _ControlsSheet extends StatelessWidget {
+  final SessionDetailsCubit cubit;
+  final SessionDetailsLoaded state;
+
+  static const double _initialChildSize = 0.3;
+  static const double _maxChildSize = 0.7;
+
+  const _ControlsSheet({required this.cubit, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    return DraggableScrollableSheet(
+      initialChildSize: _initialChildSize,
+      minChildSize: _initialChildSize,
+      maxChildSize: _maxChildSize,
+      snap: true,
+      snapSizes: const [_initialChildSize, _maxChildSize],
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
-          // Frame counter
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              'Frame ${frameIndex + 1} / $totalFrames',
-              style: const TextStyle(
-                color: Color(0xFF888888),
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Previous / Play-Pause / Next
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            spacing: 32,
-            children: [
-              GestureDetector(
-                onTap: cubit.previousFrame,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF2A2A2A),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.chevron_left_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: cubit.togglePlayPause,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: state.isPlaying
-                        ? const Color(0xFF4CAF50)
-                        : const Color(0xFF2A2A2A),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    state.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: cubit.nextFrame,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF2A2A2A),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.white,
-                    size: 28,
+          child: CustomScrollView(
+            controller: scrollController,
+            physics: const NeverScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding + 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Drag handle
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: _DragHandle(),
+                      ),
+                      // Frame scrubber
+                      const SizedBox(height: 16),
+                      SliderTheme(
+                        data: SliderThemeData(
+                          activeTrackColor: const Color(0xFF4CAF50),
+                          inactiveTrackColor: const Color(0xFF333333),
+                          thumbColor: const Color(0xFF4CAF50),
+                          overlayShape: SliderComponentShape.noOverlay,
+                          trackHeight: 3,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 8,
+                          ),
+                        ),
+                        child: Slider(
+                          value: state.currentFrameIndex.toDouble(),
+                          max: state.totalFrames > 1
+                              ? (state.totalFrames - 1).toDouble()
+                              : 0,
+                          onChanged: (value) =>
+                              cubit.seekToFrame(value.round()),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Previous / Play-Pause / Next
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        spacing: 32,
+                        children: [
+                          _ControlButton(
+                            onTap: cubit.previousFrame,
+                            icon: Icons.chevron_left_rounded,
+                          ),
+                          _ControlButton(
+                            onTap: cubit.togglePlayPause,
+                            icon: state.isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            isActive: state.isPlaying,
+                          ),
+                          _ControlButton(
+                            onTap: cubit.nextFrame,
+                            icon: Icons.chevron_right_rounded,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 32),
+                      Row(
+                        spacing: 8,
+                        children: [
+                          for (final speed
+                              in SessionDetailsCubit.availableSpeeds)
+                            Expanded(
+                              child: _SpeedPill(
+                                speed: speed,
+                                isActive: state.playbackSpeed == speed,
+                                onTap: () => cubit.setPlaybackSpeed(speed),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
-// =============================================================================
-// Options sheet widgets
-// =============================================================================
-
-class _SheetSectionHeader extends StatelessWidget {
-  final String title;
-
-  const _SheetSectionHeader({required this.title});
+class _DragHandle extends StatelessWidget {
+  const _DragHandle();
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        color: Color(0xFF666666),
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 1.2,
+    return Container(
+      width: 36,
+      height: 4,
+      decoration: BoxDecoration(
+        color: const Color(0xFF555555),
+        borderRadius: BorderRadius.circular(2),
       ),
     );
   }
 }
 
-class _SheetSpeedPill extends StatelessWidget {
+class _ControlButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final IconData icon;
+  final bool isActive;
+
+  const _ControlButton({
+    required this.onTap,
+    required this.icon,
+    this.isActive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF4CAF50) : const Color(0xFF2A2A2A),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 28),
+      ),
+    );
+  }
+}
+
+class _SpeedPill extends StatelessWidget {
   final double speed;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _SheetSpeedPill({
+  const _SpeedPill({
     required this.speed,
     required this.isActive,
     required this.onTap,
@@ -591,9 +580,7 @@ class _SheetSpeedPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isActive
-              ? const Color(0xFF4CAF50)
-              : const Color(0xFF2A2A2A),
+          color: isActive ? const Color(0xFF4CAF50) : const Color(0xFF2A2A2A),
           borderRadius: BorderRadius.circular(12),
         ),
         alignment: Alignment.center,

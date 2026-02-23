@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:video_player/video_player.dart';
 
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
@@ -8,10 +9,10 @@ import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/domain/models/landmark.dart';
 import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_details_state.dart';
-import 'package:pose_detection/presentation/widgets/frame_image_painter.dart';
 import 'package:pose_detection/presentation/widgets/landmark_detail_sheet.dart';
+import 'package:pose_detection/presentation/widgets/landmark_overlay_painter.dart';
 
-/// Page for viewing a recorded session with frame-by-frame navigation
+/// Page for viewing a recorded session with video playback
 /// and synchronized landmark overlay.
 class SessionDetailsPage extends StatefulWidget {
   final Session session;
@@ -106,7 +107,8 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
       children: [
         const SizedBox(height: 24),
         Expanded(
-          child: _FrameWithOverlay(
+          child: _VideoWithOverlay(
+            cubit: _cubit,
             state: state,
             onLandmarkTapped: (landmark) {
               _cubit.selectLandmark(landmark.id);
@@ -125,25 +127,30 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   }
 }
 
-/// Renders the current frame image with landmarks in a single paint pass.
+/// Renders the video player with landmark overlay on top.
 /// Detects taps on landmark points and reports the tapped landmark.
-class _FrameWithOverlay extends StatelessWidget {
+class _VideoWithOverlay extends StatelessWidget {
+  final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
   final ValueChanged<LandmarkData> onLandmarkTapped;
 
-  const _FrameWithOverlay({
+  const _VideoWithOverlay({
+    required this.cubit,
     required this.state,
     required this.onLandmarkTapped,
   });
 
   @override
   Widget build(BuildContext context) {
-    final image = state.currentImage;
-    if (image == null) {
+    final controller = cubit.videoController;
+    if (controller == null || !state.isVideoReady) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFF888888)),
       );
     }
+
+    final videoWidth = state.session.imageWidth;
+    final videoHeight = state.session.imageHeight;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
@@ -165,15 +172,34 @@ class _FrameWithOverlay extends StatelessWidget {
                 details.localPosition,
                 widgetSize,
               ),
-              child: CustomPaint(
-                size: widgetSize,
-                painter: FrameImagePainter(
-                  frameImage: image,
-                  trackedFrame: state.currentFrame,
-                  rawImageWidth: state.session.imageWidth,
-                  rawImageHeight: state.session.imageHeight,
-                  isFrontCamera: state.session.isFrontCamera,
-                ),
+              child: Stack(
+                children: [
+                  // Layer 1: Video player (BoxFit.cover)
+                  Positioned.fill(
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      clipBehavior: Clip.hardEdge,
+                      child: SizedBox(
+                        width: videoWidth,
+                        height: videoHeight,
+                        child: VideoPlayer(controller),
+                      ),
+                    ),
+                  ),
+                  // Layer 2: Landmark overlay
+                  Positioned.fill(
+                    child: CustomPaint(
+                      size: widgetSize,
+                      painter: LandmarkOverlayPainter(
+                        trackedFrame: state.currentFrame,
+                        videoSize: Size(videoWidth, videoHeight),
+                        rawImageWidth: state.session.imageWidth,
+                        rawImageHeight: state.session.imageHeight,
+                        isFrontCamera: state.session.isFrontCamera,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
           },
@@ -184,7 +210,7 @@ class _FrameWithOverlay extends StatelessWidget {
 
   /// Hit-tests the tap position against painted landmark positions.
   ///
-  /// Uses the same coordinate translation as [FrameImagePainter._drawLandmarks]
+  /// Uses the same coordinate translation as [LandmarkOverlayPainter]
   /// to ensure tap targets match the visual positions exactly.
   void _handleTap(Offset tapPosition, Size widgetSize) {
     final frame = state.currentFrame;
@@ -192,13 +218,12 @@ class _FrameWithOverlay extends StatelessWidget {
       return;
     }
 
-    final image = state.currentImage!;
     final videoSize = Size(
-      image.width.toDouble(),
-      image.height.toDouble(),
+      state.session.imageWidth,
+      state.session.imageHeight,
     );
 
-    // Same normalization as FrameImagePainter._drawLandmarks()
+    // Same normalization as LandmarkOverlayPainter._drawLandmarks()
     final landmarks = frame.landmarks.map((l) {
       var x = (l.x / state.session.imageWidth) * videoSize.width;
       final y = (l.y / state.session.imageHeight) * videoSize.height;
@@ -243,7 +268,7 @@ class _FrameWithOverlay extends StatelessWidget {
   }
 }
 
-/// Frame-by-frame navigation controls: slider, frame counter, prev/next.
+/// Frame-by-frame navigation controls: slider, frame counter, prev/next/play.
 class _FramePlaybackControls extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
@@ -274,7 +299,7 @@ class _FramePlaybackControls extends StatelessWidget {
             child: Slider(
               value: frameIndex.toDouble(),
               max: totalFrames > 1 ? (totalFrames - 1).toDouble() : 0,
-              onChanged: (value) => cubit.goToFrame(value.round()),
+              onChanged: (value) => cubit.seekToFrame(value.round()),
             ),
           ),
           // Frame counter
@@ -310,17 +335,17 @@ class _FramePlaybackControls extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: cubit.toggleAutoPlay,
+                onTap: cubit.togglePlayPause,
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: state.isAutoPlaying
+                    color: state.isPlaying
                         ? const Color(0xFF4CAF50)
                         : const Color(0xFF2A2A2A),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    state.isAutoPlaying
+                    state.isPlaying
                         ? Icons.pause_rounded
                         : Icons.play_arrow_rounded,
                     color: Colors.white,

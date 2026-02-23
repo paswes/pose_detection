@@ -9,7 +9,7 @@ import 'package:pose_detection/core/services/person_validator.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
 import 'package:pose_detection/core/services/static_image_pose_detector.dart';
 import 'package:pose_detection/core/services/video_processing_service.dart';
-import 'package:pose_detection/core/services/frame_image_decoder.dart';
+
 import 'package:pose_detection/core/services/recording_service.dart';
 import 'package:pose_detection/data/database/app_database.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
@@ -66,10 +66,6 @@ Future<void> initializeDependencies({
     () => RecordingService(),
   );
 
-  sl.registerLazySingleton<FrameImageDecoder>(
-    () => FrameImageDecoder(),
-  );
-
   sl.registerLazySingleton<StaticImagePoseDetector>(
     () => StaticImagePoseDetector(),
   );
@@ -109,7 +105,6 @@ Future<void> initializeDependencies({
     (session, _) => SessionDetailsCubit(
       session: session,
       repository: sl<SessionRepository>(),
-      decoder: sl<FrameImageDecoder>(),
     ),
   );
 

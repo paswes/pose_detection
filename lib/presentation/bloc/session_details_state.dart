@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:equatable/equatable.dart';
 
 import 'package:pose_detection/data/models/session.dart';
@@ -13,27 +11,31 @@ sealed class SessionDetailsState extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Loading session data and preparing first frame.
+/// Loading session data and preparing video player.
 class SessionDetailsLoading extends SessionDetailsState {
   const SessionDetailsLoading();
 }
 
-/// Frames loaded and ready for playback.
+/// Video player ready and frames loaded for playback.
 class SessionDetailsLoaded extends SessionDetailsState {
   final Session session;
   final List<TrackedFrame> frames;
-  final ui.Image? currentImage;
   final int currentFrameIndex;
   final int? selectedLandmarkId;
-  final bool isAutoPlaying;
+  final bool isPlaying;
+  final bool isVideoReady;
+  final Duration videoPosition;
+  final Duration videoDuration;
 
   const SessionDetailsLoaded({
     required this.session,
     required this.frames,
-    this.currentImage,
     this.currentFrameIndex = 0,
     this.selectedLandmarkId,
-    this.isAutoPlaying = false,
+    this.isPlaying = false,
+    this.isVideoReady = false,
+    this.videoPosition = Duration.zero,
+    this.videoDuration = Duration.zero,
   });
 
   int get totalFrames => frames.length;
@@ -42,22 +44,24 @@ class SessionDetailsLoaded extends SessionDetailsState {
       currentFrameIndex < frames.length ? frames[currentFrameIndex] : null;
 
   SessionDetailsLoaded copyWith({
-    ui.Image? Function()? currentImage,
     int? currentFrameIndex,
     int? Function()? selectedLandmarkId,
-    bool? isAutoPlaying,
+    bool? isPlaying,
+    bool? isVideoReady,
+    Duration? videoPosition,
+    Duration? videoDuration,
   }) {
     return SessionDetailsLoaded(
       session: session,
       frames: frames,
-      currentImage: currentImage != null
-          ? currentImage()
-          : this.currentImage,
       currentFrameIndex: currentFrameIndex ?? this.currentFrameIndex,
       selectedLandmarkId: selectedLandmarkId != null
           ? selectedLandmarkId()
           : this.selectedLandmarkId,
-      isAutoPlaying: isAutoPlaying ?? this.isAutoPlaying,
+      isPlaying: isPlaying ?? this.isPlaying,
+      isVideoReady: isVideoReady ?? this.isVideoReady,
+      videoPosition: videoPosition ?? this.videoPosition,
+      videoDuration: videoDuration ?? this.videoDuration,
     );
   }
 
@@ -67,11 +71,14 @@ class SessionDetailsLoaded extends SessionDetailsState {
     currentFrameIndex,
     selectedLandmarkId,
     totalFrames,
-    isAutoPlaying,
+    isPlaying,
+    isVideoReady,
+    videoPosition,
+    videoDuration,
   ];
 }
 
-/// Error loading session or decoding frames.
+/// Error loading session or initializing video player.
 class SessionDetailsError extends SessionDetailsState {
   final String message;
 

@@ -8,24 +8,22 @@ import 'package:pose_detection/core/utils/coordinate_translator.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 import 'package:pose_detection/domain/models/landmark.dart';
 
-/// Paints a video frame image and its landmarks in a single pass.
+/// Paints pose landmarks and skeleton connections over a video player.
 ///
-/// By rendering both the frame and landmarks in one [paint] call,
-/// we guarantee perfect synchronization — no async lag between
-/// the displayed image and the overlay.
-class FrameImagePainter extends CustomPainter {
-  final ui.Image frameImage;
+/// Draws only the landmark overlay — not the frame image.
+/// The video is rendered by a separate [VideoPlayer] widget
+/// underneath in a [Stack].
+class LandmarkOverlayPainter extends CustomPainter {
   final TrackedFrame? trackedFrame;
+  final Size videoSize;
   final double rawImageWidth;
   final double rawImageHeight;
   final bool isFrontCamera;
   final LandmarkSchema _schema;
 
-  static final _imagePaint = Paint()..filterQuality = FilterQuality.medium;
-
-  FrameImagePainter({
-    required this.frameImage,
-    this.trackedFrame,
+  LandmarkOverlayPainter({
+    required this.trackedFrame,
+    required this.videoSize,
     required this.rawImageWidth,
     required this.rawImageHeight,
     this.isFrontCamera = false,
@@ -34,47 +32,17 @@ class FrameImagePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw frame image (BoxFit.cover)
-    _drawFrameImage(canvas, size);
-
-    // 2. Draw landmarks on top if person detected
-    if (trackedFrame != null &&
-        trackedFrame!.isPersonDetected &&
-        trackedFrame!.landmarks.isNotEmpty) {
-      _drawLandmarks(canvas, size);
+    final frame = trackedFrame;
+    if (frame == null || !frame.isPersonDetected || frame.landmarks.isEmpty) {
+      return;
     }
+
+    _drawLandmarks(canvas, size, frame);
   }
 
-  void _drawFrameImage(Canvas canvas, Size size) {
-    final imgW = frameImage.width.toDouble();
-    final imgH = frameImage.height.toDouble();
-
-    // BoxFit.cover: scale uniformly to fill, center, clip overflow
-    final scaleX = size.width / imgW;
-    final scaleY = size.height / imgH;
-    final scale = scaleX > scaleY ? scaleX : scaleY;
-
-    final fittedW = imgW * scale;
-    final fittedH = imgH * scale;
-    final offsetX = (size.width - fittedW) / 2;
-    final offsetY = (size.height - fittedH) / 2;
-
-    final src = Rect.fromLTWH(0, 0, imgW, imgH);
-    final dst = Rect.fromLTWH(offsetX, offsetY, fittedW, fittedH);
-
-    canvas.drawImageRect(frameImage, src, dst, _imagePaint);
-  }
-
-  void _drawLandmarks(Canvas canvas, Size size) {
-    final frame = trackedFrame!;
-
+  void _drawLandmarks(Canvas canvas, Size size, TrackedFrame frame) {
     // Convert stored landmarks to domain Landmark objects,
     // normalizing from raw ML Kit buffer space to video pixel space.
-    final videoSize = Size(
-      frameImage.width.toDouble(),
-      frameImage.height.toDouble(),
-    );
-
     final landmarks = frame.landmarks.map((l) {
       var x = (l.x / rawImageWidth) * videoSize.width;
       final y = (l.y / rawImageHeight) * videoSize.height;
@@ -94,7 +62,8 @@ class FrameImagePainter extends CustomPainter {
     }).toList();
 
     // Translate to widget coordinates using the same BoxFit.cover transform
-    final translatedPoints = CoordinateTranslator.translateAllLandmarksWithDepth(
+    final translatedPoints =
+        CoordinateTranslator.translateAllLandmarksWithDepth(
       landmarks,
       videoSize,
       size,
@@ -185,8 +154,7 @@ class FrameImagePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant FrameImagePainter oldDelegate) {
-    return oldDelegate.frameImage != frameImage ||
-        oldDelegate.trackedFrame != trackedFrame;
+  bool shouldRepaint(covariant LandmarkOverlayPainter oldDelegate) {
+    return oldDelegate.trackedFrame != trackedFrame;
   }
 }

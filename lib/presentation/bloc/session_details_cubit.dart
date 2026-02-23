@@ -1,33 +1,33 @@
-import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:video_player/video_player.dart';
 
-import 'package:pose_detection/core/services/frame_image_cache.dart';
-import 'package:pose_detection/core/services/frame_image_decoder.dart';
 import 'package:pose_detection/data/models/session.dart';
+import 'package:pose_detection/data/models/tracked_frame.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
 import 'package:pose_detection/presentation/bloc/session_details_state.dart';
 
-/// Manages frame-based playback for a recorded session.
+/// Manages video playback with synchronized landmark overlay.
 ///
-/// Uses a sliding window [FrameImageCache] to keep only a small number
-/// of decoded frames in memory, preventing OOM crashes on long videos.
+/// Uses [VideoPlayerController] for hardware-accelerated video playback.
+/// Matches the current video position to the nearest stored [TrackedFrame]
+/// via binary search, so landmarks stay in sync with the displayed frame.
 class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   final Session session;
   final SessionRepository _repository;
-  final FrameImageDecoder _decoder;
-  Timer? _autoPlayTimer;
-  FrameImageCache? _frameCache;
+  VideoPlayerController? _controller;
+
+  /// Exposes the video controller for the page to build the [VideoPlayer] widget.
+  VideoPlayerController? get videoController => _controller;
 
   SessionDetailsCubit({
     required this.session,
     required SessionRepository repository,
-    required FrameImageDecoder decoder,
   })  : _repository = repository,
-        _decoder = decoder,
         super(const SessionDetailsLoading());
 
-  /// Load tracked frames from DB and prepare the frame cache.
+  /// Load tracked frames from DB and initialize the video player.
   Future<void> initialize() async {
     try {
       final frames = await _repository.getFramesForSession(session.id);
@@ -37,81 +37,166 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         return;
       }
 
-      final timestamps = frames.map((f) => f.timestampMicros).toList();
+      // Initialize video player
+      final videoFile = File(session.videoPath);
+      if (!videoFile.existsSync()) {
+        emit(const SessionDetailsError(message: 'Video nicht gefunden'));
+        return;
+      }
 
-      // Create the sliding window cache (no bulk decode)
-      _frameCache = FrameImageCache(
-        videoPath: session.videoPath,
-        timestampsMicros: timestamps,
-        decoder: _decoder,
-      );
-
-      // Decode first frame to show immediately
-      final firstImage = await _frameCache!.getFrame(0);
+      _controller = VideoPlayerController.file(videoFile);
+      await _controller!.initialize();
+      _controller!.addListener(_onVideoPositionChanged);
 
       emit(SessionDetailsLoaded(
         session: session,
         frames: frames,
-        currentImage: firstImage,
+        isVideoReady: true,
+        videoDuration: _controller!.value.duration,
       ));
-
-      // Prefetch frames around the start
-      _frameCache!.prefetchAround(0);
     } catch (e) {
       emit(SessionDetailsError(message: 'Fehler beim Laden: $e'));
     }
   }
 
-  /// Jump to a specific frame by index.
-  Future<void> goToFrame(int index) async {
+  /// Listener called by [VideoPlayerController] on position/state changes.
+  void _onVideoPositionChanged() {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    final controller = _controller;
+    if (controller == null) return;
+
+    final position = controller.value.position;
+    final positionMicros = position.inMicroseconds;
+    final newIndex = _findNearestFrameIndex(current.frames, positionMicros);
+    final isPlaying = controller.value.isPlaying;
+
+    // Only emit when something actually changed
+    if (newIndex == current.currentFrameIndex &&
+        isPlaying == current.isPlaying &&
+        position == current.videoPosition) {
+      return;
+    }
+
+    emit(current.copyWith(
+      currentFrameIndex: newIndex,
+      videoPosition: position,
+      isPlaying: isPlaying,
+    ));
+  }
+
+  /// Binary search for the frame closest to [positionMicros].
+  ///
+  /// Frames are sorted by timestampMicros (guaranteed by DB ORDER BY).
+  int _findNearestFrameIndex(
+    List<TrackedFrame> frames,
+    int positionMicros,
+  ) {
+    if (frames.isEmpty) return 0;
+    if (frames.length == 1) return 0;
+
+    int lo = 0;
+    int hi = frames.length - 1;
+
+    while (lo < hi) {
+      final mid = (lo + hi) ~/ 2;
+      if (frames[mid].timestampMicros < positionMicros) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+
+    // Check if lo-1 is closer than lo
+    if (lo > 0) {
+      final diffLo = (frames[lo].timestampMicros - positionMicros).abs();
+      final diffPrev = (frames[lo - 1].timestampMicros - positionMicros).abs();
+      if (diffPrev < diffLo) return lo - 1;
+    }
+
+    return lo;
+  }
+
+  /// Toggle play/pause.
+  Future<void> togglePlayPause() async {
+    final current = state;
+    if (current is! SessionDetailsLoaded) return;
+
+    final controller = _controller;
+    if (controller == null) return;
+
+    if (controller.value.isPlaying) {
+      await controller.pause();
+    } else {
+      // If at the end, seek back to start before playing
+      if (controller.value.position >= controller.value.duration) {
+        await controller.seekTo(Duration.zero);
+      }
+      await controller.play();
+    }
+  }
+
+  /// Seek to a specific frame by index.
+  Future<void> seekToFrame(int index) async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
 
     final clamped = index.clamp(0, current.totalFrames - 1);
-    final image = await _frameCache?.getFrame(clamped);
+    final timestampMicros = current.frames[clamped].timestampMicros;
+
+    await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
     emit(current.copyWith(
       currentFrameIndex: clamped,
-      currentImage: () => image,
+      videoPosition: Duration(microseconds: timestampMicros),
     ));
-
-    _frameCache?.prefetchAround(clamped);
   }
 
-  /// Advance to the next frame.
+  /// Advance to the next frame (pauses if playing).
   Future<void> nextFrame() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
 
-    if (current.currentFrameIndex < current.totalFrames - 1) {
-      final nextIndex = current.currentFrameIndex + 1;
-      final image = await _frameCache?.getFrame(nextIndex);
+    if (current.currentFrameIndex >= current.totalFrames - 1) return;
 
-      emit(current.copyWith(
-        currentFrameIndex: nextIndex,
-        currentImage: () => image,
-      ));
-
-      _frameCache?.prefetchAround(nextIndex);
+    if (_controller?.value.isPlaying == true) {
+      await _controller?.pause();
     }
+
+    final nextIndex = current.currentFrameIndex + 1;
+    final timestampMicros = current.frames[nextIndex].timestampMicros;
+
+    await _controller?.seekTo(Duration(microseconds: timestampMicros));
+
+    emit(current.copyWith(
+      currentFrameIndex: nextIndex,
+      videoPosition: Duration(microseconds: timestampMicros),
+      isPlaying: false,
+    ));
   }
 
-  /// Go back one frame.
+  /// Go back one frame (pauses if playing).
   Future<void> previousFrame() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
 
-    if (current.currentFrameIndex > 0) {
-      final prevIndex = current.currentFrameIndex - 1;
-      final image = await _frameCache?.getFrame(prevIndex);
+    if (current.currentFrameIndex <= 0) return;
 
-      emit(current.copyWith(
-        currentFrameIndex: prevIndex,
-        currentImage: () => image,
-      ));
-
-      _frameCache?.prefetchAround(prevIndex);
+    if (_controller?.value.isPlaying == true) {
+      await _controller?.pause();
     }
+
+    final prevIndex = current.currentFrameIndex - 1;
+    final timestampMicros = current.frames[prevIndex].timestampMicros;
+
+    await _controller?.seekTo(Duration(microseconds: timestampMicros));
+
+    emit(current.copyWith(
+      currentFrameIndex: prevIndex,
+      videoPosition: Duration(microseconds: timestampMicros),
+      isPlaying: false,
+    ));
   }
 
   /// Select a landmark by ID, or clear selection with null.
@@ -121,83 +206,11 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     emit(current.copyWith(selectedLandmarkId: () => id));
   }
 
-  /// Toggle auto-play at the video's natural frame rate.
-  void toggleAutoPlay() {
-    final current = state;
-    if (current is! SessionDetailsLoaded) return;
-
-    if (current.isAutoPlaying) {
-      stopAutoPlay();
-    } else {
-      _startAutoPlay(current);
-    }
-  }
-
-  /// Stop auto-play if running.
-  void stopAutoPlay() {
-    _autoPlayTimer?.cancel();
-    _autoPlayTimer = null;
-
-    final current = state;
-    if (current is! SessionDetailsLoaded) return;
-    if (current.isAutoPlaying) {
-      emit(current.copyWith(isAutoPlaying: false));
-    }
-  }
-
-  void _startAutoPlay(SessionDetailsLoaded loaded) {
-    final intervalMs = _calculateFrameIntervalMs(loaded);
-
-    emit(loaded.copyWith(isAutoPlaying: true));
-
-    _autoPlayTimer = Timer.periodic(
-      Duration(milliseconds: intervalMs),
-      (_) async {
-        final current = state;
-        if (current is! SessionDetailsLoaded) return;
-
-        if (current.currentFrameIndex < current.totalFrames - 1) {
-          final nextIndex = current.currentFrameIndex + 1;
-          final image = await _frameCache?.getFrame(nextIndex);
-
-          emit(current.copyWith(
-            currentFrameIndex: nextIndex,
-            currentImage: () => image,
-          ));
-
-          _frameCache?.prefetchAround(nextIndex);
-        } else {
-          // Reached end — loop back to start and stop
-          _autoPlayTimer?.cancel();
-          _autoPlayTimer = null;
-
-          final firstImage = await _frameCache?.getFrame(0);
-          emit(current.copyWith(
-            currentFrameIndex: 0,
-            currentImage: () => firstImage,
-            isAutoPlaying: false,
-          ));
-        }
-      },
-    );
-  }
-
-  /// Calculate frame interval from stored timestamps.
-  int _calculateFrameIntervalMs(SessionDetailsLoaded loaded) {
-    if (loaded.frames.length < 2) return 33;
-
-    final first = loaded.frames.first.timestampMicros;
-    final last = loaded.frames.last.timestampMicros;
-    final totalMs = (last - first) / 1000;
-    return (totalMs / (loaded.frames.length - 1)).round().clamp(16, 100);
-  }
-
   @override
   Future<void> close() {
-    _autoPlayTimer?.cancel();
-    _autoPlayTimer = null;
-    _frameCache?.dispose();
-    _frameCache = null;
+    _controller?.removeListener(_onVideoPositionChanged);
+    _controller?.dispose();
+    _controller = null;
     return super.close();
   }
 }

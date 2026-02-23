@@ -14,7 +14,7 @@ import 'package:pose_detection/domain/models/landmark.dart';
 /// The video is rendered by a separate [VideoPlayer] widget
 /// underneath in a [Stack].
 class LandmarkOverlayPainter extends CustomPainter {
-  final TrackedFrame? trackedFrame;
+  final ValueNotifier<TrackedFrame?> frameNotifier;
   final Size videoSize;
   final double rawImageWidth;
   final double rawImageHeight;
@@ -22,17 +22,18 @@ class LandmarkOverlayPainter extends CustomPainter {
   final LandmarkSchema _schema;
 
   LandmarkOverlayPainter({
-    required this.trackedFrame,
+    required this.frameNotifier,
     required this.videoSize,
     required this.rawImageWidth,
     required this.rawImageHeight,
     this.isFrontCamera = false,
     LandmarkSchema? schema,
-  }) : _schema = schema ?? sl<LandmarkSchema>();
+  })  : _schema = schema ?? sl<LandmarkSchema>(),
+        super(repaint: frameNotifier);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final frame = trackedFrame;
+    final frame = frameNotifier.value;
     if (frame == null || !frame.isPersonDetected || frame.landmarks.isEmpty) {
       return;
     }
@@ -155,6 +156,11 @@ class LandmarkOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant LandmarkOverlayPainter oldDelegate) {
-    return oldDelegate.trackedFrame != trackedFrame;
+    // Repaints are driven by the frameNotifier listenable (via super.repaint),
+    // not by widget rebuilds. Only repaint on config changes.
+    return oldDelegate.videoSize != videoSize ||
+        oldDelegate.rawImageWidth != rawImageWidth ||
+        oldDelegate.rawImageHeight != rawImageHeight ||
+        oldDelegate.isFrontCamera != isFrontCamera;
   }
 }

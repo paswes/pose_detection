@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
@@ -17,6 +18,13 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   final Session session;
   final SessionRepository _repository;
   VideoPlayerController? _controller;
+
+  /// Direct repaint signal for the landmark overlay painter.
+  ///
+  /// Updated synchronously in the video position listener so the overlay
+  /// repaints on the next render frame — bypassing the BLoC rebuild pipeline
+  /// to eliminate visible lag between video and landmarks.
+  final frameNotifier = ValueNotifier<TrackedFrame?>(null);
 
   /// Exposes the video controller for the page to build the [VideoPlayer] widget.
   VideoPlayerController? get videoController => _controller;
@@ -48,6 +56,9 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       await _controller!.initialize();
       _controller!.addListener(_onVideoPositionChanged);
 
+      // Set initial frame for the painter
+      frameNotifier.value = frames.first;
+
       emit(SessionDetailsLoaded(
         session: session,
         frames: frames,
@@ -72,7 +83,12 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final newIndex = _findNearestFrameIndex(current.frames, positionMicros);
     final isPlaying = controller.value.isPlaying;
 
-    // Only emit when something actually changed
+    // Update painter directly for instant overlay sync (bypasses BLoC pipeline)
+    if (newIndex != current.currentFrameIndex) {
+      frameNotifier.value = current.frames[newIndex];
+    }
+
+    // Only emit BLoC state when something actually changed (for UI controls)
     if (newIndex == current.currentFrameIndex &&
         isPlaying == current.isPlaying &&
         position == current.videoPosition) {
@@ -145,6 +161,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final clamped = index.clamp(0, current.totalFrames - 1);
     final timestampMicros = current.frames[clamped].timestampMicros;
 
+    frameNotifier.value = current.frames[clamped];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
     emit(current.copyWith(
@@ -167,6 +184,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final nextIndex = current.currentFrameIndex + 1;
     final timestampMicros = current.frames[nextIndex].timestampMicros;
 
+    frameNotifier.value = current.frames[nextIndex];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
     emit(current.copyWith(
@@ -190,6 +208,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final prevIndex = current.currentFrameIndex - 1;
     final timestampMicros = current.frames[prevIndex].timestampMicros;
 
+    frameNotifier.value = current.frames[prevIndex];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
     emit(current.copyWith(
@@ -211,6 +230,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     _controller?.removeListener(_onVideoPositionChanged);
     _controller?.dispose();
     _controller = null;
+    frameNotifier.dispose();
     return super.close();
   }
 }

@@ -186,12 +186,13 @@ class _VideoWithOverlay extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Layer 2: Landmark overlay
+                  // Layer 2: Landmark overlay — driven by ValueNotifier
+                  // for instant repaint (bypasses BLoC rebuild pipeline)
                   Positioned.fill(
                     child: CustomPaint(
                       size: widgetSize,
                       painter: LandmarkOverlayPainter(
-                        trackedFrame: state.currentFrame,
+                        frameNotifier: cubit.frameNotifier,
                         videoSize: Size(videoWidth, videoHeight),
                         rawImageWidth: state.session.imageWidth,
                         rawImageHeight: state.session.imageHeight,

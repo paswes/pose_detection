@@ -415,7 +415,7 @@ class _ControlsSheet extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
 
-  static const double _initialChildSize = 0.32;
+  static const double _initialChildSize = 0.34;
   static const double _maxChildSize = 0.7;
 
   const _ControlsSheet({required this.cubit, required this.state});
@@ -449,7 +449,10 @@ class _ControlsSheet extends StatelessWidget {
                     children: [
                       // Rep pills (tap to seek to rep start)
                       if (state.reps.isNotEmpty)
-                        _RepPillRow(cubit: cubit, state: state),
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: _RepPillRow(cubit: cubit, state: state),
+                        ),
                       if (state.reps.isNotEmpty) const SizedBox(height: 24),
                       // Frame scrubber
                       _RepMarkerSlider(

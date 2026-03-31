@@ -24,7 +24,10 @@ class RecordingService {
 
   int get frameCount => _frames.length;
 
-  Future<void> startRecording(CameraController controller, String sessionId) async {
+  Future<void> startRecording(
+    CameraController controller,
+    String sessionId,
+  ) async {
     _sessionId = sessionId;
     _recordingStartTime = DateTime.now();
     _frames.clear();
@@ -58,7 +61,9 @@ class RecordingService {
       // Use original capture timestamp (not post-detection) relative to video start
       timestampMicros: captureTimestampMicros - videoStart,
       // Store empty landmarks array when no person detected (pose == null)
-      landmarks: pose?.landmarks.map((l) => LandmarkData.fromLandmark(l)).toList() ?? [],
+      landmarks:
+          pose?.landmarks.map((l) => LandmarkData.fromLandmark(l)).toList() ??
+          [],
       isPersonDetected: personDetection.isPersonDetected,
       personConfidence: pose?.avgLikelihood ?? 0.0,
     );

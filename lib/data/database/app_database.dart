@@ -62,18 +62,30 @@ class AppDatabase {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute('ALTER TABLE sessions ADD COLUMN is_front_camera INTEGER NOT NULL DEFAULT 0');
-      await db.execute('ALTER TABLE sessions ADD COLUMN is_landscape INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE sessions ADD COLUMN is_front_camera INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE sessions ADD COLUMN is_landscape INTEGER NOT NULL DEFAULT 0',
+      );
     }
     if (oldVersion < 3) {
-      await db.execute('ALTER TABLE sessions ADD COLUMN image_width REAL NOT NULL DEFAULT 0');
-      await db.execute('ALTER TABLE sessions ADD COLUMN image_height REAL NOT NULL DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE sessions ADD COLUMN image_width REAL NOT NULL DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE sessions ADD COLUMN image_height REAL NOT NULL DEFAULT 0',
+      );
     }
     if (oldVersion < 4) {
-      await db.execute('ALTER TABLE sessions ADD COLUMN sensor_orientation INTEGER NOT NULL DEFAULT 90');
+      await db.execute(
+        'ALTER TABLE sessions ADD COLUMN sensor_orientation INTEGER NOT NULL DEFAULT 90',
+      );
     }
     if (oldVersion < 5) {
-      await db.execute('ALTER TABLE sessions ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE sessions ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0',
+      );
       // Mark existing demo session from previous versions
       await db.execute("UPDATE sessions SET is_demo = 1 WHERE id = 'demo_mel'");
     }

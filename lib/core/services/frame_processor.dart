@@ -45,7 +45,7 @@ class FrameProcessor {
   final IPoseDetector _poseDetector;
 
   FrameProcessor({required IPoseDetector poseDetector})
-      : _poseDetector = poseDetector;
+    : _poseDetector = poseDetector;
 
   Future<FrameProcessingResult> processFrame({
     required CameraImage image,

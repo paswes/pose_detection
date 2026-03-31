@@ -81,12 +81,18 @@ class LandmarkSchema {
   /// shoulders → elbows → wrists, hips → knees → ankles.
   /// Removes head (0-10), hands (17-22), heels (29-30), and foot tips (31-32).
   static const rdlLandmarkIds = <int>{
-    leftShoulder, rightShoulder,
-    leftElbow, rightElbow,
-    leftWrist, rightWrist,
-    leftHip, rightHip,
-    leftKnee, rightKnee,
-    leftAnkle, rightAnkle,
+    leftShoulder,
+    rightShoulder,
+    leftElbow,
+    rightElbow,
+    leftWrist,
+    rightWrist,
+    leftHip,
+    rightHip,
+    leftKnee,
+    rightKnee,
+    leftAnkle,
+    rightAnkle,
   };
 
   // ---------------------------------------------------------------------------
@@ -97,37 +103,37 @@ class LandmarkSchema {
   static const mlKit33 = LandmarkSchema(
     landmarkCount: 33,
     landmarkNames: [
-      'Nose',           // 0
+      'Nose', // 0
       'Left Eye Inner', // 1
-      'Left Eye',       // 2
+      'Left Eye', // 2
       'Left Eye Outer', // 3
       'Right Eye Inner', // 4
-      'Right Eye',      // 5
+      'Right Eye', // 5
       'Right Eye Outer', // 6
-      'Left Ear',       // 7
-      'Right Ear',      // 8
-      'Left Mouth',     // 9
-      'Right Mouth',    // 10
-      'Left Shoulder',  // 11
+      'Left Ear', // 7
+      'Right Ear', // 8
+      'Left Mouth', // 9
+      'Right Mouth', // 10
+      'Left Shoulder', // 11
       'Right Shoulder', // 12
-      'Left Elbow',     // 13
-      'Right Elbow',    // 14
-      'Left Wrist',     // 15
-      'Right Wrist',    // 16
-      'Left Pinky',     // 17
-      'Right Pinky',    // 18
-      'Left Index',     // 19
-      'Right Index',    // 20
-      'Left Thumb',     // 21
-      'Right Thumb',    // 22
-      'Left Hip',       // 23
-      'Right Hip',      // 24
-      'Left Knee',      // 25
-      'Right Knee',     // 26
-      'Left Ankle',     // 27
-      'Right Ankle',    // 28
-      'Left Heel',      // 29
-      'Right Heel',     // 30
+      'Left Elbow', // 13
+      'Right Elbow', // 14
+      'Left Wrist', // 15
+      'Right Wrist', // 16
+      'Left Pinky', // 17
+      'Right Pinky', // 18
+      'Left Index', // 19
+      'Right Index', // 20
+      'Left Thumb', // 21
+      'Right Thumb', // 22
+      'Left Hip', // 23
+      'Right Hip', // 24
+      'Left Knee', // 25
+      'Right Knee', // 26
+      'Left Ankle', // 27
+      'Right Ankle', // 28
+      'Left Heel', // 29
+      'Right Heel', // 30
       'Left Foot Index', // 31
       'Right Foot Index', // 32
     ],
@@ -170,37 +176,37 @@ class LandmarkSchema {
   static const rdl = LandmarkSchema(
     landmarkCount: 33,
     landmarkNames: [
-      'Nose',           // 0
+      'Nose', // 0
       'Left Eye Inner', // 1
-      'Left Eye',       // 2
+      'Left Eye', // 2
       'Left Eye Outer', // 3
       'Right Eye Inner', // 4
-      'Right Eye',      // 5
+      'Right Eye', // 5
       'Right Eye Outer', // 6
-      'Left Ear',       // 7
-      'Right Ear',      // 8
-      'Left Mouth',     // 9
-      'Right Mouth',    // 10
-      'Left Shoulder',  // 11
+      'Left Ear', // 7
+      'Right Ear', // 8
+      'Left Mouth', // 9
+      'Right Mouth', // 10
+      'Left Shoulder', // 11
       'Right Shoulder', // 12
-      'Left Elbow',     // 13
-      'Right Elbow',    // 14
-      'Left Wrist',     // 15
-      'Right Wrist',    // 16
-      'Left Pinky',     // 17
-      'Right Pinky',    // 18
-      'Left Index',     // 19
-      'Right Index',    // 20
-      'Left Thumb',     // 21
-      'Right Thumb',    // 22
-      'Left Hip',       // 23
-      'Right Hip',      // 24
-      'Left Knee',      // 25
-      'Right Knee',     // 26
-      'Left Ankle',     // 27
-      'Right Ankle',    // 28
-      'Left Heel',      // 29
-      'Right Heel',     // 30
+      'Left Elbow', // 13
+      'Right Elbow', // 14
+      'Left Wrist', // 15
+      'Right Wrist', // 16
+      'Left Pinky', // 17
+      'Right Pinky', // 18
+      'Left Index', // 19
+      'Right Index', // 20
+      'Left Thumb', // 21
+      'Right Thumb', // 22
+      'Left Hip', // 23
+      'Right Hip', // 24
+      'Left Knee', // 25
+      'Right Knee', // 26
+      'Left Ankle', // 27
+      'Right Ankle', // 28
+      'Left Heel', // 29
+      'Right Heel', // 30
       'Left Foot Index', // 31
       'Right Foot Index', // 32
     ],

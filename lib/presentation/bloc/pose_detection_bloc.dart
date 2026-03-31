@@ -236,7 +236,10 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       _pendingResult = await _recordingService.stopRecording(controller);
 
-      Logger.info('Bloc', 'Recording stopped (${_pendingResult!.frames.length} frames)');
+      Logger.info(
+        'Bloc',
+        'Recording stopped (${_pendingResult!.frames.length} frames)',
+      );
       emit(RecordingStopped());
     } catch (e) {
       Logger.error('Bloc', 'ERROR stopping recording: $e');
@@ -268,8 +271,10 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         durationMs: result.duration.inMilliseconds,
         videoPath: result.videoPath,
         frameCount: result.frames.length,
-        isFrontCamera: _cameraService.currentLensDirection == CameraLensDirection.front,
-        isLandscape: _cameraService.currentOrientation != DeviceOrientation.portraitUp,
+        isFrontCamera:
+            _cameraService.currentLensDirection == CameraLensDirection.front,
+        isLandscape:
+            _cameraService.currentOrientation != DeviceOrientation.portraitUp,
         imageWidth: result.imageSize.width,
         imageHeight: result.imageSize.height,
         sensorOrientation: sensorOrientation,
@@ -278,7 +283,10 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       await _sessionRepository.saveSession(session, result.frames);
       _pendingResult = null;
 
-      Logger.info('Bloc', 'Session saved: ${session.id} (${result.frames.length} frames)');
+      Logger.info(
+        'Bloc',
+        'Session saved: ${session.id} (${result.frames.length} frames)',
+      );
       emit(SessionSaved(session.id));
     } catch (e) {
       Logger.error('Bloc', 'ERROR saving session: $e');

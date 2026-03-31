@@ -1,4 +1,3 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -197,9 +196,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       children: [
         CameraPreviewWidget(
           cameraController: state.cameraController,
-          isFrontCamera:
-              state.cameraController.description.lensDirection ==
-              CameraLensDirection.front,
           isLandscape: !_isPortrait,
         ),
         _buildBackButton(),
@@ -214,7 +210,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
       children: [
         CameraPreviewWidget(
           cameraController: state.cameraController,
-          isFrontCamera: state.isFrontCamera,
           isLandscape: !_isPortrait,
         ),
 

@@ -37,7 +37,10 @@ class CoordinateTranslator {
     FitMode fitMode = FitMode.cover,
   }) {
     return translatePoint(
-      landmark.x, landmark.y, imageSize, widgetSize,
+      landmark.x,
+      landmark.y,
+      imageSize,
+      widgetSize,
       fitMode: fitMode,
     );
   }
@@ -72,7 +75,12 @@ class CoordinateTranslator {
     FitMode fitMode = FitMode.cover,
     double alignY = 0.5,
   }) {
-    final transform = _getTransform(imageSize, widgetSize, fitMode, alignY: alignY);
+    final transform = _getTransform(
+      imageSize,
+      widgetSize,
+      fitMode,
+      alignY: alignY,
+    );
 
     // Calculate Z-range for normalization
     double minZ = double.infinity;
@@ -109,14 +117,14 @@ class CoordinateTranslator {
   }) {
     return switch (fitMode) {
       FitMode.cover => TransformCalculator.calculateCoverTransform(
-          imageSize: imageSize,
-          screenSize: widgetSize,
-        ),
+        imageSize: imageSize,
+        screenSize: widgetSize,
+      ),
       FitMode.contain => TransformCalculator.calculateContainTransform(
-          imageSize: imageSize,
-          screenSize: widgetSize,
-          alignY: alignY,
-        ),
+        imageSize: imageSize,
+        screenSize: widgetSize,
+        alignY: alignY,
+      ),
     };
   }
 }

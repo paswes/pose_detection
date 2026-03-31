@@ -5,21 +5,29 @@ import 'package:pose_detection/domain/models/detection_metrics.dart';
 import 'package:pose_detection/domain/models/person_detection_result.dart';
 
 /// States for PoseDetectionBloc
-abstract class PoseDetectionState extends Equatable {
+sealed class PoseDetectionState extends Equatable {
+  const PoseDetectionState();
+
   @override
   List<Object?> get props => [];
 }
 
 /// Initial state
-class PoseDetectionInitial extends PoseDetectionState {}
+class PoseDetectionInitial extends PoseDetectionState {
+  const PoseDetectionInitial();
+}
 
 /// Camera is initializing
-class CameraInitializing extends PoseDetectionState {}
+class CameraInitializing extends PoseDetectionState {
+  const CameraInitializing();
+}
 
 /// Camera initialized and ready to start capture
 class CameraReady extends PoseDetectionState {
   final CameraController cameraController;
 
+  // CameraController is mutable, so const is not possible.
+  // ignore: prefer_const_constructors_in_immutables
   CameraReady(this.cameraController);
 
   @override
@@ -62,7 +70,14 @@ class Detecting extends PoseDetectionState {
   }
 
   @override
-  List<Object?> get props => [cameraController, currentPose, metrics, canSwitchCamera, isFrontCamera, personDetection];
+  List<Object?> get props => [
+    cameraController,
+    currentPose,
+    metrics,
+    canSwitchCamera,
+    isFrontCamera,
+    personDetection,
+  ];
 }
 
 /// Actively recording a session (video + pose tracking)
@@ -106,32 +121,41 @@ class Recording extends PoseDetectionState {
 
   @override
   List<Object?> get props => [
-    cameraController, currentPose, metrics, isFrontCamera,
-    personDetection, recordingDuration, frameCount,
+    cameraController,
+    currentPose,
+    metrics,
+    isFrontCamera,
+    personDetection,
+    recordingDuration,
+    frameCount,
   ];
 }
 
 /// Recording stopped, waiting for user to provide title
-class RecordingStopped extends PoseDetectionState {}
+class RecordingStopped extends PoseDetectionState {
+  const RecordingStopped();
+}
 
 /// Session saved successfully after recording
 class SessionSaved extends PoseDetectionState {
   final String sessionId;
 
-  SessionSaved(this.sessionId);
+  const SessionSaved(this.sessionId);
 
   @override
   List<Object?> get props => [sessionId];
 }
 
 /// Saving session in progress
-class SavingSession extends PoseDetectionState {}
+class SavingSession extends PoseDetectionState {
+  const SavingSession();
+}
 
 /// Error state
 class PoseDetectionError extends PoseDetectionState {
   final String message;
 
-  PoseDetectionError(this.message);
+  const PoseDetectionError(this.message);
 
   @override
   List<Object?> get props => [message];

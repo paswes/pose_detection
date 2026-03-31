@@ -41,8 +41,8 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   SessionDetailsCubit({
     required this.session,
     required SessionRepository repository,
-  })  : _repository = repository,
-        super(const SessionDetailsLoading());
+  }) : _repository = repository,
+       super(const SessionDetailsLoading());
 
   /// Load tracked frames from DB and initialize the video player.
   Future<void> initialize() async {
@@ -78,14 +78,16 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       _repCounter.reset();
       _repCounter.processFrame(frames.first, globalFrameIndex: 0);
 
-      emit(SessionDetailsLoaded(
-        session: session,
-        frames: frames,
-        isVideoReady: true,
-        videoDuration: _controller!.value.duration,
-        hipAngle: _repCounter.currentAngle,
-        reps: _allReps,
-      ));
+      emit(
+        SessionDetailsLoaded(
+          session: session,
+          frames: frames,
+          isVideoReady: true,
+          videoDuration: _controller!.value.duration,
+          hipAngle: _repCounter.currentAngle,
+          reps: _allReps,
+        ),
+      );
 
       // Add listener AFTER initial state is emitted, so any early
       // callbacks find a valid SessionDetailsLoaded state
@@ -126,7 +128,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     // scaled by the current playback speed.
     final positionMicros = isPlaying
         ? position.inMicroseconds +
-            _scaledLookAheadMicros(current.playbackSpeed)
+              _scaledLookAheadMicros(current.playbackSpeed)
         : position.inMicroseconds;
     final newIndex = _findNearestFrameIndex(current.frames, positionMicros);
 
@@ -156,14 +158,16 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       return;
     }
 
-    emit(current.copyWith(
-      currentFrameIndex: newIndex,
-      videoPosition: position,
-      isPlaying: isPlaying,
-      repCount: _repCounter.repCount,
-      hipAngle: () => _repCounter.currentAngle,
-      reps: _allReps,
-    ));
+    emit(
+      current.copyWith(
+        currentFrameIndex: newIndex,
+        videoPosition: position,
+        isPlaying: isPlaying,
+        repCount: _repCounter.repCount,
+        hipAngle: () => _repCounter.currentAngle,
+        reps: _allReps,
+      ),
+    );
   }
 
   /// Binary search for the frame closest to [positionMicros].
@@ -218,13 +222,15 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         _repCounter.processFrame(current.frames.first, globalFrameIndex: 0);
         frameNotifier.value = current.frames.first;
         await controller.seekTo(Duration.zero);
-        emit(current.copyWith(
-          currentFrameIndex: 0,
-          videoPosition: Duration.zero,
-          repCount: _repCounter.repCount,
-          hipAngle: () => _repCounter.currentAngle,
-          reps: _allReps,
-        ));
+        emit(
+          current.copyWith(
+            currentFrameIndex: 0,
+            videoPosition: Duration.zero,
+            repCount: _repCounter.repCount,
+            hipAngle: () => _repCounter.currentAngle,
+            reps: _allReps,
+          ),
+        );
         await controller.play();
         return;
       }
@@ -267,13 +273,15 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     frameNotifier.value = current.frames[clamped];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
-    emit(current.copyWith(
-      currentFrameIndex: clamped,
-      videoPosition: Duration(microseconds: timestampMicros),
-      repCount: _repCounter.repCount,
-      hipAngle: () => _repCounter.currentAngle,
-      reps: _allReps,
-    ));
+    emit(
+      current.copyWith(
+        currentFrameIndex: clamped,
+        videoPosition: Duration(microseconds: timestampMicros),
+        repCount: _repCounter.repCount,
+        hipAngle: () => _repCounter.currentAngle,
+        reps: _allReps,
+      ),
+    );
   }
 
   /// Update overlay and state, with throttled video seeks.
@@ -299,13 +307,15 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       _controller?.seekTo(Duration(microseconds: timestampMicros));
     }
 
-    emit(current.copyWith(
-      currentFrameIndex: clamped,
-      videoPosition: Duration(microseconds: timestampMicros),
-      repCount: _repCounter.repCount,
-      hipAngle: () => _repCounter.currentAngle,
-      reps: _allReps,
-    ));
+    emit(
+      current.copyWith(
+        currentFrameIndex: clamped,
+        videoPosition: Duration(microseconds: timestampMicros),
+        repCount: _repCounter.repCount,
+        hipAngle: () => _repCounter.currentAngle,
+        reps: _allReps,
+      ),
+    );
   }
 
   /// Seek the video controller to the current frame position.
@@ -343,14 +353,16 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     frameNotifier.value = current.frames[nextIndex];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
-    emit(current.copyWith(
-      currentFrameIndex: nextIndex,
-      videoPosition: Duration(microseconds: timestampMicros),
-      isPlaying: false,
-      repCount: _repCounter.repCount,
-      hipAngle: () => _repCounter.currentAngle,
-      reps: _allReps,
-    ));
+    emit(
+      current.copyWith(
+        currentFrameIndex: nextIndex,
+        videoPosition: Duration(microseconds: timestampMicros),
+        isPlaying: false,
+        repCount: _repCounter.repCount,
+        hipAngle: () => _repCounter.currentAngle,
+        reps: _allReps,
+      ),
+    );
   }
 
   /// Go back one frame (pauses if playing).
@@ -375,14 +387,16 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     frameNotifier.value = current.frames[prevIndex];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
 
-    emit(current.copyWith(
-      currentFrameIndex: prevIndex,
-      videoPosition: Duration(microseconds: timestampMicros),
-      isPlaying: false,
-      repCount: _repCounter.repCount,
-      hipAngle: () => _repCounter.currentAngle,
-      reps: _allReps,
-    ));
+    emit(
+      current.copyWith(
+        currentFrameIndex: prevIndex,
+        videoPosition: Duration(microseconds: timestampMicros),
+        isPlaying: false,
+        repCount: _repCounter.repCount,
+        hipAngle: () => _repCounter.currentAngle,
+        reps: _allReps,
+      ),
+    );
   }
 
   /// Select a landmark by ID, or clear selection with null.

@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
-
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/data/models/session.dart';
-import 'package:pose_detection/features/anatomy/presentation/pages/anatomy_page.dart';
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_list_state.dart';
 import 'package:pose_detection/presentation/pages/capture_page.dart';
@@ -96,19 +94,6 @@ class _HomePageState extends State<HomePage> {
                     onTap: () {
                       Navigator.of(sheetContext).pop();
                       _navigateToCapture();
-                    },
-                  ),
-                  _MoreSheetItem(
-                    icon: Icons.accessibility_new_rounded,
-                    label: 'Anatomie',
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      Navigator.push(
-                        this.context,
-                        MaterialPageRoute(
-                          builder: (_) => const AnatomyPage(),
-                        ),
-                      );
                     },
                   ),
                 ],

@@ -49,7 +49,8 @@ class PersonValidator implements IPersonValidator {
     final rightEar = _getLandmark(pose, LandmarkSchema.rightEar);
 
     // Check core landmark likelihood
-    final hasAllLikelihood = _hasMinLikelihood(nose) &&
+    final hasAllLikelihood =
+        _hasMinLikelihood(nose) &&
         _hasMinLikelihood(leftShoulder) &&
         _hasMinLikelihood(rightShoulder) &&
         _hasMinLikelihood(leftHip) &&
@@ -73,16 +74,21 @@ class PersonValidator implements IPersonValidator {
     final ratio = shoulderWidth > 0 && torsoLength > 0
         ? torsoLength / shoulderWidth
         : 0.0;
-    final proportionsOk = ratio >= _minProportionRatio && ratio <= _maxProportionRatio;
-    final minSizeOk = shoulderWidth >= _minShoulderWidth && torsoLength >= _minTorsoLength;
+    final proportionsOk =
+        ratio >= _minProportionRatio && ratio <= _maxProportionRatio;
+    final minSizeOk =
+        shoulderWidth >= _minShoulderWidth && torsoLength >= _minTorsoLength;
 
     // Symmetry checks
     final shoulderSymmetry = (leftShoulder.y - rightShoulder.y).abs();
-    final shoulderSymmetryOk = shoulderWidth > 0 && shoulderSymmetry < shoulderWidth * _maxSymmetryRatio;
+    final shoulderSymmetryOk =
+        shoulderWidth > 0 &&
+        shoulderSymmetry < shoulderWidth * _maxSymmetryRatio;
 
     final hipWidth = (leftHip.x - rightHip.x).abs();
     final hipSymmetry = (leftHip.y - rightHip.y).abs();
-    final hipSymmetryOk = hipWidth > 0 && hipSymmetry < hipWidth * _maxSymmetryRatio;
+    final hipSymmetryOk =
+        hipWidth > 0 && hipSymmetry < hipWidth * _maxSymmetryRatio;
 
     // Neck proportion
     final neckLength = shoulderCenterY - nose.y;
@@ -98,7 +104,8 @@ class PersonValidator implements IPersonValidator {
     final faceOk = facePartsDetected >= _minFaceParts;
 
     // Final decision: all checks must pass
-    final isPersonDetected = headAboveShoulders &&
+    final isPersonDetected =
+        headAboveShoulders &&
         shouldersAboveHips &&
         proportionsOk &&
         minSizeOk &&

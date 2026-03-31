@@ -30,8 +30,7 @@ class VideoUploadProcessing extends VideoUploadState {
     required this.totalFrames,
   });
 
-  double get progress =>
-      totalFrames > 0 ? completedFrames / totalFrames : 0.0;
+  double get progress => totalFrames > 0 ? completedFrames / totalFrames : 0.0;
 
   @override
   List<Object?> get props => [completedFrames, totalFrames];

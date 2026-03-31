@@ -10,14 +10,10 @@ import 'package:pose_detection/core/services/person_validator.dart';
 import 'package:pose_detection/core/services/pose_detection_service.dart';
 import 'package:pose_detection/core/services/static_image_pose_detector.dart';
 import 'package:pose_detection/core/services/video_processing_service.dart';
-
 import 'package:pose_detection/core/services/recording_service.dart';
 import 'package:pose_detection/data/database/app_database.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
 import 'package:pose_detection/data/models/session.dart';
-import 'package:pose_detection/features/anatomy/data/repositories/anatomy_repository.dart';
-import 'package:pose_detection/features/anatomy/domain/repositories/i_anatomy_repository.dart';
-import 'package:pose_detection/features/anatomy/presentation/cubit/anatomy_cubit.dart';
 import 'package:pose_detection/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
@@ -25,13 +21,10 @@ import 'package:pose_detection/presentation/bloc/video_upload_cubit.dart';
 
 final GetIt sl = GetIt.instance;
 
-/// Initialize all dependencies.
-/// Call this in main() before runApp().
 Future<void> initializeDependencies({
   PoseDetectionConfig? config,
   LandmarkSchema? schema,
 }) async {
-  // Configuration
   sl.registerSingleton<PoseDetectionConfig>(
     config ?? PoseDetectionConfig.defaultConfig,
   );
@@ -40,17 +33,14 @@ Future<void> initializeDependencies({
     schema ?? LandmarkSchema.mlKit33,
   );
 
-  // Database
   final database = AppDatabase();
   await database.initialize();
   sl.registerSingleton<AppDatabase>(database);
 
-  // Repositories
   sl.registerLazySingleton<SessionRepository>(
     () => SessionRepository(database: sl<AppDatabase>()),
   );
 
-  // Core Services (lazy singletons - created on first access)
   sl.registerLazySingleton<ICameraService>(
     () => CameraService(),
   );
@@ -84,16 +74,6 @@ Future<void> initializeDependencies({
     ),
   );
 
-  // Anatomy Feature
-  sl.registerLazySingleton<IAnatomyRepository>(
-    () => AnatomyRepository(),
-  );
-
-  sl.registerFactory<AnatomyCubit>(
-    () => AnatomyCubit(repository: sl<IAnatomyRepository>()),
-  );
-
-  // BLoC / Cubit
   sl.registerFactory<PoseDetectionBloc>(
     () => PoseDetectionBloc(
       cameraService: sl<ICameraService>(),
@@ -128,11 +108,8 @@ Future<void> initializeDependencies({
   );
 }
 
-/// Reset all dependencies.
-/// Useful for testing.
 Future<void> resetDependencies() async {
   await sl.reset();
 }
 
-/// Check if dependencies have been initialized
 bool get dependenciesInitialized => sl.isRegistered<PoseDetectionConfig>();

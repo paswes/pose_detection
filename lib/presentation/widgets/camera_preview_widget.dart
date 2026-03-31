@@ -1,40 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:pose_detection/core/utils/transform_calculator.dart';
 
 /// Widget for displaying fullscreen camera preview.
 /// Uses BoxFit.cover to fill the screen while maintaining aspect ratio.
-/// Supports mirroring for front camera (selfie mode).
 class CameraPreviewWidget extends StatelessWidget {
   final CameraController cameraController;
-  final bool isFrontCamera;
   final bool isLandscape;
 
   const CameraPreviewWidget({
     super.key,
     required this.cameraController,
-    this.isFrontCamera = false,
     this.isLandscape = false,
   });
-
-  /// Calculates the BoxFit.cover transformation parameters.
-  /// @deprecated Use TransformCalculator.calculateCoverTransform instead.
-  @Deprecated('Use TransformCalculator.calculateCoverTransform instead')
-  static ({double scale, Offset offset, Size fittedSize})
-  getImageToScreenTransform({
-    required Size imageSize,
-    required Size screenSize,
-  }) {
-    final transform = TransformCalculator.calculateCoverTransform(
-      imageSize: imageSize,
-      screenSize: screenSize,
-    );
-    return (
-      scale: transform.scale,
-      offset: transform.offset,
-      fittedSize: transform.fittedSize,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,17 +70,5 @@ class CameraPreviewWidget extends StatelessWidget {
         ),
       ),
     );
-
-    // Mirror the preview for front camera (like a mirror)
-    // This makes it more intuitive for the user - left is left
-    // if (isFrontCamera) {
-    //   preview = Transform.flip(
-    //     //flipX: true,
-    //     flipX: false,
-    //     child: preview,
-    //   );
-    // }
-
-    // return preview;
   }
 }

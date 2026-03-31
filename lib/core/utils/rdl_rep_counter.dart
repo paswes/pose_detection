@@ -1,7 +1,5 @@
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-
 import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/data/models/landmark_data.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
@@ -92,10 +90,6 @@ class RdlRepCounter {
   /// Recent (frameIndex, rawAngle) pairs for backtracking descent onset.
   final List<(int, double)> _recentAngles = [];
 
-  // DEBUG: Track angle range across all frames
-  double _minAngleSeen = double.infinity;
-  double _maxAngleSeen = double.negativeInfinity;
-
   /// Frames spent in the current descending phase.
   int _descentFrameCount = 0;
 
@@ -120,7 +114,6 @@ class RdlRepCounter {
   double? get currentAngle => _currentAngle;
   List<RdlRepData> get reps => List.unmodifiable(_reps);
 
-  // TODO: Remove debug logging after calibration
   int _frameIndex = 0;
 
   /// Process a single frame. Returns `true` if the rep count changed.
@@ -142,10 +135,6 @@ class RdlRepCounter {
 
     _nullStreak = 0;
 
-    // DEBUG: Track angle range
-    if (angle < _minAngleSeen) _minAngleSeen = angle;
-    if (angle > _maxAngleSeen) _maxAngleSeen = angle;
-
     // Store for descent onset backtracking
     _recentAngles.add((frameIdx, angle));
     if (_recentAngles.length > _recentAnglesCapacity) {
@@ -166,13 +155,6 @@ class RdlRepCounter {
       _bottomFrameIndex = frameIdx;
       _bottomTimestampMicros = frame.timestampMicros;
       _bottomFrame = frame;
-    }
-
-    // DEBUG: Log every 10th frame + all state transitions
-    if (_frameIndex % 10 == 0) {
-      debugPrint('[RepCounter] frame=$_frameIndex raw=${angle.toStringAsFixed(1)} '
-          'smoothed=${smoothed.toStringAsFixed(1)} phase=$_phase '
-          'descent=$_descentFrameCount reps=$_repCount');
     }
 
     return _updatePhase(smoothed, frameIdx, frame);
@@ -200,8 +182,6 @@ class RdlRepCounter {
     for (int i = 0; i <= end; i++) {
       processFrame(frames[i], globalFrameIndex: i);
     }
-    debugPrint('[RepCounter] countRepsUpTo($targetIndex) → reps=$_repCount '
-        'angleRange=${_minAngleSeen.toStringAsFixed(1)}..${_maxAngleSeen.toStringAsFixed(1)}');
   }
 
   /// Reset all state to initial values.
@@ -214,8 +194,6 @@ class RdlRepCounter {
     _descentFrameCount = 0;
     _nullStreak = 0;
     _frameIndex = 0;
-    _minAngleSeen = double.infinity;
-    _maxAngleSeen = double.negativeInfinity;
     _reps.clear();
     _descentStartFrameIndex = 0;
     _descentStartTimestampMicros = 0;
@@ -284,9 +262,12 @@ class RdlRepCounter {
     if (shoulder == null || hip == null || knee == null) return null;
 
     return _angle3Point(
-      shoulder.x, shoulder.y,
-      hip.x, hip.y,
-      knee.x, knee.y,
+      shoulder.x,
+      shoulder.y,
+      hip.x,
+      hip.y,
+      knee.x,
+      knee.y,
     );
   }
 
@@ -348,9 +329,12 @@ class RdlRepCounter {
     if (hip == null || knee == null || ankle == null) return null;
 
     return _angle3Point(
-      hip.x, hip.y,
-      knee.x, knee.y,
-      ankle.x, ankle.y,
+      hip.x,
+      hip.y,
+      knee.x,
+      knee.y,
+      ankle.x,
+      ankle.y,
     );
   }
 
@@ -368,10 +352,6 @@ class RdlRepCounter {
       case RdlPhase.standing:
         if (smoothedAngle < _hingeAngle - _hysteresisMargin) {
           final onsetFrameIdx = _findDescentOnset(frameIdx);
-          debugPrint('[RepCounter] STANDING→DESCENDING at frame=$_frameIndex '
-              'smoothed=${smoothedAngle.toStringAsFixed(1)} '
-              'onset=$onsetFrameIdx (was $frameIdx) '
-              '(threshold: <${(_hingeAngle - _hysteresisMargin).toStringAsFixed(0)})');
           _phase = RdlPhase.descending;
           _descentFrameCount = 0;
           _descentStartFrameIndex = onsetFrameIdx;
@@ -391,37 +371,36 @@ class RdlRepCounter {
 
           // Snapshot per-rep data
           final bottomFrame = _bottomFrame;
-          _reps.add(RdlRepData(
-            repNumber: _repCount,
-            minHipAngle: _minAngleDuringDescent,
-            startFrameIndex: _descentStartFrameIndex,
-            bottomFrameIndex: _bottomFrameIndex,
-            endFrameIndex: frameIdx,
-            descentDuration: Duration(
-              microseconds:
-                  _bottomTimestampMicros - _descentStartTimestampMicros,
+          _reps.add(
+            RdlRepData(
+              repNumber: _repCount,
+              minHipAngle: _minAngleDuringDescent,
+              startFrameIndex: _descentStartFrameIndex,
+              bottomFrameIndex: _bottomFrameIndex,
+              endFrameIndex: frameIdx,
+              descentDuration: Duration(
+                microseconds:
+                    _bottomTimestampMicros - _descentStartTimestampMicros,
+              ),
+              totalDuration: Duration(
+                microseconds:
+                    frame.timestampMicros - _descentStartTimestampMicros,
+              ),
+              leftHipAngle: bottomFrame != null
+                  ? calculateSideHipAngle(bottomFrame, left: true)
+                  : null,
+              rightHipAngle: bottomFrame != null
+                  ? calculateSideHipAngle(bottomFrame, left: false)
+                  : null,
+              leftKneeAngle: bottomFrame != null
+                  ? calculateKneeAngle(bottomFrame, left: true)
+                  : null,
+              rightKneeAngle: bottomFrame != null
+                  ? calculateKneeAngle(bottomFrame, left: false)
+                  : null,
             ),
-            totalDuration: Duration(
-              microseconds:
-                  frame.timestampMicros - _descentStartTimestampMicros,
-            ),
-            leftHipAngle: bottomFrame != null
-                ? calculateSideHipAngle(bottomFrame, left: true)
-                : null,
-            rightHipAngle: bottomFrame != null
-                ? calculateSideHipAngle(bottomFrame, left: false)
-                : null,
-            leftKneeAngle: bottomFrame != null
-                ? calculateKneeAngle(bottomFrame, left: true)
-                : null,
-            rightKneeAngle: bottomFrame != null
-                ? calculateKneeAngle(bottomFrame, left: false)
-                : null,
-          ));
+          );
 
-          debugPrint('[RepCounter] DESCENDING→STANDING REP #$_repCount at frame=$_frameIndex '
-              'smoothed=${smoothedAngle.toStringAsFixed(1)} descent=$_descentFrameCount '
-              '(threshold: >${(_standingAngle + _hysteresisMargin).toStringAsFixed(0)})');
           _phase = RdlPhase.standing;
           return true;
         }

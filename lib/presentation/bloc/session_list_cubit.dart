@@ -16,10 +16,10 @@ class SessionListCubit extends Cubit<SessionListState> {
     required SessionRepository repository,
     required DemoSessionService demoService,
     required VideoProcessingService processingService,
-  })  : _repository = repository,
-        _demoService = demoService,
-        _processingService = processingService,
-        super(const SessionListInitializing());
+  }) : _repository = repository,
+       _demoService = demoService,
+       _processingService = processingService,
+       super(const SessionListInitializing());
 
   /// Seed the demo session (if needed) and load all sessions.
   Future<void> loadSessions() async {
@@ -29,10 +29,12 @@ class SessionListCubit extends Cubit<SessionListState> {
       emit(const SessionListInitializing());
       await _demoService.ensureDemoSession(
         onProgress: (completed, total) {
-          emit(SessionListInitializing(
-            completedFrames: completed,
-            totalFrames: total,
-          ));
+          emit(
+            SessionListInitializing(
+              completedFrames: completed,
+              totalFrames: total,
+            ),
+          );
         },
       );
     }
@@ -44,14 +46,17 @@ class SessionListCubit extends Cubit<SessionListState> {
   /// Pick, process, and save a video — shows a processing placeholder in the list.
   Future<void> processVideoFromPath(String videoPath) async {
     final current = state;
-    final currentSessions =
-        current is SessionListLoaded ? current.sessions : <Session>[];
+    final currentSessions = current is SessionListLoaded
+        ? current.sessions
+        : <Session>[];
 
     // Show placeholder card immediately
-    emit(SessionListLoaded(
-      sessions: currentSessions,
-      processingVideo: true,
-    ));
+    emit(
+      SessionListLoaded(
+        sessions: currentSessions,
+        processingVideo: true,
+      ),
+    );
 
     try {
       final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -62,10 +67,12 @@ class SessionListCubit extends Cubit<SessionListState> {
         onProgress: (completed, total) {
           final s = state;
           if (s is SessionListLoaded) {
-            emit(s.copyWith(
-              processingCompleted: completed,
-              processingTotal: total,
-            ));
+            emit(
+              s.copyWith(
+                processingCompleted: completed,
+                processingTotal: total,
+              ),
+            );
           }
         },
       );

@@ -62,7 +62,11 @@ class SessionRepository {
       }
     }
 
-    await db.delete('tracked_frames', where: 'session_id = ?', whereArgs: [sessionId]);
+    await db.delete(
+      'tracked_frames',
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+    );
     await db.delete('sessions', where: 'id = ?', whereArgs: [sessionId]);
   }
 }

@@ -14,9 +14,9 @@ class VideoUploadCubit extends Cubit<VideoUploadState> {
   VideoUploadCubit({
     required VideoProcessingService processingService,
     required SessionRepository sessionRepository,
-  })  : _processingService = processingService,
-        _sessionRepository = sessionRepository,
-        super(const VideoUploadIdle());
+  }) : _processingService = processingService,
+       _sessionRepository = sessionRepository,
+       super(const VideoUploadIdle());
 
   /// Pick a video from the gallery, process it, and save to DB.
   Future<void> pickAndProcessVideo() async {
@@ -47,10 +47,12 @@ class VideoUploadCubit extends Cubit<VideoUploadState> {
         videoPath,
         sessionId,
         onProgress: (completed, total) {
-          emit(VideoUploadProcessing(
-            completedFrames: completed,
-            totalFrames: total,
-          ));
+          emit(
+            VideoUploadProcessing(
+              completedFrames: completed,
+              totalFrames: total,
+            ),
+          );
         },
       );
 

@@ -4,7 +4,6 @@ import 'package:pose_detection/core/data/database/app_database.dart';
 import 'package:pose_detection/core/data/models/session.dart';
 import 'package:pose_detection/core/data/models/tracked_frame.dart';
 
-/// Repository for persisting and querying recorded sessions.
 class SessionRepository {
   final AppDatabase _database;
 

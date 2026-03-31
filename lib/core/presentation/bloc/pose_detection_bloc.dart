@@ -13,7 +13,6 @@ import 'package:pose_detection/core/data/repositories/session_repository.dart';
 import 'package:pose_detection/core/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/core/presentation/bloc/pose_detection_state.dart';
 
-/// BLoC for pose detection with session recording support.
 class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   final ICameraService _cameraService;
   final IPoseDetector _poseDetector;
@@ -26,7 +25,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   Timer? _recordingTimer;
   RecordingResult? _pendingResult;
 
-  // Inline error tracking (replaces ErrorTracker)
   int _consecutiveErrors = 0;
   static const _maxConsecutiveErrors = 10;
 
@@ -155,7 +153,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
 
     try {
-      // Start image stream before video recording (iOS requires this order)
       _startImageStream();
 
       await _recordingService.startRecording(controller, sessionId);
@@ -168,7 +165,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         ),
       );
 
-      // Timer to update recording duration via event
       _recordingTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
         if (state is Recording) {
           add(RecordingTickEvent());
@@ -357,9 +353,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       final isPersonDetected = _personValidator.validate(pose);
 
-      // Record ALL frames during recording, including no-person frames.
-      // This enables true 1:1 playback matching the recording experience.
-      // Frames without person detection will have empty landmarks array.
       _recordingService.recordFrame(
         pose,
         isPersonDetected,

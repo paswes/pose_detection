@@ -3,11 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/data/repositories/session_repository.dart';
 import 'package:pose_detection/core/presentation/bloc/session_list_state.dart';
 
-/// Optional async setup hook called before loading sessions.
-/// Features can use this to seed demo data, run migrations, etc.
 typedef BeforeLoadHook = Future<void> Function();
 
-/// Cubit for managing the session list on the home page.
 class SessionListCubit extends Cubit<SessionListState> {
   final SessionRepository _repository;
   final BeforeLoadHook? _beforeLoad;
@@ -20,7 +17,6 @@ class SessionListCubit extends Cubit<SessionListState> {
        _beforeLoad = beforeLoad,
        super(const SessionListLoading());
 
-  /// Run optional setup hook (once) then load all sessions.
   Future<void> loadSessions() async {
     if (!_hasRunBeforeLoad && _beforeLoad != null) {
       _hasRunBeforeLoad = true;

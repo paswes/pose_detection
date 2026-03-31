@@ -1,16 +1,6 @@
-/// Schema for ML Kit / MediaPipe 33-landmark pose model.
-///
-/// Provides typed landmark IDs, human-readable names, and skeleton
-/// connections. All landmark IDs are defined as named constants so
-/// consumers never need magic numbers.
 class LandmarkSchema {
-  /// Total number of landmarks
   final int landmarkCount;
-
-  /// Human-readable names for each landmark
   final List<String> landmarkNames;
-
-  /// Skeleton connections as pairs of landmark indices
   final List<List<int>> skeletonConnections;
 
   const LandmarkSchema({
@@ -19,10 +9,8 @@ class LandmarkSchema {
     required this.skeletonConnections,
   });
 
-  /// Get landmark name by ID, returns 'Unknown N' if out of range
-  String getLandmarkName(int id) {
-    return id < landmarkNames.length ? landmarkNames[id] : 'Unknown $id';
-  }
+  String getLandmarkName(int id) =>
+      id < landmarkNames.length ? landmarkNames[id] : 'Unknown $id';
 
   static const int nose = 0;
   static const int leftEyeInner = 1;
@@ -62,7 +50,6 @@ class LandmarkSchema {
   static const int leftFootIndex = 31;
   static const int rightFootIndex = 32;
 
-  /// ML Kit / MediaPipe 33-landmark schema
   static const mlKit33 = LandmarkSchema(
     landmarkCount: 33,
     landmarkNames: [

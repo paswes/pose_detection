@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:pose_detection/core/domain/models/landmark.dart';
 
-/// A single frame of tracking data stored per session.
 class TrackedFrame {
   final String sessionId;
   final int timestampMicros;
@@ -21,7 +20,6 @@ class TrackedFrame {
     'timestamp_micros': timestampMicros,
     'landmarks_json': jsonEncode(landmarks.map((l) => l.toJson()).toList()),
     'is_person_detected': isPersonDetected ? 1 : 0,
-    // Legacy column kept for backwards compatibility with older DB versions
     'person_confidence': 0.0,
   };
 

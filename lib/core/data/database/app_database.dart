@@ -1,7 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
-/// SQLite database for storing recorded sessions and tracking data.
 class AppDatabase {
   static const _databaseName = 'pose_detection.db';
   static const _databaseVersion = 5;

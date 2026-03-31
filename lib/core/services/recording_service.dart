@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pose_detection/core/data/models/tracked_frame.dart';
 import 'package:pose_detection/core/domain/models/detected_pose.dart';
 
-/// Manages recording state and frame collection during a capture session.
 class RecordingService {
   DateTime? _recordingStartTime;
   int? _videoStartTimestampMicros;

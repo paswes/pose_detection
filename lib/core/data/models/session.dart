@@ -1,4 +1,3 @@
-/// A recorded pose detection session.
 class Session {
   final String id;
   final String title;

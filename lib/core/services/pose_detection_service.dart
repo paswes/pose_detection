@@ -6,12 +6,9 @@ import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/domain/models/detected_pose.dart';
 import 'package:pose_detection/core/domain/models/landmark.dart';
 
-/// Service responsible for ML Kit pose detection.
-/// Converts ML Kit outputs to simple domain models.
 class PoseDetectionService implements IPoseDetector {
   PoseDetector? _poseDetector;
 
-  /// Initialize the pose detector lazily to defer ML model loading
   void _ensureInitialized() {
     _poseDetector ??= PoseDetector(
       options: PoseDetectorOptions(

@@ -3,7 +3,6 @@ import 'package:equatable/equatable.dart';
 import 'package:pose_detection/core/data/models/session.dart';
 import 'package:pose_detection/core/data/models/tracked_frame.dart';
 
-/// States for the session details playback screen.
 sealed class SessionDetailsState extends Equatable {
   const SessionDetailsState();
 
@@ -11,12 +10,10 @@ sealed class SessionDetailsState extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Loading session data and preparing video player.
 class SessionDetailsLoading extends SessionDetailsState {
   const SessionDetailsLoading();
 }
 
-/// Video player ready and frames loaded for playback.
 class SessionDetailsLoaded extends SessionDetailsState {
   final Session session;
   final List<TrackedFrame> frames;
@@ -83,7 +80,6 @@ class SessionDetailsLoaded extends SessionDetailsState {
   ];
 }
 
-/// Error loading session or initializing video player.
 class SessionDetailsError extends SessionDetailsState {
   final String message;
 

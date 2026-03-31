@@ -2,7 +2,6 @@ import 'package:camera/camera.dart';
 import 'package:equatable/equatable.dart';
 import 'package:pose_detection/core/domain/models/detected_pose.dart';
 
-/// States for PoseDetectionBloc
 sealed class PoseDetectionState extends Equatable {
   const PoseDetectionState();
 
@@ -10,29 +9,23 @@ sealed class PoseDetectionState extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Initial state
 class PoseDetectionInitial extends PoseDetectionState {
   const PoseDetectionInitial();
 }
 
-/// Camera is initializing
 class CameraInitializing extends PoseDetectionState {
   const CameraInitializing();
 }
 
-/// Camera initialized and ready to start capture
 class CameraReady extends PoseDetectionState {
   final CameraController cameraController;
 
-  // CameraController is mutable, so const is not possible.
-  // ignore: prefer_const_constructors_in_immutables
-  CameraReady(this.cameraController);
+  const CameraReady(this.cameraController);
 
   @override
   List<Object?> get props => [cameraController];
 }
 
-/// Actively detecting poses with real-time metrics
 class Detecting extends PoseDetectionState {
   final CameraController cameraController;
   final bool canSwitchCamera;
@@ -63,7 +56,6 @@ class Detecting extends PoseDetectionState {
   ];
 }
 
-/// Actively recording a session (video + pose tracking)
 class Recording extends PoseDetectionState {
   final CameraController cameraController;
   final DetectedPose? currentPose;
@@ -109,12 +101,10 @@ class Recording extends PoseDetectionState {
   ];
 }
 
-/// Recording stopped, waiting for user to provide title
 class RecordingStopped extends PoseDetectionState {
   const RecordingStopped();
 }
 
-/// Session saved successfully after recording
 class SessionSaved extends PoseDetectionState {
   final String sessionId;
 
@@ -124,12 +114,10 @@ class SessionSaved extends PoseDetectionState {
   List<Object?> get props => [sessionId];
 }
 
-/// Saving session in progress
 class SavingSession extends PoseDetectionState {
   const SavingSession();
 }
 
-/// Error state
 class PoseDetectionError extends PoseDetectionState {
   final String message;
 

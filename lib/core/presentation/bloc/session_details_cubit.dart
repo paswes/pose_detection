@@ -10,36 +10,19 @@ import 'package:pose_detection/core/data/models/tracked_frame.dart';
 import 'package:pose_detection/core/data/repositories/session_repository.dart';
 import 'package:pose_detection/core/presentation/bloc/session_details_state.dart';
 
-/// Manages video playback with synchronized landmark overlay.
-///
-/// Uses [VideoPlayerController] for hardware-accelerated video playback.
-/// Matches the current video position to the nearest stored [TrackedFrame]
-/// via binary search, so landmarks stay in sync with the displayed frame.
-///
-/// An optional [ExerciseAnalyzer] is called during frame processing to
-/// provide exercise-specific analysis (e.g. rep counting). When null,
-/// the page shows a raw landmark view.
 class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   final Session session;
   final SessionRepository _repository;
   final ExerciseAnalyzer? _analyzer;
   VideoPlayerController? _controller;
 
-  /// Direct repaint signal for the landmark overlay painter.
-  ///
-  /// Updated synchronously in the video position listener so the overlay
-  /// repaints on the next render frame — bypassing the BLoC rebuild pipeline
-  /// to eliminate visible lag between video and landmarks.
   final frameNotifier = ValueNotifier<TrackedFrame?>(null);
 
-  /// Throttle state for scrub video seeks.
   DateTime _lastScrubSeek = DateTime(0);
   static const _scrubSeekInterval = Duration(milliseconds: 100);
 
-  /// Exposes the video controller for the page to build the [VideoPlayer] widget.
   VideoPlayerController? get videoController => _controller;
 
-  /// The exercise analyzer, if any. The page queries this for UI extensions.
   ExerciseAnalyzer? get analyzer => _analyzer;
 
   SessionDetailsCubit({
@@ -50,7 +33,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
        _analyzer = analyzer,
        super(const SessionDetailsLoading());
 
-  /// Load tracked frames from DB and initialize the video player.
+  /// Load tracked frame data from DB and initialize the video player.
   Future<void> initialize() async {
     try {
       final frames = await _repository.getFramesForSession(session.id);
@@ -82,26 +65,19 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         ),
       );
 
-      // Add listener AFTER initial state is emitted, so any early
-      // callbacks find a valid SessionDetailsLoaded state
       _controller!.addListener(_onVideoPositionChanged);
     } catch (e) {
       emit(SessionDetailsError(message: 'Fehler beim Laden: $e'));
     }
   }
 
-  /// Available playback speed options for analysis mode.
   static const availableSpeeds = [0.25, 0.5, 0.75, 1.0];
 
-  /// Base lookahead at 1.0x, compensating for iOS AVPlayer platform channel
-  /// reporting delay (~2 frames at 30 FPS).
   static const _baseLookAheadMicros = 66000;
 
-  /// Scaled lookahead for a given playback speed.
   static int _scaledLookAheadMicros(double speed) =>
       (_baseLookAheadMicros * speed).round();
 
-  /// Listener called by [VideoPlayerController] on position/state changes.
   void _onVideoPositionChanged() {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -150,7 +126,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     );
   }
 
-  /// Binary search for the frame closest to [positionMicros].
   int _findNearestFrameIndex(
     List<TrackedFrame> frames,
     int positionMicros,
@@ -179,7 +154,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     return lo;
   }
 
-  /// Toggle play/pause.
   Future<void> togglePlayPause() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -190,7 +164,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     if (controller.value.isPlaying) {
       await controller.pause();
     } else {
-      // If at the last frame, restart from the beginning
       if (current.currentFrameIndex >= current.totalFrames - 1) {
         _analyzer?.reset();
         _analyzer?.processFrame(
@@ -216,7 +189,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     }
   }
 
-  /// Set the video playback speed.
   Future<void> setPlaybackSpeed(double speed) async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -225,7 +197,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     emit(current.copyWith(playbackSpeed: speed));
   }
 
-  /// Seek to a specific frame by index.
   Future<void> seekToFrame(int index) async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -246,7 +217,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     );
   }
 
-  /// Update overlay and state, with throttled video seeks.
   void scrubToFrame(int index) {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -272,7 +242,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     );
   }
 
-  /// Seek the video controller to the current frame position.
   Future<void> commitScrub() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -282,7 +251,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
   }
 
-  /// Advance to the next frame (pauses if playing).
   Future<void> nextFrame() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -313,7 +281,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     );
   }
 
-  /// Go back one frame (pauses if playing).
   Future<void> previousFrame() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -341,7 +308,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     );
   }
 
-  /// Select a landmark by ID, or clear selection with null.
   void selectLandmark(int? id) {
     final current = state;
     if (current is! SessionDetailsLoaded) return;

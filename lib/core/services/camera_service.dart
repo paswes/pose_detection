@@ -3,8 +3,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 
-/// Service responsible for camera lifecycle management.
-/// Implements ICameraService for dependency injection.
 class CameraService implements ICameraService {
   CameraController? _controller;
   List<CameraDescription>? _cameras;

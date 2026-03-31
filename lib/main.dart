@@ -4,10 +4,7 @@ import 'package:pose_detection/presentation/pages/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize dependency injection
   await initializeDependencies();
-
   runApp(const PoseEngineApp());
 }
 
@@ -20,7 +17,6 @@ class PoseEngineApp extends StatelessWidget {
       title: 'Pose Engine Core',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        // Minimalist grey palette
         scaffoldBackgroundColor: const Color(0xFF121212),
         primaryColor: const Color(0xFF888888),
         colorScheme: const ColorScheme.dark(

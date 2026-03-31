@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/presentation/bloc/session_list_cubit.dart';
@@ -19,7 +17,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final SessionListCubit _cubit;
-  bool _isPicking = false;
 
   @override
   void initState() {
@@ -46,66 +43,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _pickAndUploadVideo() async {
-    if (_isPicking) return;
-
-    setState(() => _isPicking = true);
-
-    try {
-      final picker = ImagePicker();
-      final video = await picker.pickVideo(source: ImageSource.gallery);
-
-      if (!mounted) return;
-      setState(() => _isPicking = false);
-
-      if (video == null) return;
-
-      _cubit.processVideoFromPath(video.path);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isPicking = false);
-    }
-  }
-
-  void _showMoreSheet() {
-    WoltModalSheet.show(
-      context: context,
-      pageListBuilder: (sheetContext) => [
-        SliverWoltModalSheetPage(
-          backgroundColor: const Color(0xFF1E1E1E),
-          surfaceTintColor: Colors.transparent,
-
-          mainContentSliversBuilder: (context) => [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              sliver: SliverList.list(
-                children: [
-                  _MoreSheetItem(
-                    icon: Icons.video_library_rounded,
-                    label: 'Video hochladen',
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      _pickAndUploadVideo();
-                    },
-                  ),
-                  _MoreSheetItem(
-                    icon: Icons.videocam_rounded,
-                    label: 'Live Capture',
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      _navigateToCapture();
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-      modalBarrierColor: Colors.black54,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
@@ -127,25 +64,17 @@ class _HomePageState extends State<HomePage> {
           'assets/powered_by.png',
           height: 28,
         ),
-        actions: [
-          if (!state.processingVideo)
-            GestureDetector(
-              onTap: _showMoreSheet,
-              child: Container(
-                margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.all(8),
-                child: const Icon(
-                  Icons.more_horiz_rounded,
-                  color: Color(0xFF888888),
-                  size: 24,
-                ),
-              ),
-            ),
-        ],
       ),
       body: sessions.isEmpty && !state.processingVideo
           ? _buildEmptyState()
           : _buildSessionList(state),
+      floatingActionButton: state.processingVideo
+          ? null
+          : FloatingActionButton(
+              onPressed: _navigateToCapture,
+              backgroundColor: const Color(0xFF4AE6D7),
+              child: const Icon(Icons.videocam_rounded, color: Colors.black),
+            ),
     );
   }
 
@@ -278,45 +207,6 @@ class _InitializingScreen extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// -- More Sheet Item --
-
-class _MoreSheetItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _MoreSheetItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, color: const Color(0xFF888888), size: 22),
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
         ),
       ),
     );

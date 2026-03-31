@@ -1,5 +1,5 @@
 import 'package:camera/camera.dart';
-import 'package:pose_detection/domain/models/detected_pose.dart';
+import 'package:pose_detection/core/domain/models/detected_pose.dart';
 
 /// Abstract interface for pose detection.
 /// Decouples from ML Kit implementation for testability.

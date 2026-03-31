@@ -1,8 +1,8 @@
 import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
-import 'package:pose_detection/domain/models/detected_pose.dart';
-import 'package:pose_detection/domain/models/landmark.dart';
-import 'package:pose_detection/domain/models/person_detection_result.dart';
+import 'package:pose_detection/core/domain/models/detected_pose.dart';
+import 'package:pose_detection/core/domain/models/landmark.dart';
+import 'package:pose_detection/core/domain/models/person_detection_result.dart';
 
 /// Validates if a detected pose represents a real person.
 ///

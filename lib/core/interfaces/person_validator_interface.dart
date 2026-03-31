@@ -1,5 +1,5 @@
-import 'package:pose_detection/domain/models/detected_pose.dart';
-import 'package:pose_detection/domain/models/person_detection_result.dart';
+import 'package:pose_detection/core/domain/models/detected_pose.dart';
+import 'package:pose_detection/core/domain/models/person_detection_result.dart';
 
 /// Interface for validating if a detected pose represents a real person
 /// ML Kit returns poses even for objects (cables, desks, etc.)

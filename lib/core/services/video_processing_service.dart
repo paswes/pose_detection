@@ -6,8 +6,8 @@ import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'package:pose_detection/core/services/static_image_pose_detector.dart';
-import 'package:pose_detection/data/models/landmark_data.dart';
-import 'package:pose_detection/data/models/tracked_frame.dart';
+import 'package:pose_detection/core/data/models/landmark_data.dart';
+import 'package:pose_detection/core/data/models/tracked_frame.dart';
 
 /// Result of processing an uploaded video through pose detection.
 class VideoProcessingResult {

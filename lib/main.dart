@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+
 import 'package:pose_detection/core/di/service_locator.dart';
-import 'package:pose_detection/presentation/pages/home_page.dart';
+import 'package:pose_detection/core/presentation/pages/home_page.dart';
+import 'package:pose_detection/rdl_example/rdl_feature.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDependencies();
+  await initializeDependencies(
+    featureRegistrars: [registerRdlDependencies],
+    analyzerResolver: rdlAnalyzerResolver,
+    demoServiceFactory: rdlDemoService,
+  );
   runApp(const PoseEngineApp());
 }
 

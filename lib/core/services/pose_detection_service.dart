@@ -3,8 +3,8 @@ import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
-import 'package:pose_detection/domain/models/detected_pose.dart';
-import 'package:pose_detection/domain/models/landmark.dart';
+import 'package:pose_detection/core/domain/models/detected_pose.dart';
+import 'package:pose_detection/core/domain/models/landmark.dart';
 
 /// Service responsible for ML Kit pose detection.
 /// Converts ML Kit outputs to simple domain models.

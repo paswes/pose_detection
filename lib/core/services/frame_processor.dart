@@ -1,6 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
-import 'package:pose_detection/domain/models/detected_pose.dart';
+import 'package:pose_detection/core/domain/models/detected_pose.dart';
 
 /// Result of processing a single frame.
 class FrameProcessingResult {

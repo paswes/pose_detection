@@ -2,8 +2,8 @@ import 'dart:ui';
 
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
-import 'package:pose_detection/domain/models/detected_pose.dart';
-import 'package:pose_detection/domain/models/landmark.dart';
+import 'package:pose_detection/core/domain/models/detected_pose.dart';
+import 'package:pose_detection/core/domain/models/landmark.dart';
 
 /// Detects poses in static image files (e.g. JPEG frames extracted from video).
 ///

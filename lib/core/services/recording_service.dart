@@ -3,10 +3,10 @@ import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pose_detection/data/models/landmark_data.dart';
-import 'package:pose_detection/data/models/tracked_frame.dart';
-import 'package:pose_detection/domain/models/detected_pose.dart';
-import 'package:pose_detection/domain/models/person_detection_result.dart';
+import 'package:pose_detection/core/data/models/landmark_data.dart';
+import 'package:pose_detection/core/data/models/tracked_frame.dart';
+import 'package:pose_detection/core/domain/models/detected_pose.dart';
+import 'package:pose_detection/core/domain/models/person_detection_result.dart';
 
 /// Manages recording state and frame collection during a capture session.
 class RecordingService {

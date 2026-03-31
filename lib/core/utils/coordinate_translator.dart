@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:pose_detection/core/utils/transform_calculator.dart';
-import 'package:pose_detection/domain/models/landmark.dart';
+import 'package:pose_detection/core/domain/models/landmark.dart';
 
 /// How the video/image is fitted into the widget.
 enum FitMode { cover, contain }

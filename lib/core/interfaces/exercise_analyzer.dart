@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
-import 'package:pose_detection/data/models/session.dart';
-import 'package:pose_detection/data/models/tracked_frame.dart';
+import 'package:pose_detection/core/data/models/session.dart';
+import 'package:pose_detection/core/data/models/tracked_frame.dart';
 
 /// Extension point for exercise-specific analysis on top of generic
 /// session playback.
@@ -11,13 +11,13 @@ import 'package:pose_detection/data/models/tracked_frame.dart';
 /// extensions to an optional [ExerciseAnalyzer]. When no analyzer is
 /// provided, the session details page shows a raw landmark view.
 ///
-/// **To create a new exercise example:**
-/// 1. Copy `lib/features/rdl_example/` as a template.
+/// **To create a new exercise feature:**
+/// 1. Create a new folder under `lib/features/your_exercise/`.
 /// 2. Implement this interface for your exercise.
-/// 3. Register it in `service_locator.dart`.
+/// 3. Create a feature entry point file (see `lib/features/rdl_example/rdl_feature.dart`).
+/// 4. Wire it into `main.dart` via `initializeDependencies`.
 ///
-/// See `lib/features/rdl_example/presentation/rdl_analyzer.dart` for a
-/// complete reference implementation.
+/// See `lib/features/rdl_example/` for a complete reference implementation.
 abstract class ExerciseAnalyzer {
   /// Landmark schema for overlay rendering (connections, names).
   LandmarkSchema get schema;

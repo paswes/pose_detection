@@ -41,7 +41,6 @@ class PoseDetectionService implements IPoseDetector {
     );
   }
 
-  /// Convert ML Kit Pose to domain DetectedPose
   DetectedPose _convertToDomainModel({
     required Pose pose,
     required double imageWidth,
@@ -66,14 +65,12 @@ class PoseDetectionService implements IPoseDetector {
     );
   }
 
-  /// Convert CameraImage to InputImage for ML Kit
   InputImage? _convertCameraImage(CameraImage image, int sensorOrientation) {
     final imageRotation = InputImageRotationValue.fromRawValue(
       sensorOrientation,
     );
     if (imageRotation == null) return null;
 
-    // iOS: BGRA8888 format, single plane
     if (Platform.isIOS) {
       final plane = image.planes.first;
       return InputImage.fromBytes(

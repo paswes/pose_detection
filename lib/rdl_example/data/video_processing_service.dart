@@ -53,18 +53,9 @@ class VideoProcessingService {
     String sessionId, {
     void Function(int completed, int total)? onProgress,
   }) async {
-    // 1. Copy video to app documents
     final videoPath = await _copyToDocuments(sourcePath, sessionId);
-
-    // 2. Get video metadata
     final metadata = await _getVideoMetadata(videoPath);
-
-    // 3. Generate frame timestamps at ~30 FPS
-    final timestampsMs = _generateTimestamps(
-      durationMs: metadata.durationMs,
-    );
-
-    // 4. Extract frames + detect poses
+    final timestampsMs = _generateTimestamps(durationMs: metadata.durationMs);
     final frames = <TrackedFrame>[];
     final tempDir = await _createTempFrameDir(sessionId);
 
@@ -81,7 +72,6 @@ class VideoProcessingService {
       );
 
       if (framePath == null) {
-        // Frame extraction failed — store empty frame
         frames.add(
           TrackedFrame(
             sessionId: sessionId,
@@ -94,14 +84,12 @@ class VideoProcessingService {
         continue;
       }
 
-      // Run ML Kit pose detection
       final pose = await _poseDetector.detectPoseFromFile(
         framePath,
         imageWidth: metadata.width,
         imageHeight: metadata.height,
       );
 
-      // Build TrackedFrame with raw landmarks
       frames.add(
         TrackedFrame(
           sessionId: sessionId,
@@ -111,7 +99,6 @@ class VideoProcessingService {
         ),
       );
 
-      // Clean up temp frame file immediately
       try {
         await File(framePath).delete();
       } catch (_) {}
@@ -119,7 +106,6 @@ class VideoProcessingService {
       onProgress?.call(i + 1, timestampsMs.length);
     }
 
-    // Clean up temp directory
     await _cleanupTempDir(tempDir);
 
     return VideoProcessingResult(

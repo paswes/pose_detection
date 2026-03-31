@@ -25,8 +25,6 @@ class RdlAnalyzer implements ExerciseAnalyzer {
   @override
   Set<int>? get visibleLandmarkIds => rdlLandmarkIds;
 
-  // -- Frame processing ------------------------------------------------------
-
   @override
   void precompute(List<TrackedFrame> frames) {
     _counter.countRepsUpTo(frames, frames.length - 1);
@@ -70,8 +68,6 @@ class RdlAnalyzer implements ExerciseAnalyzer {
       _injuredIds.add(id);
     }
   }
-
-  // -- UI builders -----------------------------------------------------------
 
   @override
   Widget? buildHud(BuildContext context, int currentFrameIndex) {
@@ -146,10 +142,6 @@ class RdlAnalyzer implements ExerciseAnalyzer {
     return RdlAnalyticsPage(session: session, reps: _allReps);
   }
 }
-
-// =============================================================================
-// Private widgets (moved from session_details_page.dart)
-// =============================================================================
 
 class _OverlayBadge extends StatelessWidget {
   final String value;

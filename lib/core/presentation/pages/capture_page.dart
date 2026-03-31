@@ -112,10 +112,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
-  // ============================================================
-  // VIEWS
-  // ============================================================
-
   Widget _buildLoadingView() {
     return const Center(
       child: Column(
@@ -212,25 +208,14 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           isLandscape: !_isPortrait,
         ),
 
-        // Pose overlay
         if (state.currentPose != null && state.isPersonDetected)
           _buildPoseOverlayFromRecording(state),
-
-        // Back button (top-left)
         _buildBackButton(),
-
-        // Person indicator (top-right)
         _buildPersonIndicator(state.isPersonDetected),
-
-        // Bottom: recording time (left) + stop button (right)
         _buildRecordingControls(state),
       ],
     );
   }
-
-  // ============================================================
-  // OVERLAYS & INDICATORS
-  // ============================================================
 
   Widget _buildBackButton() {
     return SafeArea(
@@ -312,10 +297,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     );
   }
 
-  // ============================================================
-  // DIALOGS
-  // ============================================================
-
   void _showSaveSessionDialog() {
     final controller = TextEditingController();
 
@@ -374,10 +355,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     return 'Session ${now.day}.${now.month}.${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
-  // ============================================================
-  // BOTTOM CONTROLS
-  // ============================================================
-
   Widget _buildIdleControls(CameraReady state) {
     return SafeArea(
       child: Align(
@@ -394,7 +371,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                   _buildOrientationSwitchButton(),
                 ],
               ),
-              // Green play button — starts recording
               GestureDetector(
                 onTap: () => _bloc.add(StartRecordingEvent()),
                 child: Container(
@@ -430,7 +406,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Recording time indicator (replaces camera/orientation buttons)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -465,7 +440,6 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
                 ),
               ),
 
-              // Red stop button
               GestureDetector(
                 onTap: () => _bloc.add(StopRecordingEvent()),
                 child: Container(

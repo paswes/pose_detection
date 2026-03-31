@@ -26,7 +26,6 @@ class TransformCalculator {
     final scaleX = screenSize.width / imageSize.width;
     final scaleY = screenSize.height / imageSize.height;
 
-    // Use the LARGER scale to ensure full coverage (BoxFit.cover behavior)
     final scale = scaleX > scaleY ? scaleX : scaleY;
 
     final fittedWidth = imageSize.width * scale;
@@ -55,7 +54,6 @@ class TransformCalculator {
     final scaleX = screenSize.width / imageSize.width;
     final scaleY = screenSize.height / imageSize.height;
 
-    // Use the SMALLER scale so the entire image fits (BoxFit.contain behavior)
     final scale = scaleX < scaleY ? scaleX : scaleY;
 
     final fittedWidth = imageSize.width * scale;

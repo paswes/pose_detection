@@ -100,7 +100,6 @@ class RdlRepCounter {
   /// At 30 FPS, 15 frames = 500ms — brief occlusions won't reset state.
   static const _maxNullStreak = 15;
 
-  // Per-rep tracking state
   final List<RdlRepData> _reps = [];
   int _descentStartFrameIndex = 0;
   int _descentStartTimestampMicros = 0;
@@ -337,10 +336,6 @@ class RdlRepCounter {
       ankle.y,
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
 
   /// Update the state machine. Returns `true` if a rep was counted.
   bool _updatePhase(

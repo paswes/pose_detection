@@ -32,8 +32,6 @@ Future<void> initializeDependencies({
   AnalyzerResolver? analyzerResolver,
   BeforeLoadHook? beforeLoad,
 }) async {
-  // -- Core singletons --
-
   sl.registerSingleton<LandmarkSchema>(
     schema ?? LandmarkSchema.mlKit33,
   );
@@ -62,15 +60,11 @@ Future<void> initializeDependencies({
     () => RecordingService(),
   );
 
-  // -- Feature registration --
-
   for (final registrar in featureRegistrars ?? []) {
     registrar(sl);
   }
 
   final resolveAnalyzer = analyzerResolver;
-
-  // -- Factories (BLoC / Cubit) --
 
   sl.registerFactory<PoseDetectionBloc>(
     () => PoseDetectionBloc(

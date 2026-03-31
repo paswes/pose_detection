@@ -143,10 +143,6 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   }
 }
 
-// =============================================================================
-// Video with overlay + HUD elements
-// =============================================================================
-
 class _VideoWithOverlay extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
@@ -191,7 +187,6 @@ class _VideoWithOverlay extends StatelessWidget {
             ),
             child: Stack(
               children: [
-                // Layer 1: Video
                 Positioned.fill(
                   child: FittedBox(
                     fit: BoxFit.contain,
@@ -203,7 +198,6 @@ class _VideoWithOverlay extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Layer 2: Landmark overlay
                 Positioned.fill(
                   child: CustomPaint(
                     size: widgetSize,
@@ -223,7 +217,6 @@ class _VideoWithOverlay extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Layer 3: Top HUD
                 Positioned(
                   top: topPadding + 8,
                   left: 16,
@@ -322,10 +315,6 @@ class _VideoWithOverlay extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// Overlay HUD widgets
-// =============================================================================
-
 class _OverlayButton extends StatelessWidget {
   final VoidCallback onTap;
   final IconData icon;
@@ -353,10 +342,6 @@ class _OverlayButton extends StatelessWidget {
     );
   }
 }
-
-// =============================================================================
-// Draggable controls sheet
-// =============================================================================
 
 class _ControlsSheet extends StatelessWidget {
   final SessionDetailsCubit cubit;

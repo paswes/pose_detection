@@ -266,7 +266,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Emitter<PoseDetectionState> emit,
   ) async {
     if (!_cameraService.canSwitchCamera) return;
-    // Don't allow camera switch during recording
     if (state is Recording) return;
 
     final wasDetecting = state is Detecting;
@@ -354,8 +353,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       _consecutiveErrors = 0;
 
-      // Only process frames during active recording.
-      // Detection is not needed in idle/preview states.
       if (state is! Recording) return;
 
       final isPersonDetected = _personValidator.validate(pose);

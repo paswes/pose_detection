@@ -48,7 +48,6 @@ class CameraPreviewWidget extends StatelessWidget {
     final double imageHeight;
 
     if (isLandscape) {
-      // Landscape mode: use previewSize as-is
       imageWidth = previewSize.width;
       imageHeight = previewSize.height;
     } else {

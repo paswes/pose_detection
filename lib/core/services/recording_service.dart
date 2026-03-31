@@ -71,7 +71,6 @@ class RecordingService {
 
     final videoFile = await controller.stopVideoRecording();
 
-    // Move video to app documents directory
     final appDir = await getApplicationDocumentsDirectory();
     final videoDir = Directory('${appDir.path}/videos');
     if (!await videoDir.exists()) {
@@ -82,7 +81,6 @@ class RecordingService {
     final newPath = '${videoDir.path}/session_$timestamp.mp4';
     await File(videoFile.path).copy(newPath);
 
-    // Clean up temp file
     try {
       await File(videoFile.path).delete();
     } catch (_) {}
@@ -92,7 +90,6 @@ class RecordingService {
     final imageSize = _imageSize ?? Size.zero;
     final sessionId = _sessionId!;
 
-    // Reset state
     _recordingStartTime = null;
     _videoStartTimestampMicros = null;
     _frames.clear();

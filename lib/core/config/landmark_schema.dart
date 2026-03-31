@@ -24,11 +24,6 @@ class LandmarkSchema {
     return id < landmarkNames.length ? landmarkNames[id] : 'Unknown $id';
   }
 
-  // ---------------------------------------------------------------------------
-  // ML Kit / MediaPipe 33-landmark IDs
-  // ---------------------------------------------------------------------------
-
-  // Face
   static const int nose = 0;
   static const int leftEyeInner = 1;
   static const int leftEye = 2;
@@ -41,7 +36,6 @@ class LandmarkSchema {
   static const int leftMouth = 9;
   static const int rightMouth = 10;
 
-  // Upper body
   static const int leftShoulder = 11;
   static const int rightShoulder = 12;
   static const int leftElbow = 13;
@@ -49,7 +43,6 @@ class LandmarkSchema {
   static const int leftWrist = 15;
   static const int rightWrist = 16;
 
-  // Hands
   static const int leftPinky = 17;
   static const int rightPinky = 18;
   static const int leftIndex = 19;
@@ -57,7 +50,6 @@ class LandmarkSchema {
   static const int leftThumb = 21;
   static const int rightThumb = 22;
 
-  // Lower body
   static const int leftHip = 23;
   static const int rightHip = 24;
   static const int leftKnee = 25;
@@ -65,15 +57,10 @@ class LandmarkSchema {
   static const int leftAnkle = 27;
   static const int rightAnkle = 28;
 
-  // Feet
   static const int leftHeel = 29;
   static const int rightHeel = 30;
   static const int leftFootIndex = 31;
   static const int rightFootIndex = 32;
-
-  // ---------------------------------------------------------------------------
-  // Default schema instance
-  // ---------------------------------------------------------------------------
 
   /// ML Kit / MediaPipe 33-landmark schema
   static const mlKit33 = LandmarkSchema(
@@ -114,33 +101,42 @@ class LandmarkSchema {
       'Right Foot Index', // 32
     ],
     skeletonConnections: [
-      // Face
-      [leftEyeInner, leftEye], [leftEye, leftEyeOuter],
+      [leftEyeInner, leftEye],
+      [leftEye, leftEyeOuter],
       [leftEyeOuter, leftEar],
-      [rightEyeInner, rightEye], [rightEye, rightEyeOuter],
+      [rightEyeInner, rightEye],
+      [rightEye, rightEyeOuter],
       [rightEyeOuter, rightEar],
       [leftMouth, rightMouth],
-      [nose, leftEyeInner], [nose, rightEyeInner],
-      [leftMouth, leftEar], [rightMouth, rightEar],
-      // Torso
+      [nose, leftEyeInner],
+      [nose, rightEyeInner],
+      [leftMouth, leftEar],
+      [rightMouth, rightEar],
       [leftShoulder, rightShoulder],
-      [leftShoulder, leftHip], [rightShoulder, rightHip],
+      [leftShoulder, leftHip],
+      [rightShoulder, rightHip],
       [leftHip, rightHip],
-      // Left arm
-      [leftShoulder, leftElbow], [leftElbow, leftWrist],
-      [leftWrist, leftPinky], [leftWrist, leftIndex],
-      [leftPinky, leftIndex], [leftWrist, leftThumb],
-      // Right arm
-      [rightShoulder, rightElbow], [rightElbow, rightWrist],
-      [rightWrist, rightPinky], [rightWrist, rightIndex],
-      [rightPinky, rightIndex], [rightWrist, rightThumb],
-      // Left leg
-      [leftHip, leftKnee], [leftKnee, leftAnkle],
-      [leftAnkle, leftHeel], [leftAnkle, leftFootIndex],
+      [leftShoulder, leftElbow],
+      [leftElbow, leftWrist],
+      [leftWrist, leftPinky],
+      [leftWrist, leftIndex],
+      [leftPinky, leftIndex],
+      [leftWrist, leftThumb],
+      [rightShoulder, rightElbow],
+      [rightElbow, rightWrist],
+      [rightWrist, rightPinky],
+      [rightWrist, rightIndex],
+      [rightPinky, rightIndex],
+      [rightWrist, rightThumb],
+      [leftHip, leftKnee],
+      [leftKnee, leftAnkle],
+      [leftAnkle, leftHeel],
+      [leftAnkle, leftFootIndex],
       [leftHeel, leftFootIndex],
-      // Right leg
-      [rightHip, rightKnee], [rightKnee, rightAnkle],
-      [rightAnkle, rightHeel], [rightAnkle, rightFootIndex],
+      [rightHip, rightKnee],
+      [rightKnee, rightAnkle],
+      [rightAnkle, rightHeel],
+      [rightAnkle, rightFootIndex],
       [rightHeel, rightFootIndex],
     ],
   );

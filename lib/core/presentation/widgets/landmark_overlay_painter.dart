@@ -94,10 +94,7 @@ class LandmarkOverlayPainter extends CustomPainter {
       likelihoodMap[l.id] = l.likelihood;
     }
 
-    // Draw connections first (below landmarks)
     _drawConnections(canvas, translatedPoints, likelihoodMap);
-
-    // Draw landmarks on top
     _drawLandmarkPoints(canvas, translatedPoints, likelihoodMap);
   }
 
@@ -124,14 +121,12 @@ class LandmarkOverlayPainter extends CustomPainter {
       final drawRadius = isSelected ? baseRadius * 2.0 : baseRadius;
 
       if (isSelected) {
-        // Outer pulse glow — very large, soft
         final outerGlow = Paint()
           ..color = color.withValues(alpha: 0.3)
           ..style = PaintingStyle.fill
           ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 24);
         canvas.drawCircle(position, drawRadius + 20, outerGlow);
 
-        // Inner selection glow — bright white
         final selectionGlow = Paint()
           ..color = Colors.white.withValues(alpha: 0.9)
           ..style = PaintingStyle.fill
@@ -139,20 +134,17 @@ class LandmarkOverlayPainter extends CustomPainter {
         canvas.drawCircle(position, drawRadius + 10, selectionGlow);
       }
 
-      // Glow
       final glowPaint = Paint()
         ..color = color.withValues(alpha: 0.3 * dimFactor)
         ..style = PaintingStyle.fill
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4);
       canvas.drawCircle(position, drawRadius + 3, glowPaint);
 
-      // Fill
       final fillPaint = Paint()
         ..color = color.withValues(alpha: dimFactor)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(position, drawRadius, fillPaint);
 
-      // Outline
       final outlinePaint = Paint()
         ..color = Colors.white.withValues(
           alpha: (isSelected ? 1.0 : 0.5) * dimFactor,
@@ -194,7 +186,6 @@ class LandmarkOverlayPainter extends CustomPainter {
         final lineAlpha = touchesSelected ? 0.9 : alpha;
 
         if (touchesSelected) {
-          // Connection glow behind the line
           final glowPaint = Paint()
             ..color = lineColor.withValues(alpha: 0.4)
             ..style = PaintingStyle.stroke

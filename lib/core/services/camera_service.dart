@@ -56,7 +56,6 @@ class CameraService implements ICameraService {
     CameraLensDirection direction, [
     DeviceOrientation? orientation,
   ]) async {
-    // Find camera with requested direction, fallback to first available
     final camera = _cameras!.firstWhere(
       (camera) => camera.lensDirection == direction,
       orElse: () => _cameras!.first,
@@ -76,7 +75,6 @@ class CameraService implements ICameraService {
 
     await _controller!.initialize();
 
-    // Lock camera orientation
     await _controller!.lockCaptureOrientation(_currentOrientation);
   }
 
@@ -84,28 +82,22 @@ class CameraService implements ICameraService {
   Future<void> switchCamera() async {
     if (!canSwitchCamera) return;
 
-    // Save current streaming state and callback
     final wasStreaming = isStreamingImages;
     final callback = _imageStreamCallback;
 
-    // Stop current stream
     if (wasStreaming) {
       stopImageStream();
     }
 
-    // Dispose current controller
     await _controller?.dispose();
     _controller = null;
 
-    // Switch direction
     final newDirection = _currentDirection == CameraLensDirection.back
         ? CameraLensDirection.front
         : CameraLensDirection.back;
 
-    // Initialize with new direction
     await _initializeCameraWithDirection(newDirection);
 
-    // Restart stream if was streaming
     if (wasStreaming && callback != null) {
       startImageStream(callback);
     }
@@ -115,23 +107,18 @@ class CameraService implements ICameraService {
   Future<void> setOrientation(DeviceOrientation orientation) async {
     if (_currentOrientation == orientation) return;
 
-    // Save current streaming state and callback
     final wasStreaming = isStreamingImages;
     final callback = _imageStreamCallback;
 
-    // Stop current stream
     if (wasStreaming) {
       stopImageStream();
     }
 
-    // Dispose current controller
     await _controller?.dispose();
     _controller = null;
 
-    // Initialize with new orientation
     await _initializeCameraWithDirection(_currentDirection, orientation);
 
-    // Restart stream if was streaming
     if (wasStreaming && callback != null) {
       startImageStream(callback);
     }

@@ -30,11 +30,11 @@ class PosePainter extends CustomPainter {
   /// Get likelihood-based color (heatmap)
   Color _getLikelihoodColor(double likelihood) {
     if (likelihood > 0.8) {
-      return const Color(0xFF4CAF50); // Green
+      return const Color(0xFF4CAF50);
     } else if (likelihood > 0.5) {
-      return const Color(0xFFFFEB3B); // Yellow
+      return const Color(0xFFFFEB3B);
     } else {
-      return const Color(0xFFF44336); // Red
+      return const Color(0xFFF44336);
     }
   }
 
@@ -42,7 +42,6 @@ class PosePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (pose.landmarks.isEmpty) return;
 
-    // Pre-compute ALL translations with depth info ONCE
     final translatedPoints =
         CoordinateTranslator.translateAllLandmarksWithDepth(
           pose.landmarks,
@@ -50,16 +49,12 @@ class PosePainter extends CustomPainter {
           widgetSize,
         );
 
-    // Build a quick lookup for likelihood values
     final likelihoodMap = <int, double>{};
     for (final landmark in pose.landmarks) {
       likelihoodMap[landmark.id] = landmark.likelihood;
     }
 
-    // Draw all skeletal connections first (below landmarks)
     _drawAllConnections(canvas, translatedPoints, likelihoodMap);
-
-    // Draw all landmark points on top
     _drawAllLandmarks(canvas, translatedPoints, likelihoodMap);
   }
 
@@ -75,26 +70,20 @@ class PosePainter extends CustomPainter {
       final depth = entry.value.normalizedDepth;
       final likelihood = likelihoodMap[id] ?? 0.5;
 
-      // Depth-based radius: closer = larger
       final baseRadius = 4.0 + (depth * 4.0);
-
-      // Get likelihood-based color
       final likelihoodColor = _getLikelihoodColor(likelihood);
 
-      // Draw subtle glow based on likelihood
       final glowPaint = Paint()
         ..color = likelihoodColor.withValues(alpha: 0.3)
         ..style = PaintingStyle.fill
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4);
       canvas.drawCircle(position, baseRadius + 3, glowPaint);
 
-      // Draw main landmark point with likelihood color
       final landmarkPaint = Paint()
         ..color = likelihoodColor
         ..style = PaintingStyle.fill;
       canvas.drawCircle(position, baseRadius, landmarkPaint);
 
-      // Draw thin white outline for visibility
       final outlinePaint = Paint()
         ..color = Colors.white.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
@@ -117,18 +106,11 @@ class PosePainter extends CustomPainter {
       final point2Data = points[id2];
 
       if (point1Data != null && point2Data != null) {
-        // Average depth for line thickness
         final avgDepth =
             (point1Data.normalizedDepth + point2Data.normalizedDepth) / 2;
-
-        // Average likelihood for color
         final avgLikelihood =
             ((likelihoodMap[id1] ?? 0.5) + (likelihoodMap[id2] ?? 0.5)) / 2;
-
-        // Depth-based line thickness
         final lineWidth = 1.5 + (avgDepth * 2.0);
-
-        // Likelihood-based alpha (minimal, academic look)
         final alpha = 0.3 + (avgLikelihood * 0.5);
 
         final linePaint = Paint()

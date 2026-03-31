@@ -70,10 +70,6 @@ class RdlAnalyticsPage extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// Set summary
-// =============================================================================
-
 class _SetSummary extends StatelessWidget {
   final List<RdlRepData> reps;
 
@@ -186,10 +182,6 @@ class _SummaryBox extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// Rep card
-// =============================================================================
-
 class _RepCard extends StatelessWidget {
   final RdlRepData rep;
   final VoidCallback onTap;
@@ -212,7 +204,6 @@ class _RepCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row
             Row(
               children: [
                 Text(
@@ -232,7 +223,6 @@ class _RepCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            // Top metrics row
             Row(
               spacing: 8,
               children: [
@@ -252,7 +242,6 @@ class _RepCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // L/R angles row
             Row(
               spacing: 8,
               children: [
@@ -274,7 +263,6 @@ class _RepCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // Knee angles row
             Row(
               spacing: 8,
               children: [
@@ -286,7 +274,6 @@ class _RepCard extends StatelessWidget {
                   label: 'R Knie',
                   value: _formatAngle(rep.rightKneeAngle),
                 ),
-                // Spacer box to keep 3-column layout
                 const Expanded(child: SizedBox.shrink()),
               ],
             ),

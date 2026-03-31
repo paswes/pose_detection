@@ -103,7 +103,6 @@ SliverWoltModalSheetPage _buildPage(
         padding: const EdgeInsets.fromLTRB(16, 32, 16, 48),
         sliver: SliverList.list(
           children: [
-            // Exercise-specific metrics (if any)
             if (metrics.isNotEmpty) ...[
               Row(
                 spacing: 8,
@@ -115,7 +114,6 @@ SliverWoltModalSheetPage _buildPage(
               const SizedBox(height: 24),
             ],
 
-            // Selected landmark with green/red indicator + injury toggle
             Row(
               children: [
                 Container(
@@ -173,7 +171,6 @@ SliverWoltModalSheetPage _buildPage(
 
             if (connections.isNotEmpty) ...[
               const SizedBox(height: 16),
-              // Connections section — tappable navigation
               ...connections.map(
                 (conn) => _ConnectionRow(
                   name: conn.name,
@@ -215,8 +212,6 @@ List<_Connection> _getConnectedLandmarks(
       .map((id) => (id: id, name: schema.getLandmarkName(id)))
       .toList();
 }
-
-// -- Private widgets ---------------------------------------------------------
 
 class _MetricBox extends StatelessWidget {
   final String label;

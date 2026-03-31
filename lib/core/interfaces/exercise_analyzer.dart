@@ -12,12 +12,12 @@ import 'package:pose_detection/core/data/models/tracked_frame.dart';
 /// provided, the session details page shows a raw landmark view.
 ///
 /// **To create a new exercise feature:**
-/// 1. Create a new folder under `lib/features/your_exercise/`.
+/// 1. Create a new folder under `lib/` (e.g. `lib/my_exercise/`).
 /// 2. Implement this interface for your exercise.
-/// 3. Create a feature entry point file (see `lib/features/rdl_example/rdl_feature.dart`).
+/// 3. Create a feature entry point file (see `lib/rdl_example/rdl_feature.dart`).
 /// 4. Wire it into `main.dart` via `initializeDependencies`.
 ///
-/// See `lib/features/rdl_example/` for a complete reference implementation.
+/// See `lib/rdl_example/` for a complete reference implementation.
 abstract class ExerciseAnalyzer {
   /// Landmark schema for overlay rendering (connections, names).
   LandmarkSchema get schema;

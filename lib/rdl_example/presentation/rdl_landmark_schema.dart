@@ -61,21 +61,16 @@ const rdlSchema = LandmarkSchema(
     'Right Foot Index', // 32
   ],
   skeletonConnections: [
-    // Torso
     [LandmarkSchema.leftShoulder, LandmarkSchema.rightShoulder],
     [LandmarkSchema.leftShoulder, LandmarkSchema.leftHip],
     [LandmarkSchema.rightShoulder, LandmarkSchema.rightHip],
     [LandmarkSchema.leftHip, LandmarkSchema.rightHip],
-    // Left arm
     [LandmarkSchema.leftShoulder, LandmarkSchema.leftElbow],
     [LandmarkSchema.leftElbow, LandmarkSchema.leftWrist],
-    // Right arm
     [LandmarkSchema.rightShoulder, LandmarkSchema.rightElbow],
     [LandmarkSchema.rightElbow, LandmarkSchema.rightWrist],
-    // Left leg
     [LandmarkSchema.leftHip, LandmarkSchema.leftKnee],
     [LandmarkSchema.leftKnee, LandmarkSchema.leftAnkle],
-    // Right leg
     [LandmarkSchema.rightHip, LandmarkSchema.rightKnee],
     [LandmarkSchema.rightKnee, LandmarkSchema.rightAnkle],
   ],

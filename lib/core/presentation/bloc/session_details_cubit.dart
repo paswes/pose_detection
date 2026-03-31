@@ -60,7 +60,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         return;
       }
 
-      // Initialize video player
       final videoFile = File(session.videoPath);
       if (!videoFile.existsSync()) {
         emit(const SessionDetailsError(message: 'Video nicht gefunden'));
@@ -70,13 +69,8 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       _controller = VideoPlayerController.file(videoFile);
       await _controller!.initialize();
 
-      // Seek to start to ensure position is exactly 0
       await _controller!.seekTo(Duration.zero);
-
-      // Set initial frame for the painter
       frameNotifier.value = frames.first;
-
-      // Let the analyzer pre-compute over all frames (e.g. rep counting).
       _analyzer?.precompute(frames);
 
       emit(
@@ -124,11 +118,9 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         : position.inMicroseconds;
     final newIndex = _findNearestFrameIndex(current.frames, positionMicros);
 
-    // Update painter directly for instant overlay sync
     if (newIndex != current.currentFrameIndex) {
       frameNotifier.value = current.frames[newIndex];
 
-      // Delegate frame processing to the analyzer
       if (_analyzer != null) {
         final prevIndex = current.currentFrameIndex;
         if (newIndex > prevIndex) {
@@ -143,7 +135,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       }
     }
 
-    // Only emit BLoC state when something actually changed
     if (newIndex == current.currentFrameIndex &&
         isPlaying == current.isPlaying &&
         position == current.videoPosition) {

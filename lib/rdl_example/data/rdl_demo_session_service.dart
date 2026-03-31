@@ -44,14 +44,10 @@ class RdlDemoSessionService implements DemoSessionService {
   Future<void> ensureDemoSession({
     void Function(int completed, int total)? onProgress,
   }) async {
-    // Check if already seeded
     final existing = await _repository.getFramesForSession(_demoSessionId);
     if (existing.isNotEmpty) return;
 
-    // Write bundled asset to temp file for the processing pipeline
     final videoPath = await _writeAssetToTempFile();
-
-    // Process through the standard pipeline
     final result = await _processingService.processVideo(
       videoPath,
       _demoSessionId,

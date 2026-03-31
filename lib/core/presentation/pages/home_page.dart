@@ -37,7 +37,6 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute(builder: (context) => const CapturePage()),
     );
 
-    // Reload sessions if a new session was saved
     if (result == true) {
       _cubit.loadSessions();
     }
@@ -97,9 +96,7 @@ class _HomePageState extends State<HomePage> {
           height: 28,
         ),
       ),
-      body: sessions.isEmpty
-          ? _buildEmptyState()
-          : _buildSessionList(sessions),
+      body: sessions.isEmpty ? _buildEmptyState() : _buildSessionList(sessions),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToCapture,
         backgroundColor: const Color(0xFF4AE6D7),
@@ -173,8 +170,6 @@ class _HomePageState extends State<HomePage> {
     return confirmed == true;
   }
 }
-
-// -- Session Card --
 
 class _SessionCard extends StatelessWidget {
   final Session session;

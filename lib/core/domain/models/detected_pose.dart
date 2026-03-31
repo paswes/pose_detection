@@ -29,5 +29,4 @@ class DetectedPose {
 
   /// Number of landmarks
   int get landmarkCount => landmarks.length;
-
 }

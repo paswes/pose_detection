@@ -24,8 +24,8 @@ class DemoSessionService {
   DemoSessionService({
     required SessionRepository repository,
     required VideoProcessingService processingService,
-  })  : _repository = repository,
-        _processingService = processingService;
+  }) : _repository = repository,
+       _processingService = processingService;
 
   /// Whether the demo session still needs to be processed.
   Future<bool> needsProcessing() async {

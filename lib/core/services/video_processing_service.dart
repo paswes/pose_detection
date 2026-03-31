@@ -83,13 +83,15 @@ class VideoProcessingService {
 
       if (framePath == null) {
         // Frame extraction failed — store empty frame
-        frames.add(TrackedFrame(
-          sessionId: sessionId,
-          timestampMicros: timestampMicros,
-          landmarks: const [],
-          isPersonDetected: false,
-          personConfidence: 0.0,
-        ));
+        frames.add(
+          TrackedFrame(
+            sessionId: sessionId,
+            timestampMicros: timestampMicros,
+            landmarks: const [],
+            isPersonDetected: false,
+            personConfidence: 0.0,
+          ),
+        );
         onProgress?.call(i + 1, timestampsMs.length);
         continue;
       }
@@ -102,18 +104,19 @@ class VideoProcessingService {
       );
 
       // Build TrackedFrame with raw landmarks
-      final landmarks = pose?.landmarks
-              .map((l) => LandmarkData.fromLandmark(l))
-              .toList() ??
+      final landmarks =
+          pose?.landmarks.map((l) => LandmarkData.fromLandmark(l)).toList() ??
           const [];
 
-      frames.add(TrackedFrame(
-        sessionId: sessionId,
-        timestampMicros: timestampMicros,
-        landmarks: landmarks,
-        isPersonDetected: pose != null,
-        personConfidence: pose?.avgLikelihood ?? 0.0,
-      ));
+      frames.add(
+        TrackedFrame(
+          sessionId: sessionId,
+          timestampMicros: timestampMicros,
+          landmarks: landmarks,
+          isPersonDetected: pose != null,
+          personConfidence: pose?.avgLikelihood ?? 0.0,
+        ),
+      );
 
       // Clean up temp frame file immediately
       try {

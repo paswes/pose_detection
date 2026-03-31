@@ -171,8 +171,7 @@ class _VideoUploadPageState extends State<VideoUploadPage> {
           GestureDetector(
             onTap: () => _cubit.pickAndProcessVideo(),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFF4CAF50),
                 borderRadius: BorderRadius.circular(12),

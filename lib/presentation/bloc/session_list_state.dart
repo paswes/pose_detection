@@ -15,8 +15,7 @@ class SessionListInitializing extends SessionListState {
     this.totalFrames = 0,
   });
 
-  double get progress =>
-      totalFrames > 0 ? completedFrames / totalFrames : 0.0;
+  double get progress => totalFrames > 0 ? completedFrames / totalFrames : 0.0;
 }
 
 /// Sessions loaded successfully.

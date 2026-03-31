@@ -17,12 +17,13 @@ void showLandmarkDetailSheet({
   required LandmarkData landmark,
   required List<LandmarkData> allLandmarks,
   TrackedFrame? frame,
+  bool isDemo = false,
   Set<int> injuredLandmarkIds = const {},
   ValueChanged<int>? onLandmarkSelected,
   ValueChanged<int>? onInjuryToggled,
   VoidCallback? onDismissed,
 }) {
-  final schema = LandmarkSchema.rdl;
+  final schema = isDemo ? LandmarkSchema.rdl : LandmarkSchema.mlKit33;
 
   // Local mutable copy so the sheet can react to toggles immediately.
   final injuredIds = ValueNotifier<Set<int>>(Set<int>.from(injuredLandmarkIds));
@@ -37,6 +38,7 @@ void showLandmarkDetailSheet({
         schema,
         allLandmarks,
         frame,
+        isDemo,
         injuredIds.value,
         (id) {
           // Toggle locally + notify cubit
@@ -81,6 +83,7 @@ SliverWoltModalSheetPage _buildPage(
   LandmarkSchema schema,
   List<LandmarkData> allLandmarks,
   TrackedFrame? frame,
+  bool isDemo,
   Set<int> injuredLandmarkIds,
   ValueChanged<int> onInjuryToggled,
   ValueChanged<int> onConnectionTapped,
@@ -100,22 +103,22 @@ SliverWoltModalSheetPage _buildPage(
         padding: const EdgeInsets.fromLTRB(16, 32, 16, 48),
         sliver: SliverList.list(
           children: [
-            // Metrics section
-            Row(
-              spacing: 8,
-              children: [
-                for (final m in metrics)
-                  _MetricBox(
-                    label: m.label,
-                    value: m.value != null
-                        ? '${m.value!.toStringAsFixed(1)}°'
-                        : '–',
-                  ),
-              ],
-            ),
+            if (isDemo && metrics.isNotEmpty) ...[
+              Row(
+                spacing: 8,
+                children: [
+                  for (final m in metrics)
+                    _MetricBox(
+                      label: m.label,
+                      value: m.value != null
+                          ? '${m.value!.toStringAsFixed(1)}°'
+                          : '–',
+                    ),
+                ],
+              ),
+            ],
 
             const SizedBox(height: 24),
-
             // Selected landmark with green indicator + injury toggle
             Row(
               children: [

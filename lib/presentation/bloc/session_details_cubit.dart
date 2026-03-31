@@ -70,13 +70,13 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       // Set initial frame for the painter
       frameNotifier.value = frames.first;
 
-      // Pre-compute all reps so markers are visible from the start.
-      // Run through every frame, then reset the counter back to frame 0
-      // but keep the discovered reps list.
-      _repCounter.countRepsUpTo(frames, frames.length - 1);
-      _allReps = _repCounter.reps;
-      _repCounter.reset();
-      _repCounter.processFrame(frames.first, globalFrameIndex: 0);
+      // Pre-compute all reps so markers are visible from the start (demo only).
+      if (session.isDemo) {
+        _repCounter.countRepsUpTo(frames, frames.length - 1);
+        _allReps = _repCounter.reps;
+        _repCounter.reset();
+        _repCounter.processFrame(frames.first, globalFrameIndex: 0);
+      }
 
       emit(
         SessionDetailsLoaded(
@@ -138,16 +138,18 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
 
       // Process ALL intermediate frames so the rep counter never skips
       // state transitions when the position listener fires infrequently.
-      final prevIndex = current.currentFrameIndex;
-      if (newIndex > prevIndex) {
-        _repCounter.processFrameRange(
-          current.frames,
-          prevIndex + 1,
-          newIndex,
-        );
-      } else {
-        // Jumped backward (rare during playback) — replay from start
-        _repCounter.countRepsUpTo(current.frames, newIndex);
+      if (session.isDemo) {
+        final prevIndex = current.currentFrameIndex;
+        if (newIndex > prevIndex) {
+          _repCounter.processFrameRange(
+            current.frames,
+            prevIndex + 1,
+            newIndex,
+          );
+        } else {
+          // Jumped backward (rare during playback) — replay from start
+          _repCounter.countRepsUpTo(current.frames, newIndex);
+        }
       }
     }
 

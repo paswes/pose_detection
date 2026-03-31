@@ -105,7 +105,9 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
             cubit: _cubit,
             state: state,
             onBack: () => Navigator.pop(context),
-            onAnalyticsTapped: () => _openAnalytics(state),
+            onAnalyticsTapped: state.session.isDemo
+                ? () => _openAnalytics(state)
+                : null,
             onLandmarkTapped: (landmark) {
               _cubit.selectLandmark(landmark.id);
               showLandmarkDetailSheet(
@@ -113,6 +115,7 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
                 landmark: landmark,
                 allLandmarks: state.currentFrame?.landmarks ?? [],
                 frame: state.currentFrame,
+                isDemo: state.session.isDemo,
                 injuredLandmarkIds: state.injuredLandmarkIds,
                 onLandmarkSelected: (id) => _cubit.selectLandmark(id),
                 onInjuryToggled: (id) => _cubit.toggleLandmarkInjury(id),
@@ -229,8 +232,12 @@ class _VideoWithOverlay extends StatelessWidget {
                       isFrontCamera: state.session.isFrontCamera,
                       fitMode: FitMode.contain,
                       alignY: 0.0,
-                      schema: LandmarkSchema.rdl,
-                      visibleLandmarkIds: LandmarkSchema.rdlLandmarkIds,
+                      schema: state.session.isDemo
+                          ? LandmarkSchema.rdl
+                          : LandmarkSchema.mlKit33,
+                      visibleLandmarkIds: state.session.isDemo
+                          ? LandmarkSchema.rdlLandmarkIds
+                          : null,
                       selectedLandmarkId: state.selectedLandmarkId,
                       injuredLandmarkIds: state.injuredLandmarkIds,
                     ),
@@ -249,11 +256,12 @@ class _VideoWithOverlay extends StatelessWidget {
                         size: 28,
                       ),
                       const Spacer(),
-                      _OverlayBadge(
-                        value:
-                            '${_currentRepNumber(state)} of ${state.reps.length}',
-                        label: 'Reps',
-                      ),
+                      if (state.session.isDemo)
+                        _OverlayBadge(
+                          value:
+                              '${_currentRepNumber(state)} of ${state.reps.length}',
+                          label: 'Reps',
+                        ),
                       const Spacer(),
                       if (onAnalyticsTapped != null)
                         _OverlayButton(
@@ -283,9 +291,12 @@ class _VideoWithOverlay extends StatelessWidget {
       state.session.imageHeight,
     );
 
+    final visibleIds = state.session.isDemo
+        ? LandmarkSchema.rdlLandmarkIds
+        : null;
     final landmarks = <Landmark>[];
     for (final l in frame.landmarks) {
-      if (!LandmarkSchema.rdlLandmarkIds.contains(l.id)) continue;
+      if (visibleIds != null && !visibleIds.contains(l.id)) continue;
 
       var x = (l.x / state.session.imageWidth) * videoSize.width;
       final y = (l.y / state.session.imageHeight) * videoSize.height;
@@ -447,13 +458,13 @@ class _ControlsSheet extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Rep pills (tap to seek to rep start)
-                      if (state.reps.isNotEmpty)
+                      // Rep pills (tap to seek to rep start) — demo only
+                      if (state.session.isDemo && state.reps.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.all(8),
                           child: _RepPillRow(cubit: cubit, state: state),
                         ),
-                      if (state.reps.isNotEmpty) const SizedBox(height: 24),
+                      const SizedBox(height: 24),
                       // Frame scrubber
                       _RepMarkerSlider(
                         cubit: cubit,

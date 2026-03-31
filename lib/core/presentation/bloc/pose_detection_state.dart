@@ -1,8 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:equatable/equatable.dart';
 import 'package:pose_detection/core/domain/models/detected_pose.dart';
-import 'package:pose_detection/core/domain/models/detection_metrics.dart';
-import 'package:pose_detection/core/domain/models/person_detection_result.dart';
 
 /// States for PoseDetectionBloc
 sealed class PoseDetectionState extends Equatable {
@@ -37,46 +35,31 @@ class CameraReady extends PoseDetectionState {
 /// Actively detecting poses with real-time metrics
 class Detecting extends PoseDetectionState {
   final CameraController cameraController;
-  final DetectedPose? currentPose;
-  final DetectionMetrics metrics;
   final bool canSwitchCamera;
   final bool isFrontCamera;
-  final PersonDetectionResult personDetection;
 
-  Detecting({
+  const Detecting({
     required this.cameraController,
-    this.currentPose,
-    this.metrics = const DetectionMetrics(),
     this.canSwitchCamera = false,
     this.isFrontCamera = false,
-    PersonDetectionResult? personDetection,
-  }) : personDetection = personDetection ?? PersonDetectionResult.noPose();
+  });
 
   Detecting copyWith({
-    DetectedPose? currentPose,
-    DetectionMetrics? metrics,
     bool? canSwitchCamera,
     bool? isFrontCamera,
-    PersonDetectionResult? personDetection,
   }) {
     return Detecting(
       cameraController: cameraController,
-      currentPose: currentPose ?? this.currentPose,
-      metrics: metrics ?? this.metrics,
       canSwitchCamera: canSwitchCamera ?? this.canSwitchCamera,
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
-      personDetection: personDetection ?? this.personDetection,
     );
   }
 
   @override
   List<Object?> get props => [
     cameraController,
-    currentPose,
-    metrics,
     canSwitchCamera,
     isFrontCamera,
-    personDetection,
   ];
 }
 
@@ -84,36 +67,32 @@ class Detecting extends PoseDetectionState {
 class Recording extends PoseDetectionState {
   final CameraController cameraController;
   final DetectedPose? currentPose;
-  final DetectionMetrics metrics;
   final bool isFrontCamera;
-  final PersonDetectionResult personDetection;
+  final bool isPersonDetected;
   final Duration recordingDuration;
   final int frameCount;
 
-  Recording({
+  const Recording({
     required this.cameraController,
     this.currentPose,
-    this.metrics = const DetectionMetrics(),
     this.isFrontCamera = false,
-    PersonDetectionResult? personDetection,
+    this.isPersonDetected = false,
     this.recordingDuration = Duration.zero,
     this.frameCount = 0,
-  }) : personDetection = personDetection ?? PersonDetectionResult.noPose();
+  });
 
   Recording copyWith({
     DetectedPose? currentPose,
     bool clearPose = false,
-    DetectionMetrics? metrics,
-    PersonDetectionResult? personDetection,
+    bool? isPersonDetected,
     Duration? recordingDuration,
     int? frameCount,
   }) {
     return Recording(
       cameraController: cameraController,
       currentPose: clearPose ? null : (currentPose ?? this.currentPose),
-      metrics: metrics ?? this.metrics,
       isFrontCamera: isFrontCamera,
-      personDetection: personDetection ?? this.personDetection,
+      isPersonDetected: isPersonDetected ?? this.isPersonDetected,
       recordingDuration: recordingDuration ?? this.recordingDuration,
       frameCount: frameCount ?? this.frameCount,
     );
@@ -123,9 +102,8 @@ class Recording extends PoseDetectionState {
   List<Object?> get props => [
     cameraController,
     currentPose,
-    metrics,
     isFrontCamera,
-    personDetection,
+    isPersonDetected,
     recordingDuration,
     frameCount,
   ];

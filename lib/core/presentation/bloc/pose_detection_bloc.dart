@@ -4,24 +4,19 @@ import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pose_detection/core/config/pose_detection_config.dart';
 import 'package:pose_detection/core/interfaces/camera_service_interface.dart';
 import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
 import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
-import 'package:pose_detection/core/services/error_tracker.dart';
-import 'package:pose_detection/core/services/frame_processor.dart';
 import 'package:pose_detection/core/services/recording_service.dart';
 import 'package:pose_detection/core/data/models/session.dart';
 import 'package:pose_detection/core/data/repositories/session_repository.dart';
-import 'package:pose_detection/core/domain/models/detection_metrics.dart';
 import 'package:pose_detection/core/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/core/presentation/bloc/pose_detection_state.dart';
 
 /// BLoC for pose detection with session recording support.
 class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   final ICameraService _cameraService;
-  final FrameProcessor _frameProcessor;
-  final ErrorTracker _errorTracker;
+  final IPoseDetector _poseDetector;
   final IPersonValidator _personValidator;
   final RecordingService _recordingService;
   final SessionRepository _sessionRepository;
@@ -31,23 +26,18 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   Timer? _recordingTimer;
   RecordingResult? _pendingResult;
 
-  // FPS calculation using rolling window
-  final List<int> _frameTimestamps = [];
-  static const _fpsWindowMs = 1000;
-
-  // Current metrics
-  double _lastLatencyMs = 0.0;
+  // Inline error tracking (replaces ErrorTracker)
+  int _consecutiveErrors = 0;
+  static const _maxConsecutiveErrors = 10;
 
   PoseDetectionBloc({
     required ICameraService cameraService,
     required IPoseDetector poseDetector,
-    required PoseDetectionConfig config,
     required IPersonValidator personValidator,
     required RecordingService recordingService,
     required SessionRepository sessionRepository,
   }) : _cameraService = cameraService,
-       _frameProcessor = FrameProcessor(poseDetector: poseDetector),
-       _errorTracker = ErrorTracker(config: config),
+       _poseDetector = poseDetector,
        _personValidator = personValidator,
        _recordingService = recordingService,
        _sessionRepository = sessionRepository,
@@ -63,21 +53,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     on<SaveSessionEvent>(_onSaveSession);
     on<RecordingTickEvent>(_onRecordingTick);
     on<DisposeEvent>(_onDispose);
-  }
-
-  double _calculateFps() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    _frameTimestamps.removeWhere((t) => now - t > _fpsWindowMs);
-    return _frameTimestamps.length.toDouble();
-  }
-
-  void _recordFpsFrame() {
-    _frameTimestamps.add(DateTime.now().millisecondsSinceEpoch);
-  }
-
-  void _resetMetrics() {
-    _frameTimestamps.clear();
-    _lastLatencyMs = 0.0;
   }
 
   void _startImageStream() {
@@ -130,8 +105,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       _isStreamingActive = false;
     }
 
-    _errorTracker.reset();
-    _resetMetrics();
+    _consecutiveErrors = 0;
 
     final controller = _cameraService.controller;
     if (controller == null || !controller.value.isInitialized) {
@@ -170,8 +144,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       _isStreamingActive = false;
     }
 
-    _errorTracker.reset();
-    _resetMetrics();
+    _consecutiveErrors = 0;
 
     final controller = _cameraService.controller;
     if (controller == null || !controller.value.isInitialized) {
@@ -297,10 +270,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     if (state is Recording) return;
 
     final wasDetecting = state is Detecting;
-    final previousPose = wasDetecting ? (state as Detecting).currentPose : null;
-    final previousMetrics = wasDetecting
-        ? (state as Detecting).metrics
-        : const DetectionMetrics();
 
     try {
       emit(CameraInitializing());
@@ -319,8 +288,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         emit(
           Detecting(
             cameraController: controller,
-            currentPose: previousPose,
-            metrics: previousMetrics,
             canSwitchCamera: _cameraService.canSwitchCamera,
             isFrontCamera:
                 _cameraService.currentLensDirection ==
@@ -340,9 +307,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     Emitter<PoseDetectionState> emit,
   ) async {
     final wasDetecting = state is Detecting;
-    final previousMetrics = wasDetecting
-        ? (state as Detecting).metrics
-        : const DetectionMetrics();
 
     try {
       emit(CameraInitializing());
@@ -361,8 +325,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         emit(
           Detecting(
             cameraController: controller,
-            currentPose: null, // Clear pose since image dimensions changed
-            metrics: previousMetrics,
             canSwitchCamera: _cameraService.canSwitchCamera,
             isFrontCamera:
                 _cameraService.currentLensDirection ==
@@ -385,61 +347,46 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     _isProcessingFrame = true;
 
     try {
-      final result = await _frameProcessor.processFrame(
+      final pose = await _poseDetector.detectPose(
         image: event.image,
         sensorOrientation: event.sensorOrientation,
-        captureTimestampMicros: event.timestampMicros,
       );
 
-      if (result.success) {
-        _errorTracker.recordSuccess();
-        _recordFpsFrame();
-        _lastLatencyMs = result.latencyMs;
+      _consecutiveErrors = 0;
 
-        // Only process frames during active recording.
-        // Detection is not needed in idle/preview states.
-        if (state is! Recording) return;
+      // Only process frames during active recording.
+      // Detection is not needed in idle/preview states.
+      if (state is! Recording) return;
 
-        final personDetection = _personValidator.validate(result.pose);
+      final isPersonDetected = _personValidator.validate(pose);
 
-        // Record ALL frames during recording, including no-person frames.
-        // This enables true 1:1 playback matching the recording experience.
-        // Frames without person detection will have empty landmarks array.
-        _recordingService.recordFrame(
-          result.pose,
-          personDetection,
-          event.timestampMicros,
-        );
+      // Record ALL frames during recording, including no-person frames.
+      // This enables true 1:1 playback matching the recording experience.
+      // Frames without person detection will have empty landmarks array.
+      _recordingService.recordFrame(
+        pose,
+        isPersonDetected,
+        event.timestampMicros,
+      );
 
-        emit(
-          (state as Recording).copyWith(
-            currentPose: personDetection.isPersonDetected ? result.pose : null,
-            clearPose: !personDetection.isPersonDetected,
-            metrics: DetectionMetrics(
-              fps: _calculateFps(),
-              latencyMs: _lastLatencyMs,
-            ),
-            personDetection: personDetection,
-            frameCount: _recordingService.frameCount,
-          ),
-        );
-      } else {
-        _handleError(emit, result.error ?? 'Unknown error');
-      }
+      emit(
+        (state as Recording).copyWith(
+          currentPose: isPersonDetected ? pose : null,
+          clearPose: !isPersonDetected,
+          isPersonDetected: isPersonDetected,
+          frameCount: _recordingService.frameCount,
+        ),
+      );
     } catch (e) {
-      _handleError(emit, e.toString());
+      _consecutiveErrors++;
+
+      if (_consecutiveErrors >= _maxConsecutiveErrors) {
+        _cameraService.stopImageStream();
+        _isStreamingActive = false;
+        emit(PoseDetectionError('Too many consecutive errors. Last: $e'));
+      }
     } finally {
       _isProcessingFrame = false;
-    }
-  }
-
-  void _handleError(Emitter<PoseDetectionState> emit, String message) {
-    _errorTracker.recordError();
-
-    if (_errorTracker.hasExceededThreshold) {
-      _cameraService.stopImageStream();
-      _isStreamingActive = false;
-      emit(PoseDetectionError('Too many consecutive errors. Last: $message'));
     }
   }
 
@@ -449,6 +396,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
   ) async {
     _recordingTimer?.cancel();
     _cameraService.dispose();
-    _frameProcessor.dispose();
+    _poseDetector.dispose();
   }
 }

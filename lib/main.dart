@@ -9,7 +9,7 @@ Future<void> main() async {
   await initializeDependencies(
     featureRegistrars: [registerRdlDependencies],
     analyzerResolver: rdlAnalyzerResolver,
-    demoServiceFactory: rdlDemoService,
+    beforeLoad: () => ensureRdlDemo(sl),
   );
   runApp(const PoseEngineApp());
 }

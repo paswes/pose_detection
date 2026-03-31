@@ -30,11 +30,4 @@ class DetectedPose {
   /// Number of landmarks
   int get landmarkCount => landmarks.length;
 
-  /// Count of landmarks with high likelihood (> 0.8)
-  int get highLikelihoodCount =>
-      landmarks.where((l) => l.likelihood > 0.8).length;
-
-  /// Count of landmarks with low likelihood (< 0.5)
-  int get lowLikelihoodCount =>
-      landmarks.where((l) => l.likelihood < 0.5).length;
 }

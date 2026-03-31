@@ -23,7 +23,6 @@ class LandmarkOverlayPainter extends CustomPainter {
   final LandmarkSchema _schema;
   final Set<int>? _visibleIds;
   final int? selectedLandmarkId;
-  final Set<int> injuredLandmarkIds;
   final double alignY;
 
   LandmarkOverlayPainter({
@@ -34,7 +33,6 @@ class LandmarkOverlayPainter extends CustomPainter {
     this.isFrontCamera = false,
     this.fitMode = FitMode.cover,
     this.selectedLandmarkId,
-    this.injuredLandmarkIds = const {},
     this.alignY = 0.5,
     LandmarkSchema? schema,
     Set<int>? visibleLandmarkIds,
@@ -116,10 +114,7 @@ class LandmarkOverlayPainter extends CustomPainter {
       final isSelected = id == selectedLandmarkId;
 
       final baseRadius = 4.0 + (depth * 4.0);
-      final isInjured = injuredLandmarkIds.contains(id);
-      final color = isInjured
-          ? const Color(0xFFF44336)
-          : _getLikelihoodColor(likelihood);
+      final color = _getLikelihoodColor(likelihood);
       final dimFactor = hasSelection && !isSelected ? 0.2 : 1.0;
       final drawRadius = isSelected ? baseRadius * 2.0 : baseRadius;
 
@@ -233,7 +228,6 @@ class LandmarkOverlayPainter extends CustomPainter {
         oldDelegate._schema != _schema ||
         oldDelegate._visibleIds != _visibleIds ||
         oldDelegate.selectedLandmarkId != selectedLandmarkId ||
-        oldDelegate.injuredLandmarkIds != injuredLandmarkIds ||
         oldDelegate.alignY != alignY;
   }
 }

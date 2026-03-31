@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'package:pose_detection/core/interfaces/demo_session_service.dart';
-import 'package:pose_detection/core/services/video_processing_service.dart';
+import 'package:pose_detection/rdl_example/domain/demo_session_service.dart';
+import 'package:pose_detection/rdl_example/data/video_processing_service.dart';
 import 'package:pose_detection/core/data/models/session.dart';
 import 'package:pose_detection/core/data/repositories/session_repository.dart';
 

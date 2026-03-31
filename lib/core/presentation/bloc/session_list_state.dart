@@ -5,17 +5,9 @@ sealed class SessionListState {
   const SessionListState();
 }
 
-/// Demo video is being processed on first launch.
-class SessionListInitializing extends SessionListState {
-  final int completedFrames;
-  final int totalFrames;
-
-  const SessionListInitializing({
-    this.completedFrames = 0,
-    this.totalFrames = 0,
-  });
-
-  double get progress => totalFrames > 0 ? completedFrames / totalFrames : 0.0;
+/// Loading sessions (and optionally running feature setup like demo seeding).
+class SessionListLoading extends SessionListState {
+  const SessionListLoading();
 }
 
 /// Sessions loaded successfully.

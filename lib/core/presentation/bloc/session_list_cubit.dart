@@ -1,39 +1,31 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:pose_detection/core/interfaces/demo_session_service.dart';
 import 'package:pose_detection/core/data/repositories/session_repository.dart';
 import 'package:pose_detection/core/presentation/bloc/session_list_state.dart';
+
+/// Optional async setup hook called before loading sessions.
+/// Features can use this to seed demo data, run migrations, etc.
+typedef BeforeLoadHook = Future<void> Function();
 
 /// Cubit for managing the session list on the home page.
 class SessionListCubit extends Cubit<SessionListState> {
   final SessionRepository _repository;
-  final DemoSessionService? _demoService;
+  final BeforeLoadHook? _beforeLoad;
+  bool _hasRunBeforeLoad = false;
 
   SessionListCubit({
     required SessionRepository repository,
-    DemoSessionService? demoService,
+    BeforeLoadHook? beforeLoad,
   }) : _repository = repository,
-       _demoService = demoService,
-       super(const SessionListInitializing());
+       _beforeLoad = beforeLoad,
+       super(const SessionListLoading());
 
-  /// Seed the demo session (if needed) and load all sessions.
+  /// Run optional setup hook (once) then load all sessions.
   Future<void> loadSessions() async {
-    final demoService = _demoService;
-    if (demoService != null) {
-      final needsDemo = await demoService.needsProcessing();
-      if (needsDemo) {
-        emit(const SessionListInitializing());
-        await demoService.ensureDemoSession(
-          onProgress: (completed, total) {
-            emit(
-              SessionListInitializing(
-                completedFrames: completed,
-                totalFrames: total,
-              ),
-            );
-          },
-        );
-      }
+    if (!_hasRunBeforeLoad && _beforeLoad != null) {
+      _hasRunBeforeLoad = true;
+      emit(const SessionListLoading());
+      await _beforeLoad();
     }
 
     final sessions = await _repository.getAllSessions();

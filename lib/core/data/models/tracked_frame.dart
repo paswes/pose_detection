@@ -1,21 +1,19 @@
 import 'dart:convert';
 
-import 'package:pose_detection/core/data/models/landmark_data.dart';
+import 'package:pose_detection/core/domain/models/landmark.dart';
 
 /// A single frame of tracking data stored per session.
 class TrackedFrame {
   final String sessionId;
   final int timestampMicros;
-  final List<LandmarkData> landmarks;
+  final List<Landmark> landmarks;
   final bool isPersonDetected;
-  final double personConfidence;
 
   const TrackedFrame({
     required this.sessionId,
     required this.timestampMicros,
     required this.landmarks,
     required this.isPersonDetected,
-    required this.personConfidence,
   });
 
   Map<String, dynamic> toMap() => {
@@ -23,12 +21,13 @@ class TrackedFrame {
     'timestamp_micros': timestampMicros,
     'landmarks_json': jsonEncode(landmarks.map((l) => l.toJson()).toList()),
     'is_person_detected': isPersonDetected ? 1 : 0,
-    'person_confidence': personConfidence,
+    // Legacy column kept for backwards compatibility with older DB versions
+    'person_confidence': 0.0,
   };
 
   factory TrackedFrame.fromMap(Map<String, dynamic> map) {
     final landmarksList = (jsonDecode(map['landmarks_json'] as String) as List)
-        .map((e) => LandmarkData.fromJson(e as Map<String, dynamic>))
+        .map((e) => Landmark.fromJson(e as Map<String, dynamic>))
         .toList();
 
     return TrackedFrame(
@@ -36,7 +35,6 @@ class TrackedFrame {
       timestampMicros: map['timestamp_micros'] as int,
       landmarks: landmarksList,
       isPersonDetected: (map['is_person_detected'] as int) == 1,
-      personConfidence: (map['person_confidence'] as num).toDouble(),
     );
   }
 }

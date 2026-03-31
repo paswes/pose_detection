@@ -3,10 +3,8 @@ import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pose_detection/core/data/models/landmark_data.dart';
 import 'package:pose_detection/core/data/models/tracked_frame.dart';
 import 'package:pose_detection/core/domain/models/detected_pose.dart';
-import 'package:pose_detection/core/domain/models/person_detection_result.dart';
 
 /// Manages recording state and frame collection during a capture session.
 class RecordingService {
@@ -42,7 +40,7 @@ class RecordingService {
 
   void recordFrame(
     DetectedPose? pose,
-    PersonDetectionResult personDetection,
+    bool isPersonDetected,
     int captureTimestampMicros,
   ) {
     if (!isRecording || _sessionId == null) return;
@@ -61,11 +59,8 @@ class RecordingService {
       // Use original capture timestamp (not post-detection) relative to video start
       timestampMicros: captureTimestampMicros - videoStart,
       // Store empty landmarks array when no person detected (pose == null)
-      landmarks:
-          pose?.landmarks.map((l) => LandmarkData.fromLandmark(l)).toList() ??
-          [],
-      isPersonDetected: personDetection.isPersonDetected,
-      personConfidence: pose?.avgLikelihood ?? 0.0,
+      landmarks: pose?.landmarks ?? [],
+      isPersonDetected: isPersonDetected,
     );
 
     _frames.add(frame);

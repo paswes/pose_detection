@@ -27,7 +27,6 @@ class SessionDetailsLoaded extends SessionDetailsState {
   final Duration videoPosition;
   final Duration videoDuration;
   final double playbackSpeed;
-  final Set<int> injuredLandmarkIds;
 
   const SessionDetailsLoaded({
     required this.session,
@@ -39,7 +38,6 @@ class SessionDetailsLoaded extends SessionDetailsState {
     this.videoPosition = Duration.zero,
     this.videoDuration = Duration.zero,
     this.playbackSpeed = 1.0,
-    this.injuredLandmarkIds = const {},
   });
 
   int get totalFrames => frames.length;
@@ -55,7 +53,6 @@ class SessionDetailsLoaded extends SessionDetailsState {
     Duration? videoPosition,
     Duration? videoDuration,
     double? playbackSpeed,
-    Set<int>? injuredLandmarkIds,
   }) {
     return SessionDetailsLoaded(
       session: session,
@@ -69,7 +66,6 @@ class SessionDetailsLoaded extends SessionDetailsState {
       videoPosition: videoPosition ?? this.videoPosition,
       videoDuration: videoDuration ?? this.videoDuration,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
-      injuredLandmarkIds: injuredLandmarkIds ?? this.injuredLandmarkIds,
     );
   }
 
@@ -84,7 +80,6 @@ class SessionDetailsLoaded extends SessionDetailsState {
     videoPosition,
     videoDuration,
     playbackSpeed,
-    injuredLandmarkIds,
   ];
 }
 

@@ -5,8 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
-import 'package:pose_detection/core/services/static_image_pose_detector.dart';
-import 'package:pose_detection/core/data/models/landmark_data.dart';
+import 'package:pose_detection/rdl_example/data/static_image_pose_detector.dart';
 import 'package:pose_detection/core/data/models/tracked_frame.dart';
 
 /// Result of processing an uploaded video through pose detection.
@@ -89,7 +88,6 @@ class VideoProcessingService {
             timestampMicros: timestampMicros,
             landmarks: const [],
             isPersonDetected: false,
-            personConfidence: 0.0,
           ),
         );
         onProgress?.call(i + 1, timestampsMs.length);
@@ -104,17 +102,12 @@ class VideoProcessingService {
       );
 
       // Build TrackedFrame with raw landmarks
-      final landmarks =
-          pose?.landmarks.map((l) => LandmarkData.fromLandmark(l)).toList() ??
-          const [];
-
       frames.add(
         TrackedFrame(
           sessionId: sessionId,
           timestampMicros: timestampMicros,
-          landmarks: landmarks,
+          landmarks: pose?.landmarks ?? const [],
           isPersonDetected: pose != null,
-          personConfidence: pose?.avgLikelihood ?? 0.0,
         ),
       );
 

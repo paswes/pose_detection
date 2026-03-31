@@ -49,9 +49,41 @@ class _HomePageState extends State<HomePage> {
       value: _cubit,
       child: BlocBuilder<SessionListCubit, SessionListState>(
         builder: (context, state) => switch (state) {
-          SessionListInitializing() => _InitializingScreen(state: state),
+          SessionListLoading() => _buildLoadingScreen(),
           SessionListLoaded() => _buildLoadedScaffold(state),
         },
+      ),
+    );
+  }
+
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset('assets/logo.png', width: 240, height: 240),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: const LinearProgressIndicator(
+                    backgroundColor: Color(0xFF2A2A2A),
+                    color: Color(0xFF4AE6D7),
+                    minHeight: 4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Wird geladen...',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF888888)),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -139,66 +171,6 @@ class _HomePageState extends State<HomePage> {
     );
 
     return confirmed == true;
-  }
-}
-
-// -- Initializing Screen --
-
-class _InitializingScreen extends StatelessWidget {
-  final SessionListInitializing state;
-
-  const _InitializingScreen({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                Spacer(),
-                Image.asset(
-                  'assets/logo.png',
-                  width: 240,
-                  height: 240,
-                ),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: state.totalFrames > 0 ? state.progress : null,
-                    backgroundColor: const Color(0xFF2A2A2A),
-                    color: const Color(0xFF4AE6D7),
-                    minHeight: 4,
-                  ),
-                ),
-                if (state.totalFrames > 0) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    state.totalFrames > 0
-                        ? 'Demo wird vorbereitet...'
-                        : 'Wird geladen...',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF888888),
-                    ),
-                  ),
-                ],
-                Spacer(),
-                Image.asset(
-                  'assets/powered_by.png',
-                  width: 300,
-                  height: 64,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

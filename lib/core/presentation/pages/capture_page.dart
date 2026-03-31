@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/core/domain/models/detected_pose.dart';
-import 'package:pose_detection/core/domain/models/person_detection_result.dart';
 import 'package:pose_detection/core/presentation/bloc/pose_detection_bloc.dart';
 import 'package:pose_detection/core/presentation/bloc/pose_detection_event.dart';
 import 'package:pose_detection/core/presentation/bloc/pose_detection_state.dart';
@@ -214,14 +213,14 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
         ),
 
         // Pose overlay
-        if (state.currentPose != null && state.personDetection.isPersonDetected)
+        if (state.currentPose != null && state.isPersonDetected)
           _buildPoseOverlayFromRecording(state),
 
         // Back button (top-left)
         _buildBackButton(),
 
         // Person indicator (top-right)
-        _buildPersonIndicatorFromResult(state.personDetection),
+        _buildPersonIndicator(state.isPersonDetected),
 
         // Bottom: recording time (left) + stop button (right)
         _buildRecordingControls(state),
@@ -286,11 +285,7 @@ class _CapturePageState extends State<CapturePage> with WidgetsBindingObserver {
     return overlay;
   }
 
-  Widget _buildPersonIndicatorFromResult(
-    PersonDetectionResult personDetection,
-  ) {
-    final isPersonDetected = personDetection.isPersonDetected;
-
+  Widget _buildPersonIndicator(bool isPersonDetected) {
     return SafeArea(
       child: Align(
         alignment: Alignment.topRight,

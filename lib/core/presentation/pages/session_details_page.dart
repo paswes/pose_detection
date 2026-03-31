@@ -5,7 +5,6 @@ import 'package:video_player/video_player.dart';
 
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
-import 'package:pose_detection/core/data/models/landmark_data.dart';
 import 'package:pose_detection/core/data/models/session.dart';
 import 'package:pose_detection/core/domain/models/landmark.dart';
 import 'package:pose_detection/core/presentation/bloc/session_details_cubit.dart';
@@ -115,9 +114,7 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
                 allLandmarks: state.currentFrame?.landmarks ?? [],
                 frame: state.currentFrame,
                 analyzer: _cubit.analyzer,
-                injuredLandmarkIds: state.injuredLandmarkIds,
                 onLandmarkSelected: (id) => _cubit.selectLandmark(id),
-                onInjuryToggled: (id) => _cubit.toggleLandmarkInjury(id),
                 onDismissed: () => _cubit.selectLandmark(null),
               );
             },
@@ -149,7 +146,7 @@ class _VideoWithOverlay extends StatelessWidget {
   final SessionDetailsLoaded state;
   final VoidCallback onBack;
   final VoidCallback? onAnalyticsTapped;
-  final ValueChanged<LandmarkData> onLandmarkTapped;
+  final ValueChanged<Landmark> onLandmarkTapped;
 
   const _VideoWithOverlay({
     required this.cubit,
@@ -215,7 +212,6 @@ class _VideoWithOverlay extends StatelessWidget {
                       schema: analyzer?.schema,
                       visibleLandmarkIds: analyzer?.visibleLandmarkIds,
                       selectedLandmarkId: state.selectedLandmarkId,
-                      injuredLandmarkIds: state.injuredLandmarkIds,
                     ),
                   ),
                 ),

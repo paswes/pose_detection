@@ -4,7 +4,7 @@ import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/interfaces/exercise_analyzer.dart';
-import 'package:pose_detection/core/data/models/landmark_data.dart';
+import 'package:pose_detection/core/domain/models/landmark.dart';
 import 'package:pose_detection/core/data/models/tracked_frame.dart';
 
 /// Shows a bottom sheet with details for a single pose landmark.
@@ -14,23 +14,18 @@ import 'package:pose_detection/core/data/models/tracked_frame.dart';
 /// details and connections only.
 void showLandmarkDetailSheet({
   required BuildContext context,
-  required LandmarkData landmark,
-  required List<LandmarkData> allLandmarks,
+  required Landmark landmark,
+  required List<Landmark> allLandmarks,
   TrackedFrame? frame,
   ExerciseAnalyzer? analyzer,
-  Set<int> injuredLandmarkIds = const {},
   ValueChanged<int>? onLandmarkSelected,
-  ValueChanged<int>? onInjuryToggled,
   VoidCallback? onDismissed,
 }) {
   final schema = analyzer?.schema ?? LandmarkSchema.mlKit33;
 
-  // Local mutable copy so the sheet can react to toggles immediately.
-  final injuredIds = ValueNotifier<Set<int>>(Set<int>.from(injuredLandmarkIds));
-
   late final ValueNotifier<WoltModalSheetPageListBuilder> pageListNotifier;
 
-  void rebuildPage(LandmarkData current) {
+  void rebuildPage(Landmark current) {
     pageListNotifier.value = (ctx) => [
       _buildPage(
         ctx,
@@ -39,19 +34,6 @@ void showLandmarkDetailSheet({
         allLandmarks,
         frame,
         analyzer,
-        injuredIds.value,
-        (id) {
-          // Toggle locally + notify cubit
-          final updated = Set<int>.from(injuredIds.value);
-          if (updated.contains(id)) {
-            updated.remove(id);
-          } else {
-            updated.add(id);
-          }
-          injuredIds.value = updated;
-          onInjuryToggled?.call(id);
-          rebuildPage(current);
-        },
         (id) {
           onLandmarkSelected?.call(id);
           final next = allLandmarks.firstWhere((l) => l.id == id);
@@ -72,26 +54,22 @@ void showLandmarkDetailSheet({
     modalBarrierColor: Colors.black54,
   ).whenComplete(() {
     pageListNotifier.dispose();
-    injuredIds.dispose();
     onDismissed?.call();
   });
 }
 
 SliverWoltModalSheetPage _buildPage(
   BuildContext context,
-  LandmarkData landmark,
+  Landmark landmark,
   LandmarkSchema schema,
-  List<LandmarkData> allLandmarks,
+  List<Landmark> allLandmarks,
   TrackedFrame? frame,
   ExerciseAnalyzer? analyzer,
-  Set<int> injuredLandmarkIds,
-  ValueChanged<int> onInjuryToggled,
   ValueChanged<int> onConnectionTapped,
 ) {
   final name = schema.getLandmarkName(landmark.id);
   final connections = _getConnectedLandmarks(landmark.id, schema, allLandmarks);
   final metrics = analyzer?.computeDetailMetrics(frame) ?? [];
-  final isInjured = injuredLandmarkIds.contains(landmark.id);
 
   return SliverWoltModalSheetPage(
     backgroundColor: const Color(0xFF1E1E1E),
@@ -115,16 +93,14 @@ SliverWoltModalSheetPage _buildPage(
               const SizedBox(height: 24),
             ],
 
-            // Selected landmark with green indicator + injury toggle
+            // Selected landmark with indicator
             Row(
               children: [
                 Container(
                   width: 10,
                   height: 10,
-                  decoration: BoxDecoration(
-                    color: isInjured
-                        ? const Color(0xFFF44336)
-                        : const Color(0xFF4CAF50),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF4CAF50),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -139,35 +115,6 @@ SliverWoltModalSheetPage _buildPage(
                     ),
                   ),
                 ),
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    onInjuryToggled(landmark.id);
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isInjured
-                          ? const Color(0xFFF44336).withValues(alpha: 0.15)
-                          : const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Schmerz',
-                      style: TextStyle(
-                        color: isInjured
-                            ? const Color(0xFFF44336)
-                            : const Color(0xFF666666),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
 
@@ -177,7 +124,6 @@ SliverWoltModalSheetPage _buildPage(
               ...connections.map(
                 (conn) => _ConnectionRow(
                   name: conn.name,
-                  isInjured: injuredLandmarkIds.contains(conn.id),
                   onTap: () {
                     HapticFeedback.selectionClick();
                     onConnectionTapped(conn.id);
@@ -199,7 +145,7 @@ typedef _Connection = ({int id, String name});
 List<_Connection> _getConnectedLandmarks(
   int landmarkId,
   LandmarkSchema schema,
-  List<LandmarkData> allLandmarks,
+  List<Landmark> allLandmarks,
 ) {
   final presentIds = {for (final l in allLandmarks) l.id};
   final connectedIds = <int>{};
@@ -262,12 +208,10 @@ class _MetricBox extends StatelessWidget {
 
 class _ConnectionRow extends StatelessWidget {
   final String name;
-  final bool isInjured;
   final VoidCallback onTap;
 
   const _ConnectionRow({
     required this.name,
-    this.isInjured = false,
     required this.onTap,
   });
 
@@ -283,10 +227,8 @@ class _ConnectionRow extends StatelessWidget {
             Container(
               width: 6,
               height: 6,
-              decoration: BoxDecoration(
-                color: isInjured
-                    ? const Color(0xFFF44336)
-                    : const Color(0xFF666666),
+              decoration: const BoxDecoration(
+                color: Color(0xFF666666),
                 shape: BoxShape.circle,
               ),
             ),
@@ -294,8 +236,8 @@ class _ConnectionRow extends StatelessWidget {
             Expanded(
               child: Text(
                 name,
-                style: TextStyle(
-                  color: const Color(0xFFCCCCCC),
+                style: const TextStyle(
+                  color: Color(0xFFCCCCCC),
                   fontSize: 14,
                 ),
               ),

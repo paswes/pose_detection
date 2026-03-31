@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
-import 'package:pose_detection/core/data/models/landmark_data.dart';
+import 'package:pose_detection/core/domain/models/landmark.dart';
 import 'package:pose_detection/core/data/models/tracked_frame.dart';
 
 /// Phase of a single RDL repetition.
@@ -447,7 +447,7 @@ class RdlRepCounter {
   }
 
   /// Find a landmark by ID with minimum confidence, or return `null`.
-  static LandmarkData? _findLandmark(TrackedFrame frame, int id) {
+  static Landmark? _findLandmark(TrackedFrame frame, int id) {
     for (final l in frame.landmarks) {
       if (l.id == id && l.likelihood >= _minLikelihood) return l;
     }

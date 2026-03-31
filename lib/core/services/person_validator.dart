@@ -2,7 +2,6 @@ import 'package:pose_detection/core/config/landmark_schema.dart';
 import 'package:pose_detection/core/interfaces/person_validator_interface.dart';
 import 'package:pose_detection/core/domain/models/detected_pose.dart';
 import 'package:pose_detection/core/domain/models/landmark.dart';
-import 'package:pose_detection/core/domain/models/person_detection_result.dart';
 
 /// Validates if a detected pose represents a real person.
 ///
@@ -30,10 +29,8 @@ class PersonValidator implements IPersonValidator {
   static const int _minFaceParts = 2;
 
   @override
-  PersonDetectionResult validate(DetectedPose? pose) {
-    if (pose == null) {
-      return PersonDetectionResult.noPose();
-    }
+  bool validate(DetectedPose? pose) {
+    if (pose == null) return false;
 
     // Core landmarks
     final nose = _getLandmark(pose, LandmarkSchema.nose);
@@ -56,9 +53,7 @@ class PersonValidator implements IPersonValidator {
         _hasMinLikelihood(leftHip) &&
         _hasMinLikelihood(rightHip);
 
-    if (!hasAllLikelihood) {
-      return PersonDetectionResult.noPose();
-    }
+    if (!hasAllLikelihood) return false;
 
     // Calculate metrics
     final shoulderCenterY = (leftShoulder!.y + rightShoulder!.y) / 2;
@@ -104,8 +99,7 @@ class PersonValidator implements IPersonValidator {
     final faceOk = facePartsDetected >= _minFaceParts;
 
     // Final decision: all checks must pass
-    final isPersonDetected =
-        headAboveShoulders &&
+    return headAboveShoulders &&
         shouldersAboveHips &&
         proportionsOk &&
         minSizeOk &&
@@ -113,26 +107,6 @@ class PersonValidator implements IPersonValidator {
         hipSymmetryOk &&
         neckOk &&
         faceOk;
-
-    return PersonDetectionResult(
-      isPersonDetected: isPersonDetected,
-      shoulderWidth: shoulderWidth,
-      torsoLength: torsoLength,
-      ratio: ratio,
-      minSizeOk: minSizeOk,
-      proportionsOk: proportionsOk,
-      headAboveShoulders: headAboveShoulders,
-      shouldersAboveHips: shouldersAboveHips,
-      shoulderSymmetry: shoulderSymmetry,
-      shoulderSymmetryOk: shoulderSymmetryOk,
-      hipSymmetry: hipSymmetry,
-      hipSymmetryOk: hipSymmetryOk,
-      neckLength: neckLength,
-      neckRatio: neckRatio,
-      neckOk: neckOk,
-      facePartsDetected: facePartsDetected,
-      faceOk: faceOk,
-    );
   }
 
   Landmark? _getLandmark(DetectedPose pose, int id) {

@@ -114,7 +114,13 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
                 allLandmarks: state.currentFrame?.landmarks ?? [],
                 frame: state.currentFrame,
                 analyzer: _cubit.analyzer,
+                injuredLandmarkIds:
+                    _cubit.analyzer?.injuredLandmarkIds ?? const {},
                 onLandmarkSelected: (id) => _cubit.selectLandmark(id),
+                onInjuryToggled: (id) {
+                  _cubit.analyzer?.toggleInjury(id);
+                  setState(() {});
+                },
                 onDismissed: () => _cubit.selectLandmark(null),
               );
             },
@@ -212,6 +218,8 @@ class _VideoWithOverlay extends StatelessWidget {
                       schema: analyzer?.schema,
                       visibleLandmarkIds: analyzer?.visibleLandmarkIds,
                       selectedLandmarkId: state.selectedLandmarkId,
+                      injuredLandmarkIds:
+                          analyzer?.injuredLandmarkIds ?? const {},
                     ),
                   ),
                 ),

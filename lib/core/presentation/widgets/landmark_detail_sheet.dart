@@ -18,10 +18,15 @@ void showLandmarkDetailSheet({
   required List<Landmark> allLandmarks,
   TrackedFrame? frame,
   ExerciseAnalyzer? analyzer,
+  Set<int> injuredLandmarkIds = const {},
   ValueChanged<int>? onLandmarkSelected,
+  ValueChanged<int>? onInjuryToggled,
   VoidCallback? onDismissed,
 }) {
   final schema = analyzer?.schema ?? LandmarkSchema.mlKit33;
+
+  // Local mutable copy so the sheet can react to toggles immediately.
+  final injuredIds = ValueNotifier<Set<int>>(Set<int>.from(injuredLandmarkIds));
 
   late final ValueNotifier<WoltModalSheetPageListBuilder> pageListNotifier;
 
@@ -34,6 +39,19 @@ void showLandmarkDetailSheet({
         allLandmarks,
         frame,
         analyzer,
+        injuredIds.value,
+        (id) {
+          // Toggle locally + notify caller
+          final updated = Set<int>.from(injuredIds.value);
+          if (updated.contains(id)) {
+            updated.remove(id);
+          } else {
+            updated.add(id);
+          }
+          injuredIds.value = updated;
+          onInjuryToggled?.call(id);
+          rebuildPage(current);
+        },
         (id) {
           onLandmarkSelected?.call(id);
           final next = allLandmarks.firstWhere((l) => l.id == id);
@@ -54,6 +72,7 @@ void showLandmarkDetailSheet({
     modalBarrierColor: Colors.black54,
   ).whenComplete(() {
     pageListNotifier.dispose();
+    injuredIds.dispose();
     onDismissed?.call();
   });
 }
@@ -65,11 +84,14 @@ SliverWoltModalSheetPage _buildPage(
   List<Landmark> allLandmarks,
   TrackedFrame? frame,
   ExerciseAnalyzer? analyzer,
+  Set<int> injuredLandmarkIds,
+  ValueChanged<int> onInjuryToggled,
   ValueChanged<int> onConnectionTapped,
 ) {
   final name = schema.getLandmarkName(landmark.id);
   final connections = _getConnectedLandmarks(landmark.id, schema, allLandmarks);
   final metrics = analyzer?.computeDetailMetrics(frame) ?? [];
+  final isInjured = injuredLandmarkIds.contains(landmark.id);
 
   return SliverWoltModalSheetPage(
     backgroundColor: const Color(0xFF1E1E1E),
@@ -93,14 +115,16 @@ SliverWoltModalSheetPage _buildPage(
               const SizedBox(height: 24),
             ],
 
-            // Selected landmark with indicator
+            // Selected landmark with green/red indicator + injury toggle
             Row(
               children: [
                 Container(
                   width: 10,
                   height: 10,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF4CAF50),
+                  decoration: BoxDecoration(
+                    color: isInjured
+                        ? const Color(0xFFF44336)
+                        : const Color(0xFF4CAF50),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -115,6 +139,35 @@ SliverWoltModalSheetPage _buildPage(
                     ),
                   ),
                 ),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    onInjuryToggled(landmark.id);
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isInjured
+                          ? const Color(0xFFF44336).withValues(alpha: 0.15)
+                          : const Color(0xFF2A2A2A),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Schmerz',
+                      style: TextStyle(
+                        color: isInjured
+                            ? const Color(0xFFF44336)
+                            : const Color(0xFF666666),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
 
@@ -124,6 +177,7 @@ SliverWoltModalSheetPage _buildPage(
               ...connections.map(
                 (conn) => _ConnectionRow(
                   name: conn.name,
+                  isInjured: injuredLandmarkIds.contains(conn.id),
                   onTap: () {
                     HapticFeedback.selectionClick();
                     onConnectionTapped(conn.id);
@@ -208,10 +262,12 @@ class _MetricBox extends StatelessWidget {
 
 class _ConnectionRow extends StatelessWidget {
   final String name;
+  final bool isInjured;
   final VoidCallback onTap;
 
   const _ConnectionRow({
     required this.name,
+    this.isInjured = false,
     required this.onTap,
   });
 
@@ -227,8 +283,10 @@ class _ConnectionRow extends StatelessWidget {
             Container(
               width: 6,
               height: 6,
-              decoration: const BoxDecoration(
-                color: Color(0xFF666666),
+              decoration: BoxDecoration(
+                color: isInjured
+                    ? const Color(0xFFF44336)
+                    : const Color(0xFF666666),
                 shape: BoxShape.circle,
               ),
             ),

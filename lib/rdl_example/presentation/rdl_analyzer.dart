@@ -17,6 +17,7 @@ import 'package:pose_detection/rdl_example/presentation/rdl_landmark_schema.dart
 class RdlAnalyzer implements ExerciseAnalyzer {
   final RdlRepCounter _counter = RdlRepCounter();
   List<RdlRepData> _allReps = const [];
+  final Set<int> _injuredIds = {};
 
   @override
   LandmarkSchema get schema => rdlSchema;
@@ -56,6 +57,18 @@ class RdlAnalyzer implements ExerciseAnalyzer {
   @override
   void reset() {
     _counter.reset();
+  }
+
+  @override
+  Set<int> get injuredLandmarkIds => _injuredIds;
+
+  @override
+  void toggleInjury(int id) {
+    if (_injuredIds.contains(id)) {
+      _injuredIds.remove(id);
+    } else {
+      _injuredIds.add(id);
+    }
   }
 
   // -- UI builders -----------------------------------------------------------

@@ -62,4 +62,10 @@ abstract class ExerciseAnalyzer {
 
   /// Full-page analytics widget. Null = no analytics button in HUD.
   Widget? buildAnalyticsPage(Session session);
+
+  /// Landmark IDs currently marked as injured/painful. Empty = none.
+  Set<int> get injuredLandmarkIds => const {};
+
+  /// Toggle injury marking for a landmark.
+  void toggleInjury(int id) {}
 }

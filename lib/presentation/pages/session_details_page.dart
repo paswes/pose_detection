@@ -3,8 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
-import 'package:pose_detection/core/config/landmark_schema.dart';
-import 'package:pose_detection/core/utils/rdl_rep_counter.dart';
 import 'package:pose_detection/core/di/service_locator.dart';
 import 'package:pose_detection/core/utils/coordinate_translator.dart';
 import 'package:pose_detection/data/models/landmark_data.dart';
@@ -12,7 +10,6 @@ import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/domain/models/landmark.dart';
 import 'package:pose_detection/presentation/bloc/session_details_cubit.dart';
 import 'package:pose_detection/presentation/bloc/session_details_state.dart';
-import 'package:pose_detection/presentation/pages/session_analytics_page.dart';
 import 'package:pose_detection/presentation/widgets/landmark_detail_sheet.dart';
 import 'package:pose_detection/presentation/widgets/landmark_overlay_painter.dart';
 
@@ -98,6 +95,8 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   }
 
   Widget _buildLoaded(SessionDetailsLoaded state) {
+    final analyticsPage = _cubit.analyzer?.buildAnalyticsPage(state.session);
+
     return Stack(
       children: [
         Positioned.fill(
@@ -105,7 +104,7 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
             cubit: _cubit,
             state: state,
             onBack: () => Navigator.pop(context),
-            onAnalyticsTapped: state.session.isDemo
+            onAnalyticsTapped: analyticsPage != null
                 ? () => _openAnalytics(state)
                 : null,
             onLandmarkTapped: (landmark) {
@@ -115,7 +114,7 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
                 landmark: landmark,
                 allLandmarks: state.currentFrame?.landmarks ?? [],
                 frame: state.currentFrame,
-                isDemo: state.session.isDemo,
+                analyzer: _cubit.analyzer,
                 injuredLandmarkIds: state.injuredLandmarkIds,
                 onLandmarkSelected: (id) => _cubit.selectLandmark(id),
                 onInjuryToggled: (id) => _cubit.toggleLandmarkInjury(id),
@@ -130,14 +129,10 @@ class _SessionDetailsPageState extends State<SessionDetailsPage> {
   }
 
   Future<void> _openAnalytics(SessionDetailsLoaded state) async {
+    final page = _cubit.analyzer!.buildAnalyticsPage(state.session)!;
     final frameIndex = await Navigator.push<int>(
       context,
-      MaterialPageRoute(
-        builder: (_) => SessionAnalyticsPage(
-          session: state.session,
-          reps: state.reps,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => page),
     );
     if (frameIndex != null && mounted) {
       _cubit.seekToFrame(frameIndex);
@@ -164,22 +159,6 @@ class _VideoWithOverlay extends StatelessWidget {
     required this.onLandmarkTapped,
   });
 
-  /// Determine which rep number the current frame is in/closest to.
-  ///
-  /// Finds the last rep whose `startFrameIndex` <= current frame.
-  /// Before the first rep starts, returns 1.
-  static int _currentRepNumber(SessionDetailsLoaded state) {
-    if (state.reps.isEmpty) return 0;
-    final frame = state.currentFrameIndex;
-    var repNum = 1;
-    for (final rep in state.reps) {
-      if (frame >= rep.startFrameIndex) {
-        repNum = rep.repNumber;
-      }
-    }
-    return repNum;
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = cubit.videoController;
@@ -192,6 +171,7 @@ class _VideoWithOverlay extends StatelessWidget {
     final videoWidth = state.session.imageWidth;
     final videoHeight = state.session.imageHeight;
     final topPadding = MediaQuery.of(context).padding.top;
+    final analyzer = cubit.analyzer;
 
     return Container(
       color: Colors.black,
@@ -208,7 +188,7 @@ class _VideoWithOverlay extends StatelessWidget {
             ),
             child: Stack(
               children: [
-                // Layer 1: Video (BoxFit.contain — full frame, no crop)
+                // Layer 1: Video
                 Positioned.fill(
                   child: FittedBox(
                     fit: BoxFit.contain,
@@ -220,7 +200,7 @@ class _VideoWithOverlay extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Layer 2: Landmark overlay (contain to match video)
+                // Layer 2: Landmark overlay
                 Positioned.fill(
                   child: CustomPaint(
                     size: widgetSize,
@@ -232,18 +212,14 @@ class _VideoWithOverlay extends StatelessWidget {
                       isFrontCamera: state.session.isFrontCamera,
                       fitMode: FitMode.contain,
                       alignY: 0.0,
-                      schema: state.session.isDemo
-                          ? LandmarkSchema.rdl
-                          : LandmarkSchema.mlKit33,
-                      visibleLandmarkIds: state.session.isDemo
-                          ? LandmarkSchema.rdlLandmarkIds
-                          : null,
+                      schema: analyzer?.schema,
+                      visibleLandmarkIds: analyzer?.visibleLandmarkIds,
                       selectedLandmarkId: state.selectedLandmarkId,
                       injuredLandmarkIds: state.injuredLandmarkIds,
                     ),
                   ),
                 ),
-                // Layer 3: Top HUD (safe area aware)
+                // Layer 3: Top HUD
                 Positioned(
                   top: topPadding + 8,
                   left: 16,
@@ -256,12 +232,12 @@ class _VideoWithOverlay extends StatelessWidget {
                         size: 28,
                       ),
                       const Spacer(),
-                      if (state.session.isDemo)
-                        _OverlayBadge(
-                          value:
-                              '${_currentRepNumber(state)} of ${state.reps.length}',
-                          label: 'Reps',
-                        ),
+                      if (analyzer != null)
+                        analyzer.buildHud(
+                              context,
+                              state.currentFrameIndex,
+                            ) ??
+                            const SizedBox.shrink(),
                       const Spacer(),
                       if (onAnalyticsTapped != null)
                         _OverlayButton(
@@ -291,9 +267,7 @@ class _VideoWithOverlay extends StatelessWidget {
       state.session.imageHeight,
     );
 
-    final visibleIds = state.session.isDemo
-        ? LandmarkSchema.rdlLandmarkIds
-        : null;
+    final visibleIds = cubit.analyzer?.visibleLandmarkIds;
     final landmarks = <Landmark>[];
     for (final l in frame.landmarks) {
       if (visibleIds != null && !visibleIds.contains(l.id)) continue;
@@ -376,48 +350,6 @@ class _OverlayButton extends StatelessWidget {
   }
 }
 
-class _OverlayBadge extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _OverlayBadge({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 8,
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF999999),
-              fontSize: 11,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // =============================================================================
 // Draggable controls sheet
 // =============================================================================
@@ -434,6 +366,13 @@ class _ControlsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    final sliderExtras = cubit.analyzer?.buildSliderExtras(
+      context,
+      totalFrames: state.totalFrames,
+      currentFrameIndex: state.currentFrameIndex,
+      onSeekToFrame: cubit.seekToFrame,
+    );
 
     return DraggableScrollableSheet(
       initialChildSize: _initialChildSize,
@@ -458,20 +397,15 @@ class _ControlsSheet extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Rep pills (tap to seek to rep start) — demo only
-                      if (state.session.isDemo && state.reps.isNotEmpty)
+                      if (sliderExtras != null) ...[
                         Padding(
                           padding: const EdgeInsets.all(8),
-                          child: _RepPillRow(cubit: cubit, state: state),
+                          child: sliderExtras,
                         ),
+                        const SizedBox(height: 24),
+                      ],
+                      _FrameScrubber(cubit: cubit, state: state),
                       const SizedBox(height: 24),
-                      // Frame scrubber
-                      _RepMarkerSlider(
-                        cubit: cubit,
-                        state: state,
-                      ),
-                      const SizedBox(height: 24),
-                      // Previous / Play-Pause / Next
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         spacing: 32,
@@ -493,7 +427,6 @@ class _ControlsSheet extends StatelessWidget {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 32),
                       Row(
                         spacing: 8,
@@ -521,11 +454,11 @@ class _ControlsSheet extends StatelessWidget {
   }
 }
 
-class _RepMarkerSlider extends StatelessWidget {
+class _FrameScrubber extends StatelessWidget {
   final SessionDetailsCubit cubit;
   final SessionDetailsLoaded state;
 
-  const _RepMarkerSlider({required this.cubit, required this.state});
+  const _FrameScrubber({required this.cubit, required this.state});
 
   @override
   Widget build(BuildContext context) {
@@ -536,9 +469,7 @@ class _RepMarkerSlider extends StatelessWidget {
         thumbColor: const Color(0xFF4CAF50),
         overlayShape: SliderComponentShape.noOverlay,
         trackHeight: 3,
-        thumbShape: const RoundSliderThumbShape(
-          enabledThumbRadius: 8,
-        ),
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
       ),
       child: Slider(
         value: state.currentFrameIndex.toDouble(),
@@ -548,109 +479,6 @@ class _RepMarkerSlider extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Circular rep markers positioned at each rep's timestamp on the slider track.
-/// Tap to seek to that rep's start frame.
-class _RepPillRow extends StatelessWidget {
-  final SessionDetailsCubit cubit;
-  final SessionDetailsLoaded state;
-
-  /// Must match the Slider's internal track offset:
-  /// max(overlayRadius, thumbRadius) = max(0, 8) = 8.
-  static const _trackPadding = 8.0;
-  static const _markerDiameter = 28.0;
-
-  const _RepPillRow({required this.cubit, required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTapUp: (details) => _handleTap(details.localPosition, context),
-      child: CustomPaint(
-        painter: _RepCirclePainter(
-          reps: state.reps,
-          totalFrames: state.totalFrames,
-          activeRepNumber: _VideoWithOverlay._currentRepNumber(state),
-        ),
-        child: const SizedBox(height: _markerDiameter, width: double.infinity),
-      ),
-    );
-  }
-
-  void _handleTap(Offset tap, BuildContext context) {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null) return;
-
-    final trackWidth = box.size.width - _trackPadding * 2;
-    final maxFrames = (state.totalFrames - 1).clamp(1, state.totalFrames);
-
-    for (final rep in state.reps) {
-      final x = _trackPadding + (rep.startFrameIndex / maxFrames) * trackWidth;
-      if ((tap.dx - x).abs() < _markerDiameter / 2 + 6) {
-        HapticFeedback.selectionClick();
-        cubit.seekToFrame(rep.startFrameIndex);
-        return;
-      }
-    }
-  }
-}
-
-class _RepCirclePainter extends CustomPainter {
-  final List<RdlRepData> reps;
-  final int totalFrames;
-  final int activeRepNumber;
-
-  static const _trackPadding = 8.0;
-  static const _diameter = 28.0;
-  static const _activeColor = Color(0xFF4CAF50);
-  static const _inactiveColor = Color(0xFF2A2A2A);
-
-  _RepCirclePainter({
-    required this.reps,
-    required this.totalFrames,
-    required this.activeRepNumber,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (reps.isEmpty || totalFrames <= 1) return;
-
-    final trackWidth = size.width - _trackPadding * 2;
-    final maxFrames = totalFrames - 1;
-    final cy = size.height / 2;
-
-    for (final rep in reps) {
-      final cx = _trackPadding + (rep.startFrameIndex / maxFrames) * trackWidth;
-      final isActive = rep.repNumber <= activeRepNumber;
-
-      final circlePaint = Paint()
-        ..color = isActive ? _activeColor : _inactiveColor;
-      canvas.drawCircle(Offset(cx, cy), _diameter / 2, circlePaint);
-
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '${rep.repNumber}',
-          style: TextStyle(
-            color: isActive ? Colors.white : const Color(0xFF888888),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            height: 1,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RepCirclePainter old) =>
-      old.reps.length != reps.length ||
-      old.totalFrames != totalFrames ||
-      old.activeRepNumber != activeRepNumber;
 }
 
 class _ControlButton extends StatelessWidget {

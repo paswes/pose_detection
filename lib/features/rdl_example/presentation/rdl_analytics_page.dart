@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:pose_detection/core/utils/rdl_rep_counter.dart';
+import 'package:pose_detection/features/rdl_example/domain/rdl_rep_counter.dart';
 import 'package:pose_detection/data/models/session.dart';
 
 /// Displays per-rep analytics for an RDL session.
@@ -9,11 +9,11 @@ import 'package:pose_detection/data/models/session.dart';
 /// Shows a set summary at the top followed by individual rep cards.
 /// Tapping a rep card returns the rep's [startFrameIndex] as the
 /// navigation result so the caller can seek to that frame.
-class SessionAnalyticsPage extends StatelessWidget {
+class RdlAnalyticsPage extends StatelessWidget {
   final Session session;
   final List<RdlRepData> reps;
 
-  const SessionAnalyticsPage({
+  const RdlAnalyticsPage({
     super.key,
     required this.session,
     required this.reps,

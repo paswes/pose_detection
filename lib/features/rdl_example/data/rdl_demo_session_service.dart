@@ -14,14 +14,14 @@ import 'package:pose_detection/data/repositories/session_repository.dart';
 /// [VideoProcessingService] pipeline so its frames and landmarks are
 /// identical to a user-uploaded video. Subsequent launches skip processing
 /// because the session already exists in the DB.
-class DemoSessionService {
+class RdlDemoSessionService {
   final SessionRepository _repository;
   final VideoProcessingService _processingService;
 
   static const _demoSessionId = 'demo_mel';
   static const _demoAssetPath = 'assets/mel.mp4';
 
-  DemoSessionService({
+  RdlDemoSessionService({
     required SessionRepository repository,
     required VideoProcessingService processingService,
   }) : _repository = repository,

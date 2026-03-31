@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
-import 'package:pose_detection/core/utils/rdl_rep_counter.dart';
+import 'package:pose_detection/core/interfaces/exercise_analyzer.dart';
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
@@ -15,14 +15,15 @@ import 'package:pose_detection/presentation/bloc/session_details_state.dart';
 /// Uses [VideoPlayerController] for hardware-accelerated video playback.
 /// Matches the current video position to the nearest stored [TrackedFrame]
 /// via binary search, so landmarks stay in sync with the displayed frame.
+///
+/// An optional [ExerciseAnalyzer] is called during frame processing to
+/// provide exercise-specific analysis (e.g. rep counting). When null,
+/// the page shows a raw landmark view.
 class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   final Session session;
   final SessionRepository _repository;
-  final RdlRepCounter _repCounter = RdlRepCounter();
+  final ExerciseAnalyzer? _analyzer;
   VideoPlayerController? _controller;
-
-  /// Pre-computed reps for the entire session (for always-visible markers).
-  List<RdlRepData> _allReps = const [];
 
   /// Direct repaint signal for the landmark overlay painter.
   ///
@@ -38,10 +39,15 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   /// Exposes the video controller for the page to build the [VideoPlayer] widget.
   VideoPlayerController? get videoController => _controller;
 
+  /// The exercise analyzer, if any. The page queries this for UI extensions.
+  ExerciseAnalyzer? get analyzer => _analyzer;
+
   SessionDetailsCubit({
     required this.session,
     required SessionRepository repository,
+    ExerciseAnalyzer? analyzer,
   }) : _repository = repository,
+       _analyzer = analyzer,
        super(const SessionDetailsLoading());
 
   /// Load tracked frames from DB and initialize the video player.
@@ -70,13 +76,8 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       // Set initial frame for the painter
       frameNotifier.value = frames.first;
 
-      // Pre-compute all reps so markers are visible from the start (demo only).
-      if (session.isDemo) {
-        _repCounter.countRepsUpTo(frames, frames.length - 1);
-        _allReps = _repCounter.reps;
-        _repCounter.reset();
-        _repCounter.processFrame(frames.first, globalFrameIndex: 0);
-      }
+      // Let the analyzer pre-compute over all frames (e.g. rep counting).
+      _analyzer?.precompute(frames);
 
       emit(
         SessionDetailsLoaded(
@@ -84,8 +85,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
           frames: frames,
           isVideoReady: true,
           videoDuration: _controller!.value.duration,
-          hipAngle: _repCounter.currentAngle,
-          reps: _allReps,
         ),
       );
 
@@ -105,11 +104,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   static const _baseLookAheadMicros = 66000;
 
   /// Scaled lookahead for a given playback speed.
-  ///
-  /// The platform channel delay is constant in real time (~66 ms), but at
-  /// reduced speeds the video advances slower through that same real-time
-  /// window. Scaling keeps the landmark overlay aligned with the displayed
-  /// frame at any speed.
   static int _scaledLookAheadMicros(double speed) =>
       (_baseLookAheadMicros * speed).round();
 
@@ -124,36 +118,32 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final position = controller.value.position;
     final isPlaying = controller.value.isPlaying;
 
-    // Compensate for iOS platform channel delay during playback,
-    // scaled by the current playback speed.
     final positionMicros = isPlaying
         ? position.inMicroseconds +
               _scaledLookAheadMicros(current.playbackSpeed)
         : position.inMicroseconds;
     final newIndex = _findNearestFrameIndex(current.frames, positionMicros);
 
-    // Update painter directly for instant overlay sync (bypasses BLoC pipeline)
+    // Update painter directly for instant overlay sync
     if (newIndex != current.currentFrameIndex) {
       frameNotifier.value = current.frames[newIndex];
 
-      // Process ALL intermediate frames so the rep counter never skips
-      // state transitions when the position listener fires infrequently.
-      if (session.isDemo) {
+      // Delegate frame processing to the analyzer
+      if (_analyzer != null) {
         final prevIndex = current.currentFrameIndex;
         if (newIndex > prevIndex) {
-          _repCounter.processFrameRange(
+          _analyzer.processFrameRange(
             current.frames,
             prevIndex + 1,
             newIndex,
           );
         } else {
-          // Jumped backward (rare during playback) — replay from start
-          _repCounter.countRepsUpTo(current.frames, newIndex);
+          _analyzer.replayUpTo(current.frames, newIndex);
         }
       }
     }
 
-    // Only emit BLoC state when something actually changed (for UI controls)
+    // Only emit BLoC state when something actually changed
     if (newIndex == current.currentFrameIndex &&
         isPlaying == current.isPlaying &&
         position == current.videoPosition) {
@@ -165,16 +155,11 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         currentFrameIndex: newIndex,
         videoPosition: position,
         isPlaying: isPlaying,
-        repCount: _repCounter.repCount,
-        hipAngle: () => _repCounter.currentAngle,
-        reps: _allReps,
       ),
     );
   }
 
   /// Binary search for the frame closest to [positionMicros].
-  ///
-  /// Frames are sorted by timestampMicros (guaranteed by DB ORDER BY).
   int _findNearestFrameIndex(
     List<TrackedFrame> frames,
     int positionMicros,
@@ -194,7 +179,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       }
     }
 
-    // Check if lo-1 is closer than lo
     if (lo > 0) {
       final diffLo = (frames[lo].timestampMicros - positionMicros).abs();
       final diffPrev = (frames[lo - 1].timestampMicros - positionMicros).abs();
@@ -205,9 +189,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   }
 
   /// Toggle play/pause.
-  ///
-  /// When playback has finished (position at the last frame), pressing
-  /// play resets to the beginning so the video can be re-watched.
   Future<void> togglePlayPause() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -220,26 +201,23 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     } else {
       // If at the last frame, restart from the beginning
       if (current.currentFrameIndex >= current.totalFrames - 1) {
-        _repCounter.reset();
-        _repCounter.processFrame(current.frames.first, globalFrameIndex: 0);
+        _analyzer?.reset();
+        _analyzer?.processFrame(
+          current.frames.first,
+          globalFrameIndex: 0,
+        );
         frameNotifier.value = current.frames.first;
         await controller.seekTo(Duration.zero);
         emit(
           current.copyWith(
             currentFrameIndex: 0,
             videoPosition: Duration.zero,
-            repCount: _repCounter.repCount,
-            hipAngle: () => _repCounter.currentAngle,
-            reps: _allReps,
           ),
         );
         await controller.play();
         return;
       }
 
-      // Seek to the current frame's exact timestamp before playing,
-      // so playback starts from what the user sees — not from wherever
-      // the controller's internal position drifted to.
       final targetMicros =
           current.frames[current.currentFrameIndex].timestampMicros;
       await controller.seekTo(Duration(microseconds: targetMicros));
@@ -248,10 +226,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   }
 
   /// Set the video playback speed.
-  ///
-  /// Applies the speed to [VideoPlayerController] immediately and updates
-  /// state so the UI reflects the active speed. The lookahead compensation
-  /// scales automatically via [_scaledLookAheadMicros].
   Future<void> setPlaybackSpeed(double speed) async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -261,8 +235,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
   }
 
   /// Seek to a specific frame by index.
-  ///
-  /// Recalculates rep count from frame 0 to handle arbitrary jumps.
   Future<void> seekToFrame(int index) async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -270,7 +242,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final clamped = index.clamp(0, current.totalFrames - 1);
     final timestampMicros = current.frames[clamped].timestampMicros;
 
-    _repCounter.countRepsUpTo(current.frames, clamped);
+    _analyzer?.replayUpTo(current.frames, clamped);
 
     frameNotifier.value = current.frames[clamped];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
@@ -279,18 +251,11 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       current.copyWith(
         currentFrameIndex: clamped,
         videoPosition: Duration(microseconds: timestampMicros),
-        repCount: _repCounter.repCount,
-        hipAngle: () => _repCounter.currentAngle,
-        reps: _allReps,
       ),
     );
   }
 
   /// Update overlay and state, with throttled video seeks.
-  ///
-  /// The landmark overlay updates instantly on every call. Video seeks
-  /// are throttled to at most once per [_scrubSeekInterval] so the player
-  /// keeps up without freezing during fast slider drags.
   void scrubToFrame(int index) {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -298,11 +263,10 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final clamped = index.clamp(0, current.totalFrames - 1);
     final timestampMicros = current.frames[clamped].timestampMicros;
 
-    _repCounter.countRepsUpTo(current.frames, clamped);
+    _analyzer?.replayUpTo(current.frames, clamped);
 
     frameNotifier.value = current.frames[clamped];
 
-    // Throttled video seek — fire-and-forget to avoid blocking the UI
     final now = DateTime.now();
     if (now.difference(_lastScrubSeek) >= _scrubSeekInterval) {
       _lastScrubSeek = now;
@@ -313,17 +277,11 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
       current.copyWith(
         currentFrameIndex: clamped,
         videoPosition: Duration(microseconds: timestampMicros),
-        repCount: _repCounter.repCount,
-        hipAngle: () => _repCounter.currentAngle,
-        reps: _allReps,
       ),
     );
   }
 
   /// Seek the video controller to the current frame position.
-  ///
-  /// Called once when the slider drag ends to sync the video to
-  /// the frame the user scrubbed to.
   Future<void> commitScrub() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -347,7 +305,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final nextIndex = current.currentFrameIndex + 1;
     final timestampMicros = current.frames[nextIndex].timestampMicros;
 
-    _repCounter.processFrame(
+    _analyzer?.processFrame(
       current.frames[nextIndex],
       globalFrameIndex: nextIndex,
     );
@@ -360,17 +318,11 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         currentFrameIndex: nextIndex,
         videoPosition: Duration(microseconds: timestampMicros),
         isPlaying: false,
-        repCount: _repCounter.repCount,
-        hipAngle: () => _repCounter.currentAngle,
-        reps: _allReps,
       ),
     );
   }
 
   /// Go back one frame (pauses if playing).
-  ///
-  /// Recalculates rep count from scratch since stepping backward
-  /// can't be handled by the forward-only state machine.
   Future<void> previousFrame() async {
     final current = state;
     if (current is! SessionDetailsLoaded) return;
@@ -384,7 +336,7 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
     final prevIndex = current.currentFrameIndex - 1;
     final timestampMicros = current.frames[prevIndex].timestampMicros;
 
-    _repCounter.countRepsUpTo(current.frames, prevIndex);
+    _analyzer?.replayUpTo(current.frames, prevIndex);
 
     frameNotifier.value = current.frames[prevIndex];
     await _controller?.seekTo(Duration(microseconds: timestampMicros));
@@ -394,9 +346,6 @@ class SessionDetailsCubit extends Cubit<SessionDetailsState> {
         currentFrameIndex: prevIndex,
         videoPosition: Duration(microseconds: timestampMicros),
         isPlaying: false,
-        repCount: _repCounter.repCount,
-        hipAngle: () => _repCounter.currentAngle,
-        reps: _allReps,
       ),
     );
   }

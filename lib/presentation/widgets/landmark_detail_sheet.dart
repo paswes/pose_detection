@@ -3,27 +3,27 @@ import 'package:flutter/services.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:pose_detection/core/config/landmark_schema.dart';
-import 'package:pose_detection/core/utils/rdl_rep_counter.dart';
+import 'package:pose_detection/core/interfaces/exercise_analyzer.dart';
 import 'package:pose_detection/data/models/landmark_data.dart';
 import 'package:pose_detection/data/models/tracked_frame.dart';
 
 /// Shows a bottom sheet with details for a single pose landmark.
 ///
-/// Displays RDL biomechanical metrics (hip angle, knee angle, torso lean),
-/// the selected landmark with a green indicator, injury toggle,
-/// and connected landmarks as tappable navigation links.
+/// When an [ExerciseAnalyzer] is provided, displays exercise-specific
+/// metrics (e.g. hip angle, knee angle). Otherwise shows landmark
+/// details and connections only.
 void showLandmarkDetailSheet({
   required BuildContext context,
   required LandmarkData landmark,
   required List<LandmarkData> allLandmarks,
   TrackedFrame? frame,
-  bool isDemo = false,
+  ExerciseAnalyzer? analyzer,
   Set<int> injuredLandmarkIds = const {},
   ValueChanged<int>? onLandmarkSelected,
   ValueChanged<int>? onInjuryToggled,
   VoidCallback? onDismissed,
 }) {
-  final schema = isDemo ? LandmarkSchema.rdl : LandmarkSchema.mlKit33;
+  final schema = analyzer?.schema ?? LandmarkSchema.mlKit33;
 
   // Local mutable copy so the sheet can react to toggles immediately.
   final injuredIds = ValueNotifier<Set<int>>(Set<int>.from(injuredLandmarkIds));
@@ -38,7 +38,7 @@ void showLandmarkDetailSheet({
         schema,
         allLandmarks,
         frame,
-        isDemo,
+        analyzer,
         injuredIds.value,
         (id) {
           // Toggle locally + notify cubit
@@ -83,14 +83,14 @@ SliverWoltModalSheetPage _buildPage(
   LandmarkSchema schema,
   List<LandmarkData> allLandmarks,
   TrackedFrame? frame,
-  bool isDemo,
+  ExerciseAnalyzer? analyzer,
   Set<int> injuredLandmarkIds,
   ValueChanged<int> onInjuryToggled,
   ValueChanged<int> onConnectionTapped,
 ) {
   final name = schema.getLandmarkName(landmark.id);
   final connections = _getConnectedLandmarks(landmark.id, schema, allLandmarks);
-  final metrics = frame != null ? _computeMetrics(frame) : <_MetricInfo>[];
+  final metrics = analyzer?.computeDetailMetrics(frame) ?? [];
   final isInjured = injuredLandmarkIds.contains(landmark.id);
 
   return SliverWoltModalSheetPage(
@@ -103,22 +103,18 @@ SliverWoltModalSheetPage _buildPage(
         padding: const EdgeInsets.fromLTRB(16, 32, 16, 48),
         sliver: SliverList.list(
           children: [
-            if (isDemo && metrics.isNotEmpty) ...[
+            // Exercise-specific metrics (if any)
+            if (metrics.isNotEmpty) ...[
               Row(
                 spacing: 8,
                 children: [
                   for (final m in metrics)
-                    _MetricBox(
-                      label: m.label,
-                      value: m.value != null
-                          ? '${m.value!.toStringAsFixed(1)}°'
-                          : '–',
-                    ),
+                    _MetricBox(label: m.label, value: m.value),
                 ],
               ),
+              const SizedBox(height: 24),
             ],
 
-            const SizedBox(height: 24),
             // Selected landmark with green indicator + injury toggle
             Row(
               children: [
@@ -194,34 +190,6 @@ SliverWoltModalSheetPage _buildPage(
       ),
     ],
   );
-}
-
-/// A single metric to display in the detail sheet.
-typedef _MetricInfo = ({String label, double? value});
-
-/// Compute the 3 RDL biomechanical metrics for the current frame.
-List<_MetricInfo> _computeMetrics(TrackedFrame frame) {
-  // Hip angle (bilateral center)
-  final hipAngle = RdlRepCounter.calculateHipAngle(frame);
-
-  // Knee angle (average of both sides, or whichever is available)
-  final leftKnee = RdlRepCounter.calculateKneeAngle(frame, left: true);
-  final rightKnee = RdlRepCounter.calculateKneeAngle(frame, left: false);
-  final double? kneeAngle;
-  if (leftKnee != null && rightKnee != null) {
-    kneeAngle = (leftKnee + rightKnee) / 2;
-  } else {
-    kneeAngle = leftKnee ?? rightKnee;
-  }
-
-  // Torso lean angle
-  final torsoLean = RdlRepCounter.calculateTorsoLean(frame);
-
-  return [
-    (label: 'Hüftwinkel', value: hipAngle),
-    (label: 'Kniewinkel', value: kneeAngle),
-    (label: 'Oberkörper', value: torsoLean),
-  ];
 }
 
 /// Connected landmark with ID and display name.

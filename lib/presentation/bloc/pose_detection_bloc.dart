@@ -11,7 +11,6 @@ import 'package:pose_detection/core/interfaces/pose_detector_interface.dart';
 import 'package:pose_detection/core/services/error_tracker.dart';
 import 'package:pose_detection/core/services/frame_processor.dart';
 import 'package:pose_detection/core/services/recording_service.dart';
-import 'package:pose_detection/core/utils/logger.dart';
 import 'package:pose_detection/data/models/session.dart';
 import 'package:pose_detection/data/repositories/session_repository.dart';
 import 'package:pose_detection/domain/models/detection_metrics.dart';
@@ -116,10 +115,8 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
         throw Exception('Camera controller not properly initialized');
       }
 
-      Logger.info('Bloc', 'Camera initialized');
       emit(CameraReady(controller));
     } catch (e) {
-      Logger.error('Bloc', 'ERROR initializing: $e');
       emit(PoseDetectionError('Failed to initialize camera: $e'));
     }
   }
@@ -152,8 +149,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     );
 
     _startImageStream();
-
-    Logger.info('Bloc', 'Detection started');
   }
 
   Future<void> _onStopCapture(
@@ -164,8 +159,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
     _isStreamingActive = false;
 
     emit(CameraReady(_cameraService.controller!));
-
-    Logger.info('Bloc', 'Detection stopped');
   }
 
   Future<void> _onStartRecording(
@@ -208,10 +201,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
           add(RecordingTickEvent());
         }
       });
-
-      Logger.info('Bloc', 'Recording started (session: $sessionId)');
     } catch (e) {
-      Logger.error('Bloc', 'ERROR starting recording: $e');
       _recordingService.reset();
       emit(PoseDetectionError('Failed to start recording: $e'));
     }
@@ -236,13 +226,8 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
       _pendingResult = await _recordingService.stopRecording(controller);
 
-      Logger.info(
-        'Bloc',
-        'Recording stopped (${_pendingResult!.frames.length} frames)',
-      );
       emit(RecordingStopped());
     } catch (e) {
-      Logger.error('Bloc', 'ERROR stopping recording: $e');
       _recordingService.reset();
       emit(PoseDetectionError('Failed to stop recording: $e'));
     }
@@ -283,13 +268,8 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       await _sessionRepository.saveSession(session, result.frames);
       _pendingResult = null;
 
-      Logger.info(
-        'Bloc',
-        'Session saved: ${session.id} (${result.frames.length} frames)',
-      );
       emit(SessionSaved(session.id));
     } catch (e) {
-      Logger.error('Bloc', 'ERROR saving session: $e');
       emit(PoseDetectionError('Failed to save session: $e'));
     }
   }
@@ -350,13 +330,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       } else {
         emit(CameraReady(controller));
       }
-
-      Logger.info(
-        'Bloc',
-        'Camera switched to ${_cameraService.currentLensDirection}',
-      );
     } catch (e) {
-      Logger.error('Bloc', 'ERROR switching camera: $e');
       emit(PoseDetectionError('Failed to switch camera: $e'));
     }
   }
@@ -398,10 +372,7 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
       } else {
         emit(CameraReady(controller));
       }
-
-      Logger.info('Bloc', 'Orientation changed to ${event.orientation}');
     } catch (e) {
-      Logger.error('Bloc', 'ERROR changing orientation: $e');
       emit(PoseDetectionError('Failed to change orientation: $e'));
     }
   }
@@ -464,10 +435,6 @@ class PoseDetectionBloc extends Bloc<PoseDetectionEvent, PoseDetectionState> {
 
   void _handleError(Emitter<PoseDetectionState> emit, String message) {
     _errorTracker.recordError();
-    Logger.error(
-      'Bloc',
-      'ERROR: $message (${_errorTracker.consecutiveErrors}/${_errorTracker.maxConsecutiveErrors})',
-    );
 
     if (_errorTracker.hasExceededThreshold) {
       _cameraService.stopImageStream();
